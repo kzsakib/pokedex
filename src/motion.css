@@ -328,3 +328,460 @@
     opacity: 0.5;
   }
 }
+
+/* ---------- type accent cross-fade ----------
+   Registered custom properties can be transitioned, so the whole chassis
+   slides between type colours instead of snapping. */
+
+@property --accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f15b22;
+}
+
+@property --accent-soft {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f7a682;
+}
+
+@property --accent-deep {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a83c12;
+}
+
+.chassis {
+  transition:
+    --accent 420ms ease,
+    --accent-soft 420ms ease,
+    --accent-deep 420ms ease;
+}
+
+/* ---------- scroll progress rail ---------- */
+
+.scroll-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  z-index: 60;
+  background: rgba(16, 22, 26, 0.1);
+  pointer-events: none;
+}
+
+.scroll-progress span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-soft);
+}
+
+/* ---------- section plates ---------- */
+
+.bay-tag--rule {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.bay-rule {
+  flex: 1 1 auto;
+  min-width: 18px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(16, 22, 26, 0.3),
+    rgba(16, 22, 26, 0.04)
+  );
+  transform-origin: left center;
+}
+
+/* ---------- boot overlay ---------- */
+
+.boot-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(
+    900px 520px at 50% 28%,
+    #dadee0 0%,
+    #b9c0c3 72%
+  );
+}
+
+.boot-screen {
+  width: min(340px, 84vw);
+  font-family: var(--dp-typography-mono);
+  color: #1c2327;
+}
+
+.boot-title {
+  margin: 0 0 14px;
+  font-family: var(--dp-typography-sans);
+  font-weight: 800;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+}
+
+.boot-lines {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #414b52;
+}
+
+.boot-bar {
+  display: block;
+  height: 2px;
+  background: rgba(16, 22, 26, 0.16);
+  overflow: hidden;
+}
+
+.boot-bar span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #1c2327;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+/* ---------- skeletons ---------- */
+
+.skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(16, 22, 26, 0.11);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 22%,
+    rgba(255, 255, 255, 0.6) 46%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: skeletonSweep 1.15s ease-in-out infinite;
+}
+
+@keyframes skeletonSweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.index-tray--loading .index-row {
+  display: grid;
+  grid-template-columns: 38px 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.skeleton--no {
+  width: 34px;
+  height: 9px;
+}
+
+.skeleton--thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+}
+
+.skeleton--name {
+  width: 62%;
+  height: 11px;
+}
+
+.skeleton--tag {
+  width: 46px;
+  height: 12px;
+}
+
+.skeleton-card {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  padding: 6px 0;
+}
+
+.skeleton-card__art {
+  aspect-ratio: 1;
+  border-radius: 6px;
+}
+
+.skeleton-card__copy {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.skeleton--title {
+  width: 58%;
+  height: 22px;
+}
+
+.skeleton--line {
+  width: 100%;
+  height: 11px;
+}
+
+.skeleton--short {
+  width: 64%;
+}
+
+/* ---------- specimen scan + glow ---------- */
+
+.art-well {
+  position: relative;
+  overflow: hidden;
+}
+
+.scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 45%;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(242, 244, 244, 0.22) 55%,
+    rgba(242, 244, 244, 0.85) 92%,
+    transparent
+  );
+  mix-blend-mode: screen;
+}
+
+.screen {
+  position: relative;
+  isolation: isolate;
+}
+
+.screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(
+    260px circle at var(--glow-x, 50%) var(--glow-y, 0%),
+    rgba(255, 255, 255, 0.08),
+    transparent 68%
+  );
+  opacity: 0;
+  transition: opacity 320ms ease;
+}
+
+.screen:hover::after {
+  opacity: 1;
+}
+
+/* ---------- sliding indicators ---------- */
+
+.type-bank {
+  position: relative;
+}
+
+.chip-pill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-soft);
+}
+
+.version-tray {
+  position: relative;
+}
+
+.version-pill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-soft);
+}
+
+/* ---------- filter ghosts ---------- */
+
+.ghost-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.index-row.is-ghost {
+  border-radius: 3px;
+  background: #e7eaeb;
+  box-shadow: 0 12px 22px rgba(16, 22, 26, 0.18);
+}
+
+/* ---------- shiny feed label ---------- */
+
+.shiny-text {
+  display: inline-block;
+  background: linear-gradient(
+    100deg,
+    var(--dp-color-on-field-muted) 34%,
+    #ffffff 50%,
+    var(--dp-color-on-field-muted) 66%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: shinySweep var(--shiny-speed, 5s) linear infinite;
+}
+
+@keyframes shinySweep {
+  from {
+    background-position: 180% 0;
+  }
+  to {
+    background-position: -80% 0;
+  }
+}
+
+/* ---------- click sparks ---------- */
+
+.click-spark {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+}
+
+.click-spark__dot {
+  position: fixed;
+  width: 3px;
+  height: 3px;
+  margin: -1.5px 0 0 -1.5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-soft);
+}
+
+/* ---------- typed text reserves its own height ---------- */
+
+.text-type {
+  position: relative;
+}
+
+.text-type__ghost {
+  visibility: hidden;
+}
+
+.text-type__live {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---------- inline fault action ---------- */
+
+.key--inline {
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-family: var(--dp-typography-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+/* ---------- motion off ---------- */
+
+/* ---------- scroll reveals ---------- */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 460ms ease,
+    transform 460ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+.bay-rule.rule-reveal {
+  transform: scaleX(0);
+  transition: transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.bay-rule.rule-reveal.is-in {
+  transform: scaleX(1);
+}
+
+[data-motion="off"] .reveal,
+[data-motion="off"] .bay-rule.rule-reveal {
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+
+[data-motion="off"] .scan-line,
+[data-motion="off"] .chip-pill,
+[data-motion="off"] .version-pill,
+[data-motion="off"] .scroll-progress span {
+  display: none;
+}
+
+[data-motion="off"] .skeleton::after,
+[data-motion="off"] .shiny-text {
+  animation: none;
+}
+
+[data-motion="off"] .shiny-text {
+  background: none;
+  color: var(--dp-color-on-field-muted);
+  -webkit-text-fill-color: currentColor;
+}
+
+[data-motion="off"] .screen::after {
+  display: none;
+}
+
+[data-motion="off"] .boot-overlay {
+  display: none;
+}

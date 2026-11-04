@@ -1,8 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useGSAP } from "@gsap/react";
+import { Flip, ScrollTrigger, gsap } from "./motion";
+import { useMotion } from "./motionSettings";
 import { spriteUrl } from "./api";
 import { TYPES } from "./types";
-import { gsap } from "./motion";
-import { useMotion } from "./motionSettings";
+
+const SKELETON_ROWS = 9;
 
 export default function IndexBay({
   items,
@@ -19,33 +22,189 @@ export default function IndexBay({
 }) {
   const { motion } = useMotion();
   const listRef = useRef(null);
+  const bankRef = useRef(null);
+  const pillRef = useRef(null);
+  const ghostRef = useRef(null);
+  const captured = useRef({ state: null, nodes: [], rects: null });
+  const introPlayed = useRef(false);
 
-  /* Re-scan the tray with a short cascade whenever the result set changes. */
-  useEffect(() => {
-    if (!motion || !listRef.current) return undefined;
-    const rows = listRef.current.querySelectorAll(".index-row");
-    if (!rows.length) return undefined;
-    const tween = gsap.fromTo(
-      rows,
-      { y: 10, opacity: 0 },
-      {
-        y: 0,
-        opacity: 1,
-        duration: 0.28,
-        ease: "power2.out",
-        stagger: Math.min(0.02, 0.55 / rows.length),
-        clearProps: "transform,opacity",
-        overwrite: true,
-      },
+  const signature = useMemo(() => items.map((item) => item.id).join(","), [items]);
+
+  const { contextSafe } = useGSAP({ scope: listRef });
+
+  /* Snapshot the tray before a filter change so Flip can slide the survivors
+     and clone the leavers for their exit. */
+  const capture = () => {
+    const root = listRef.current;
+    if (!root) return;
+    const nodes = Array.from(root.querySelectorAll(".index-row:not(.is-skeleton)"));
+    if (!nodes.length) return;
+    const rects = new Map(
+      nodes.map((node) => [node.dataset.id, node.getBoundingClientRect()]),
     );
-    return () => tween.kill();
-  }, [motion, items.length, query, type]);
+    captured.current = { state: Flip.getState(nodes), nodes, rects };
+  };
 
-  /* Keep the bench entry visible when it is chosen from elsewhere
-     (random draw, evolution stage, detail links). */
+  const changeQuery = contextSafe((value) => {
+    capture();
+    onQuery(value);
+  });
+
+  const changeType = contextSafe((value) => {
+    capture();
+    onType(value);
+  });
+
+  const clearAll = contextSafe(() => {
+    capture();
+    onClear();
+  });
+
+  /* Rows cascade once, then every result change is a Flip. */
+  useGSAP(
+    () => {
+      if (!motion) return undefined;
+      const root = listRef.current;
+      if (!root) return undefined;
+      if (feed === "loading" && !items.length) return undefined;
+
+      const rows = Array.from(root.querySelectorAll(".index-row:not(.is-skeleton)"));
+
+      if (!introPlayed.current && rows.length) {
+        introPlayed.current = true;
+        gsap.from(rows, {
+          y: 12,
+          autoAlpha: 0,
+          duration: 0.35,
+          stagger: { each: 0.012, from: "start" },
+          ease: "power2.out",
+          clearProps: "all",
+        });
+        return undefined;
+      }
+
+      const snapshot = captured.current;
+      if (!snapshot.state) return undefined;
+
+      const nextIds = new Set(items.map((item) => String(item.id)));
+      const layer = ghostRef.current;
+
+      if (layer) {
+        snapshot.nodes
+          .filter((node) => !nextIds.has(node.dataset.id))
+          .forEach((node) => {
+            const rect = snapshot.rects.get(node.dataset.id);
+            if (!rect) return;
+            const clone = node.cloneNode(true);
+            clone.classList.add("is-ghost");
+            Object.assign(clone.style, {
+              position: "fixed",
+              left: `${rect.left}px`,
+              top: `${rect.top}px`,
+              width: `${rect.width}px`,
+              height: `${rect.height}px`,
+              margin: "0",
+              zIndex: "30",
+              pointerEvents: "none",
+            });
+            layer.appendChild(clone);
+            gsap.to(clone, {
+              autoAlpha: 0,
+              scale: 0.94,
+              y: -8,
+              duration: 0.26,
+              ease: "power2.in",
+              onComplete: () => clone.remove(),
+            });
+          });
+      }
+
+      Flip.from(snapshot.state, {
+        duration: 0.5,
+        ease: "power3.out",
+        absolute: true,
+        scale: true,
+        onEnter: (elements) =>
+          gsap.fromTo(
+            elements,
+            { autoAlpha: 0, scale: 0.96 },
+            {
+              autoAlpha: 1,
+              scale: 1,
+              duration: 0.32,
+              ease: "power2.out",
+              clearProps: "all",
+            },
+          ),
+        onComplete: () => ScrollTrigger.refresh(),
+      });
+
+      captured.current = { state: null, nodes: [], rects: null };
+      return undefined;
+    },
+    { scope: listRef, dependencies: [motion, signature, feed] },
+  );
+
+  /* Sliding highlight that follows the active type chip. */
+  useGSAP(
+    () => {
+      const bank = bankRef.current;
+      const pill = pillRef.current;
+      if (!bank || !pill) return;
+      if (!motion) {
+        gsap.set(pill, { autoAlpha: 0 });
+        return;
+      }
+      const active = bank.querySelector('.key--type[aria-pressed="true"]');
+      if (!active) {
+        gsap.set(pill, { autoAlpha: 0 });
+        return;
+      }
+      const bankRect = bank.getBoundingClientRect();
+      const rect = active.getBoundingClientRect();
+      gsap.to(pill, {
+        autoAlpha: 1,
+        x: rect.left - bankRect.left + (active.offsetLeft - rect.left + bankRect.left),
+        y: active.offsetTop + active.offsetHeight - 2,
+        width: active.offsetWidth,
+        duration: 0.32,
+        ease: "power3.out",
+      });
+    },
+    { scope: bankRef, dependencies: [motion, type, items.length] },
+  );
+
+  /* The empty state arrives rather than snaps. */
+  useGSAP(
+    () => {
+      if (!motion || items.length || feed === "loading") return;
+      gsap.from(".tray-empty", {
+        autoAlpha: 0,
+        y: 6,
+        duration: 0.3,
+        ease: "power2.out",
+        clearProps: "all",
+      });
+    },
+    { dependencies: [motion, items.length, feed] },
+  );
+
+  /* Keep the bench entry visible inside the tray. scrollIntoView would also
+     scroll the window, which yanked the whole page down on first load. */
+  const revealRow = (node) => {
+    const tray = listRef.current;
+    if (!tray || !node) return;
+    const trayRect = tray.getBoundingClientRect();
+    const rowRect = node.getBoundingClientRect();
+    if (rowRect.top < trayRect.top) {
+      tray.scrollTop -= trayRect.top - rowRect.top;
+    } else if (rowRect.bottom > trayRect.bottom) {
+      tray.scrollTop += rowRect.bottom - trayRect.bottom;
+    }
+  };
+
   useEffect(() => {
-    const row = listRef.current?.querySelector('[aria-selected="true"]');
-    row?.scrollIntoView({ block: "nearest" });
+    revealRow(listRef.current?.querySelector('[aria-selected="true"]'));
   }, [selectedId]);
 
   const options = () =>
@@ -56,7 +215,8 @@ export default function IndexBay({
     if (!nodes.length) return;
     const bounded = Math.min(Math.max(position, 0), nodes.length - 1);
     const node = nodes[bounded];
-    node.focus();
+    node.focus({ preventScroll: true });
+    revealRow(node);
     const id = Number(node.dataset.id);
     if (Number.isFinite(id)) onSelect(id);
   }
@@ -102,7 +262,7 @@ export default function IndexBay({
           autoComplete="off"
           spellCheck="false"
           aria-describedby="dex-search-hint"
-          onChange={(event) => onQuery(event.target.value)}
+          onChange={(event) => changeQuery(event.target.value)}
         />
         <kbd aria-hidden="true">/</kbd>
       </div>
@@ -110,12 +270,18 @@ export default function IndexBay({
         Try “pika”, “char”, or 151. Press <kbd>/</kbd> to jump here, Esc to clear.
       </p>
 
-      <div className="type-bank" role="group" aria-label="Filter by type">
+      <div
+        className="type-bank"
+        role="group"
+        aria-label="Filter by type"
+        ref={bankRef}
+      >
+        <span className="chip-pill" aria-hidden="true" ref={pillRef} />
         <button
           type="button"
           className="key key--type"
           aria-pressed={type === "all"}
-          onClick={() => onType("all")}
+          onClick={() => changeType("all")}
         >
           All
         </button>
@@ -125,14 +291,27 @@ export default function IndexBay({
             type="button"
             className="key key--type"
             aria-pressed={type === name}
-            onClick={() => onType(name)}
+            onClick={() => changeType(name)}
           >
             {name}
           </button>
         ))}
       </div>
 
-      {items.length ? (
+      <div className="ghost-layer" aria-hidden="true" ref={ghostRef} />
+
+      {feed === "loading" && !items.length ? (
+        <ul className="index-tray index-tray--loading" aria-hidden="true">
+          {Array.from({ length: SKELETON_ROWS }, (_, position) => (
+            <li key={position} className="index-row is-skeleton">
+              <span className="skeleton skeleton--no" />
+              <span className="skeleton skeleton--thumb" />
+              <span className="skeleton skeleton--name" />
+              <span className="skeleton skeleton--tag" />
+            </li>
+          ))}
+        </ul>
+      ) : items.length ? (
         <ul
           className="index-tray"
           role="listbox"
@@ -180,16 +359,10 @@ export default function IndexBay({
         </ul>
       ) : (
         <p className="tray-empty" role="status">
-          {feed === "loading" ? (
-            "Scanning the index…"
-          ) : (
-            <>
-              No entries match these filters.{" "}
-              <button type="button" className="key" onClick={onClear}>
-                Clear
-              </button>
-            </>
-          )}
+          No entries match these filters.{" "}
+          <button type="button" className="key key--inline" onClick={clearAll}>
+            Clear
+          </button>
         </p>
       )}
     </>

@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
+import { useGSAP } from "@gsap/react";
 import { gsap } from "./motion";
 import { useMotion } from "./motionSettings";
 
@@ -16,9 +17,7 @@ const point = (index, ratio) => {
 };
 
 const ringPath = (ratio) =>
-  Array.from({ length: 6 }, (_, index) => point(index, ratio).join(",")).join(
-    " ",
-  );
+  Array.from({ length: 6 }, (_, index) => point(index, ratio).join(",")).join(" ");
 
 const ordinal = (value) => {
   const remainder = value % 100;
@@ -29,40 +28,72 @@ const ordinal = (value) => {
   return `${value}th`;
 };
 
+const toPoints = (flat) => {
+  const pairs = [];
+  for (let index = 0; index < flat.length; index += 2) {
+    pairs.push(`${flat[index].toFixed(2)},${flat[index + 1].toFixed(2)}`);
+  }
+  return pairs.join(" ");
+};
+
 export default function StatRadar({ stats, active, total, percentiles, label }) {
   const { motion } = useMotion();
   const shapeRef = useRef(null);
+  const dotRefs = useRef([]);
+  const previousRef = useRef(null);
   const signature = stats.map((stat) => stat.value).join("-");
 
-  /* Draw the perimeter like a plotting pen, then settle the shape. */
-  useEffect(() => {
-    if (!motion || !shapeRef.current) return undefined;
-    const shape = shapeRef.current;
-    const length = shape.getTotalLength?.() ?? 0;
-    const tween = gsap.fromTo(
-      shape,
-      {
-        strokeDasharray: length,
-        strokeDashoffset: length,
-        scale: 0.55,
-        transformOrigin: "center center",
-      },
-      {
-        strokeDashoffset: 0,
-        scale: 1,
-        duration: 0.9,
-        ease: "power2.inOut",
-        clearProps: "transform,strokeDasharray,strokeDashoffset",
-      },
-    );
-    return () => tween.kill();
-  }, [motion, signature]);
+  const target = stats.flatMap((stat, index) =>
+    point(index, Math.max(stat.ratio, 0.02)),
+  );
+
+  useGSAP(
+    () => {
+      const shape = shapeRef.current;
+      if (!shape) return undefined;
+
+      const from = previousRef.current ?? Array.from({ length: target.length }, (_, index) =>
+        index % 2 === 0 ? CENTER : CENTER,
+      );
+      previousRef.current = target;
+
+      const draw = (values) => {
+        shape.setAttribute("points", toPoints(values));
+        stats.forEach((stat, index) => {
+          const dot = dotRefs.current[index];
+          if (!dot) return;
+          dot.setAttribute("cx", values[index * 2].toFixed(2));
+          dot.setAttribute("cy", values[index * 2 + 1].toFixed(2));
+        });
+      };
+
+      if (!motion) {
+        draw(target);
+        return undefined;
+      }
+
+      const proxy = { progress: 0 };
+      const tween = gsap.to(proxy, {
+        progress: 1,
+        duration: 0.7,
+        ease: "power2.out",
+        onUpdate: () => {
+          draw(
+            target.map(
+              (value, index) => from[index] + (value - from[index]) * proxy.progress,
+            ),
+          );
+        },
+        onComplete: () => draw(target),
+      });
+
+      return () => tween.kill();
+    },
+    { dependencies: [motion, signature] },
+  );
 
   const activeStat = stats.find((stat) => stat.key === active) ?? null;
   const percentile = activeStat ? percentiles?.[activeStat.key] : null;
-  const shape = stats
-    .map((stat, index) => point(index, Math.max(stat.ratio, 0.02)).join(","))
-    .join(" ");
 
   return (
     <div className="radar">
@@ -75,11 +106,7 @@ export default function StatRadar({ stats, active, total, percentiles, label }) 
           .join(", ")}`}
       >
         {RINGS.map((ratio) => (
-          <polygon
-            key={ratio}
-            points={ringPath(ratio)}
-            className="radar-ring"
-          />
+          <polygon key={ratio} points={ringPath(ratio)} className="radar-ring" />
         ))}
 
         {stats.map((stat, index) => {
@@ -96,13 +123,16 @@ export default function StatRadar({ stats, active, total, percentiles, label }) 
           );
         })}
 
-        <polygon ref={shapeRef} points={shape} className="radar-shape" />
+        <polygon ref={shapeRef} points={toPoints(target)} className="radar-shape" />
 
         {stats.map((stat, index) => {
           const [x, y] = point(index, Math.max(stat.ratio, 0.02));
           return (
             <circle
               key={stat.key}
+              ref={(node) => {
+                dotRefs.current[index] = node;
+              }}
               cx={x}
               cy={y}
               r={active === stat.key ? 4 : 2.4}

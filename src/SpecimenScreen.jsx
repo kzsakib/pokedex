@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { useGSAP } from "@gsap/react";
 import { artworkUrl, formatNumber, spriteUrl, titleCase } from "./api";
 import { typeAccent } from "./typeColors";
-import { gsap } from "./motion";
+import { gsap, SplitText as GSAPSplitText } from "./motion";
 import { useMotion } from "./motionSettings";
-import { SplitWords } from "./SplitText";
-import AnimatedContent from "./components/AnimatedContent";
-import CountUp from "./components/CountUp";
+import DecryptedText from "./components/DecryptedText";
+import TextType from "./components/TextType";
 import AbilityList from "./AbilityList";
 import StatRadar from "./StatRadar";
 import VersionTray from "./VersionTray";
@@ -32,31 +32,178 @@ export default function SpecimenScreen({
 }) {
   const { motion } = useMotion();
   const screenRef = useRef(null);
+  const nameSplitRef = useRef(null);
   const [entryIndex, setEntryIndex] = useState(0);
   const [activeStat, setActiveStat] = useState(null);
+
+  const { contextSafe } = useGSAP({ scope: screenRef });
 
   useEffect(() => {
     setEntryIndex(0);
     setActiveStat(null);
   }, [pokemon?.id]);
 
-  useEffect(() => {
-    if (!pokemon || !motion) return undefined;
-    const context = gsap.context(() => {
-      gsap.fromTo(
-        ".js-bar",
-        { scaleX: 0 },
-        {
-          scaleX: 1,
-          duration: 0.6,
-          stagger: 0.045,
-          ease: "power2.out",
-          clearProps: "transform",
-        },
-      );
-    }, screenRef);
-    return () => context.revert();
-  }, [motion, pokemon?.id]);
+  /* One timeline per specimen: the scan wipes the artwork, the name rises,
+     the meta staggers, then the bars and their numbers count together. */
+  useGSAP(
+    () => {
+      const root = screenRef.current;
+      if (!root || !pokemon || !motion) return undefined;
+
+      nameSplitRef.current?.revert();
+      nameSplitRef.current = null;
+
+      const art = root.querySelector(".art-well img");
+      const scan = root.querySelector(".scan-line");
+      const nameElement = root.querySelector(".screen-copy h3");
+      const meta = root.querySelectorAll(".type-tag, .measures > div");
+      const rows = Array.from(root.querySelectorAll(".stat-row"));
+      const totalElement = root.querySelector(".stats-total-value");
+      const totalValue = Number(root.dataset.total ?? 0);
+
+      const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+
+      if (art) {
+        timeline.fromTo(
+          art,
+          { autoAlpha: 0, scale: 0.86, filter: "blur(8px)" },
+          {
+            autoAlpha: 1,
+            scale: 1,
+            filter: "blur(0px)",
+            duration: 0.5,
+            clearProps: "filter,transform,visibility",
+          },
+          0,
+        );
+      }
+
+      if (scan) {
+        timeline
+          .fromTo(
+            scan,
+            { yPercent: -140, opacity: 0 },
+            { yPercent: 140, opacity: 0.9, duration: 0.6, ease: "power2.inOut" },
+            0,
+          )
+          .to(scan, { opacity: 0, duration: 0.16 }, 0.52);
+      }
+
+      if (nameElement) {
+        const split = new GSAPSplitText(nameElement, {
+          type: "chars",
+          charsClass: "split-char",
+        });
+        nameSplitRef.current = split;
+        timeline.from(
+          split.chars,
+          {
+            yPercent: 110,
+            rotateX: -70,
+            opacity: 0,
+            stagger: 0.022,
+            duration: 0.5,
+          },
+          0.06,
+        );
+      }
+
+      if (meta.length) {
+        timeline.from(
+          meta,
+          { y: 10, autoAlpha: 0, stagger: 0.04, duration: 0.38 },
+          0.1,
+        );
+      }
+
+      rows.forEach((row, index) => {
+        const fill = row.querySelector(".stat-fill");
+        const valueElement = row.querySelector(".stat-value");
+        const value = Number(row.dataset.value ?? 0);
+        const percent = Number(row.dataset.pct ?? 0);
+        const at = 0.16 + index * 0.05;
+
+        if (fill) {
+          timeline.fromTo(
+            fill,
+            { width: "0%" },
+            { width: `${percent}%`, duration: 0.72 },
+            at,
+          );
+        }
+
+        if (valueElement) {
+          const proxy = { value: 0 };
+          timeline.to(
+            proxy,
+            {
+              value,
+              duration: 0.72,
+              onUpdate: () => {
+                valueElement.textContent = String(Math.round(proxy.value));
+              },
+              onComplete: () => {
+                valueElement.textContent = String(value);
+              },
+            },
+            at,
+          );
+        }
+      });
+
+      if (totalElement) {
+        const proxy = { value: 0 };
+        timeline.to(
+          proxy,
+          {
+            value: totalValue,
+            duration: 0.9,
+            onUpdate: () => {
+              totalElement.textContent = String(Math.round(proxy.value));
+            },
+            onComplete: () => {
+              totalElement.textContent = String(totalValue);
+            },
+          },
+          0.2,
+        );
+      }
+
+      return () => {
+        timeline.kill();
+        nameSplitRef.current?.revert();
+        nameSplitRef.current = null;
+      };
+    },
+    { scope: screenRef, dependencies: [motion, pokemon?.id] },
+  );
+
+  const onArtLoad = contextSafe((event) => {
+    if (!motion) return;
+    gsap.fromTo(
+      event.currentTarget,
+      { autoAlpha: 0, filter: "blur(6px)" },
+      {
+        autoAlpha: 1,
+        filter: "blur(0px)",
+        duration: 0.45,
+        ease: "power2.out",
+        clearProps: "filter,visibility",
+      },
+    );
+  });
+
+  /* Cursor-follow glow on the dark card. */
+  const onGlowMove = contextSafe((event) => {
+    if (!motion) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    gsap.to(event.currentTarget, {
+      "--glow-x": `${(((event.clientX - rect.left) / rect.width) * 100).toFixed(1)}%`,
+      "--glow-y": `${(((event.clientY - rect.top) / rect.height) * 100).toFixed(1)}%`,
+      duration: 0.3,
+      ease: "power2.out",
+    });
+  });
 
   if (fault) {
     return (
@@ -75,13 +222,18 @@ export default function SpecimenScreen({
   if (loading || !pokemon) {
     return (
       <div className="screen" ref={screenRef}>
-        <div className="screen-state">
-          <p className="state-code">Acquiring specimen</p>
-          <span className="groove" aria-hidden="true">
-            <span />
+        <div className="skeleton-card" aria-hidden="true">
+          <span className="skeleton skeleton-card__art" />
+          <span className="skeleton-card__copy">
+            <span className="skeleton skeleton--title" />
+            <span className="skeleton skeleton--line" />
+            <span className="skeleton skeleton--line" />
+            <span className="skeleton skeleton--line skeleton--short" />
           </span>
-          <p className="state-copy">Reading the PokéAPI record…</p>
         </div>
+        <p className="visually-hidden" role="status">
+          Reading the PokéAPI record…
+        </p>
       </div>
     );
   }
@@ -100,29 +252,29 @@ export default function SpecimenScreen({
   }));
 
   return (
-    <article className="screen" ref={screenRef}>
+    <article
+      className="screen"
+      ref={screenRef}
+      data-total={total}
+      onPointerMove={onGlowMove}
+    >
       <header className="screen-head">
-        <p className="screen-no">{formatNumber(pokemon.id)}</p>
+        <p className="screen-no">
+          <DecryptedText text={formatNumber(pokemon.id)} />
+        </p>
         <p className="screen-genus">{record?.genus || "Specimen"}</p>
       </header>
 
-      <AnimatedContent
-        key={pokemon.id}
-        className="screen-stack"
-        direction="vertical"
-        distance={14}
-        duration={0.42}
-        trigger="mount"
-        threshold={0.01}
-        initialOpacity={0}
-      >
+      <div className="screen-stack">
         <div className="screen-body">
           <div className="art-well">
+            <span className="scan-line" aria-hidden="true" />
             <img
               src={artworkUrl(pokemon.id)}
               alt={`${label} official artwork`}
               width="475"
               height="475"
+              onLoad={onArtLoad}
               onError={(event) => {
                 const image = event.currentTarget;
                 if (image.dataset.fallback) return;
@@ -133,7 +285,7 @@ export default function SpecimenScreen({
           </div>
 
           <div className="screen-copy">
-            <h3>{label}</h3>
+            <h3 key={pokemon.id}>{label}</h3>
             <ul className="type-list">
               {types.map((name) => (
                 <li key={name} className="type-tag">
@@ -174,7 +326,7 @@ export default function SpecimenScreen({
               {entries.length > 1 ? ` · ${entryIndex + 1}/${entries.length}` : ""}
             </p>
           </div>
-          <SplitWords
+          <TextType
             key={`${pokemon.id}-${entryIndex}`}
             className="entry-text"
             text={entry?.text || "No English entry on record for this species."}
@@ -191,11 +343,7 @@ export default function SpecimenScreen({
             <h4 className="stats-title">Base stats</h4>
             <p className="stats-total">
               Total{" "}
-              <CountUp
-                to={total}
-                duration={0.8}
-                className="stats-total-value"
-              />
+              <span className="stats-total-value">{total}</span>
             </p>
           </div>
 
@@ -224,6 +372,8 @@ export default function SpecimenScreen({
                     type="button"
                     className={`stat-row${stat.base_stat === best ? " is-max" : ""}`}
                     aria-pressed={pressed}
+                    data-value={stat.base_stat}
+                    data-pct={percent}
                     onClick={() =>
                       setActiveStat((current) => (current === name ? null : name))
                     }
@@ -247,9 +397,7 @@ export default function SpecimenScreen({
                         style={{ width: `${percent}%` }}
                       />
                     </span>
-                    <span className="stat-value">
-                      <CountUp to={stat.base_stat} duration={0.55} />
-                    </span>
+                    <span className="stat-value">{stat.base_stat}</span>
                   </button>
                 );
               })}
@@ -258,7 +406,7 @@ export default function SpecimenScreen({
         </div>
 
         <AbilityList abilities={abilities} />
-      </AnimatedContent>
+      </div>
 
       <p className="screen-foot">
         Source PokéAPI · National Dex {formatNumber(pokemon.id)} ·{" "}

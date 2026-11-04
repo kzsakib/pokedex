@@ -5,9 +5,19 @@ import AnimatedContent from "./components/AnimatedContent";
 export default function EvolutionTray({ stages, selectedId, onSelect }) {
   const trayRef = useRef(null);
 
+  /* Scroll the tray itself. scrollIntoView also scrolls the window, which
+     opened the page scrolled down to the evolution line on first load. */
   useEffect(() => {
-    const current = trayRef.current?.querySelector('[aria-current="true"]');
-    current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const tray = trayRef.current;
+    const current = tray?.querySelector('[aria-current="true"]');
+    if (!tray || !current) return;
+    const trayRect = tray.getBoundingClientRect();
+    const rect = current.getBoundingClientRect();
+    if (rect.left < trayRect.left) {
+      tray.scrollLeft -= trayRect.left - rect.left;
+    } else if (rect.right > trayRect.right) {
+      tray.scrollLeft += rect.right - trayRect.right;
+    }
   }, [selectedId, stages]);
 
   const stageKey = stages?.length

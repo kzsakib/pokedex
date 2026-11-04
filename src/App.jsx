@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useGSAP } from "@gsap/react";
 import {
   ENTRY_LIMIT,
   evolutionStages,
@@ -14,12 +15,14 @@ import {
   readGenus,
   titleCase,
 } from "./api";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { gsap } from "./motion";
+import { ScrollTrigger, gsap } from "./motion";
 import { useMotion } from "./motionSettings";
 import { SplitChars, SplitWords } from "./SplitText";
 import { accentVars } from "./typeColors";
+import BootScreen from "./components/BootScreen";
+import ClickSpark from "./components/ClickSpark";
 import CountUp from "./components/CountUp";
+import ShinyText from "./components/ShinyText";
 import EvolutionTray from "./EvolutionTray";
 import IndexBay from "./IndexBay";
 import SpecimenScreen from "./SpecimenScreen";
@@ -29,13 +32,13 @@ const LEDE =
 
 const DEFAULT_ENTRY = 25;
 
-gsap.registerPlugin(ScrollTrigger);
-
 export default function App() {
   const { motion, toggleMotion } = useMotion();
+  const pageRef = useRef(null);
   const shellRef = useRef(null);
   const dialRef = useRef(null);
   const searchRef = useRef(null);
+  const progressRef = useRef(null);
 
   const [index, setIndex] = useState([]);
   const [entries, setEntries] = useState({});
@@ -44,6 +47,8 @@ export default function App() {
   const [lines, setLines] = useState({});
   const [scanned, setScanned] = useState(0);
   const [feed, setFeed] = useState("loading");
+  const [feedAttempt, setFeedAttempt] = useState(0);
+  const [booted, setBooted] = useState(false);
   const [selectedId, setSelectedId] = useState(DEFAULT_ENTRY);
   const [query, setQuery] = useState("");
   const [type, setType] = useState("all");
@@ -55,6 +60,7 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     const pending = [];
+    setFeed("loading");
     const flush = () => {
       if (cancelled || !pending.length) return;
       const chunk = Object.fromEntries(pending.splice(0, pending.length));
@@ -99,7 +105,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [feedAttempt]);
 
   /* Read the selected entry: specimen, abilities, species record and line. */
   useEffect(() => {
@@ -216,6 +222,8 @@ export default function App() {
   const primaryType = pokemon?.types?.[0]?.type.name;
   const accentStyle = useMemo(() => accentVars(primaryType), [primaryType]);
 
+  const { contextSafe } = useGSAP({ scope: shellRef });
+
   const select = useCallback((id) => {
     setSelectedId(id);
     setFaultId((current) => (current === id ? null : current));
@@ -226,7 +234,12 @@ export default function App() {
     setType("all");
   }, []);
 
-  const drawRandom = useCallback(() => {
+  const retryFeed = contextSafe(() => {
+    setScanned(0);
+    setFeedAttempt((value) => value + 1);
+  });
+
+  const drawRandom = contextSafe(() => {
     if (!index.length) return;
     const currentPosition = index.findIndex((item) => item.id === selectedId);
     let nextPosition = Math.floor(Math.random() * index.length);
@@ -252,65 +265,119 @@ export default function App() {
         );
       }
     }
-  }, [index, motion, selectedId, select]);
+  });
 
-  /* Boot sequence for the chassis, then directional reveals for the bays. */
-  useEffect(() => {
-    if (!motion) return undefined;
-    const context = gsap.context(() => {
-      const boot = gsap.timeline({ defaults: { ease: "power3.out" } });
-      boot
+  /* Chassis boot: every bay settles in once the boot overlay clears. */
+  useGSAP(
+    () => {
+      if (!motion || !booted) return undefined;
+      const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+      timeline
         .from(".vents span", {
           scaleX: 0,
           transformOrigin: "left center",
-          duration: 0.4,
-          stagger: 0.05,
-          clearProps: "transform",
+          duration: 0.35,
+          stagger: 0.04,
         })
         .from(
           ".screw",
-          { scale: 0, rotate: -90, duration: 0.45, stagger: 0.06, clearProps: "transform" },
+          { scale: 0, rotate: -90, duration: 0.4, stagger: 0.05 },
           0,
         )
-        .from(
-          ".dial",
-          { scale: 0.6, opacity: 0, duration: 0.55, clearProps: "transform,opacity" },
-          0.05,
-        )
+        .from(".dial", { scale: 0.72, autoAlpha: 0, duration: 0.5 }, 0.05)
         .from(
           ".bay",
-          { y: 20, autoAlpha: 0, duration: 0.55, stagger: 0.07, clearProps: "all" },
-          0.1,
+          { y: 18, autoAlpha: 0, duration: 0.5, stagger: 0.06 },
+          0.05,
         );
 
-      gsap.from(".index-col", {
-        x: -28,
-        autoAlpha: 0,
-        duration: 0.62,
-        ease: "power3.out",
-        clearProps: "all",
-        scrollTrigger: { trigger: ".workbench", start: "top 90%", once: true },
+      return () => timeline.kill();
+    },
+    { scope: shellRef, dependencies: [motion, booted] },
+  );
+
+  /* Scroll reveals for the section plates and their hairlines. */
+  useGSAP(
+    () => {
+      if (!motion) return undefined;
+      const scope = shellRef.current;
+      if (!scope) return undefined;
+
+      /* Reveals run as class-driven transitions triggered by ScrollTrigger.
+         A GSAP tween created in onEnter gets killed by context reverts and
+         reset by ScrollTrigger.refresh(), which left the footer and hairlines
+         frozen part-way; a CSS transition has no such state to lose. */
+      const triggers = [];
+      const plates = Array.from(scope.querySelectorAll(".bay-tag--rule"));
+
+      plates.forEach((plate) => {
+        plate.classList.add("reveal");
+        plate.querySelector(".bay-rule")?.classList.add("rule-reveal");
+        triggers.push(
+          ScrollTrigger.create({
+            trigger: plate,
+            start: "top 92%",
+            once: true,
+            onEnter: () => {
+              plate.classList.add("is-in");
+              plate.querySelector(".bay-rule")?.classList.add("is-in");
+            },
+          }),
+        );
       });
-      gsap.from(".specimen-col", {
-        x: 28,
-        autoAlpha: 0,
-        duration: 0.62,
-        ease: "power3.out",
-        clearProps: "all",
-        scrollTrigger: { trigger: ".workbench", start: "top 90%", once: true },
+
+      const closing = Array.from(scope.querySelectorAll(".closing > div"));
+      closing.forEach((element, index) => {
+        element.classList.add("reveal");
+        element.style.transitionDelay = `${index * 90}ms`;
       });
-      gsap.from(".closing > div", {
-        y: 18,
-        autoAlpha: 0,
-        duration: 0.5,
-        stagger: 0.09,
-        ease: "power2.out",
-        clearProps: "all",
-        scrollTrigger: { trigger: ".closing", start: "top 94%", once: true },
+      triggers.push(
+        ScrollTrigger.create({
+          trigger: ".closing",
+          start: "top 94%",
+          once: true,
+          onEnter: () => closing.forEach((element) => element.classList.add("is-in")),
+        }),
+      );
+
+      ScrollTrigger.refresh();
+
+      return () => {
+        triggers.forEach((trigger) => trigger.kill());
+        plates.forEach((plate) => {
+          plate.classList.remove("reveal", "is-in");
+          plate.querySelector(".bay-rule")?.classList.remove("rule-reveal", "is-in");
+        });
+        closing.forEach((element) => {
+          element.classList.remove("reveal", "is-in");
+          element.style.transitionDelay = "";
+        });
+      };
+    },
+    { scope: shellRef, dependencies: [motion, index.length] },
+  );
+
+  /* Thin progress rail across the top of the instrument. */
+  useGSAP(
+    () => {
+      const bar = progressRef.current;
+      if (!bar || !motion) return undefined;
+      gsap.set(bar, { scaleX: 0, transformOrigin: "left center" });
+      const trigger = ScrollTrigger.create({
+        start: 0,
+        end: "max",
+        onUpdate: (self) => gsap.set(bar, { scaleX: self.progress }),
       });
-    }, shellRef);
-    return () => context.revert();
-  }, [motion]);
+      return () => trigger.kill();
+    },
+    { scope: pageRef, dependencies: [motion, index.length, filtered.length] },
+  );
+
+  /* Layout shifts once the feed lands; ScrollTrigger needs fresh measurements. */
+  useEffect(() => {
+    const timer = window.setTimeout(() => ScrollTrigger.refresh(), 320);
+    return () => window.clearTimeout(timer);
+  }, [index.length, filtered.length, booted]);
 
   useEffect(() => {
     function onKeyDown(event) {
@@ -353,10 +420,16 @@ export default function App() {
         }`;
 
   return (
-    <div className="page">
+    <div className="page" ref={pageRef} style={accentStyle}>
       <a className="skip-link" href="#index-bay">
         Skip to index
       </a>
+
+      <div className="scroll-progress" aria-hidden="true">
+        <span ref={progressRef} />
+      </div>
+
+      <ClickSpark />
 
       <main className="chassis" ref={shellRef} style={accentStyle}>
         <div className="seam" aria-hidden="true" />
@@ -427,18 +500,14 @@ export default function App() {
             <div className="fact">
               <dt>Entries</dt>
               <dd>
-                <CountUp
-                  to={index.length || ENTRY_LIMIT}
-                  duration={1}
-                  trigger="view"
-                />
+                <CountUp to={index.length || ENTRY_LIMIT} duration={1} />
               </dd>
             </div>
             <div className="fact">
               <dt>Matches</dt>
               <dd>
                 {feed === "live" ? (
-                  <CountUp to={filtered.length} duration={0.45} trigger="view" />
+                  <CountUp to={filtered.length} duration={0.45} />
                 ) : (
                   "—"
                 )}
@@ -461,25 +530,32 @@ export default function App() {
                   className={`lamp${feed === "live" ? " lamp--on" : ""}`}
                   aria-hidden="true"
                 />
-                {feedLabel}
+                {feed === "live" ? (
+                  <ShinyText text={feedLabel} />
+                ) : (
+                  <span className="feed-label">{feedLabel}</span>
+                )}
               </dd>
             </div>
           </dl>
           {feed === "error" && (
             <p className="fault" role="alert">
-              Index feed offline — PokéAPI did not answer. Reload the page to
-              reconnect.
+              Index feed offline — PokéAPI did not answer.
+              <button type="button" className="key key--inline" onClick={retryFeed}>
+                Retry feed
+              </button>
             </p>
           )}
         </section>
 
         <div className="bay workbench">
           <section className="index-col" id="index-bay" aria-labelledby="index-title">
-            <h2 className="bay-tag" id="index-title">
+            <h2 className="bay-tag bay-tag--rule" id="index-title">
               <span className="bay-index" aria-hidden="true">
                 02
               </span>
-              Index
+              <span className="bay-label">Index</span>
+              <span className="bay-rule" aria-hidden="true" />
             </h2>
             <IndexBay
               items={filtered}
@@ -497,11 +573,12 @@ export default function App() {
           </section>
 
           <section className="specimen-col" aria-labelledby="specimen-title">
-            <h2 className="bay-tag" id="specimen-title">
+            <h2 className="bay-tag bay-tag--rule" id="specimen-title">
               <span className="bay-index" aria-hidden="true">
                 03
               </span>
-              Specimen record
+              <span className="bay-label">Specimen record</span>
+              <span className="bay-rule" aria-hidden="true" />
             </h2>
             <div className="bezel">
               <SpecimenScreen
@@ -568,6 +645,8 @@ export default function App() {
           </div>
         </footer>
       </main>
+
+      {!booted && <BootScreen motion={motion} onDone={() => setBooted(true)} />}
 
       <p className="visually-hidden" role="status" aria-live="polite">
         {announcement}
