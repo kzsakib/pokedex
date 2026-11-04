@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
-import { artworkUrl, formatNumber, spriteUrl, titleCase } from "./api";
+import {
+  artworkUrl,
+  formatNumber,
+  pixelSpriteFallbackUrl,
+  pixelSpriteRawUrl,
+  pixelSpriteUrl,
+  titleCase,
+} from "./api";
 import { typeAccent } from "./typeColors";
 import { gsap, SplitText as GSAPSplitText } from "./motion";
 import { useMotion } from "./motionSettings";
@@ -193,6 +200,21 @@ export default function SpecimenScreen({
     );
   });
 
+  /* Hovering the species name re-runs a short wave through its letters. */
+  const onNameHover = contextSafe(() => {
+    const split = nameSplitRef.current;
+    if (!motion || !split) return;
+    gsap.to(split.chars, {
+      y: -6,
+      duration: 0.22,
+      yoyo: true,
+      repeat: 1,
+      stagger: 0.018,
+      ease: "power2.out",
+      overwrite: "auto",
+    });
+  });
+
   /* Cursor-follow glow on the dark card. */
   const onGlowMove = contextSafe((event) => {
     if (!motion) return;
@@ -270,22 +292,33 @@ export default function SpecimenScreen({
           <div className="art-well">
             <span className="scan-line" aria-hidden="true" />
             <img
-              src={artworkUrl(pokemon.id)}
-              alt={`${label} official artwork`}
-              width="475"
-              height="475"
+              className="pixel-sprite"
+              src={pixelSpriteUrl(pokemon.id)}
+              alt={`${label} Red/Blue sprite`}
+              width="40"
+              height="40"
               onLoad={onArtLoad}
               onError={(event) => {
                 const image = event.currentTarget;
-                if (image.dataset.fallback) return;
-                image.dataset.fallback = "1";
-                image.src = spriteUrl(pokemon.id);
+                const step = image.dataset.fallback ?? "0";
+                if (step === "0") {
+                  image.dataset.fallback = "1";
+                  image.src = pixelSpriteRawUrl(pokemon.id);
+                } else if (step === "1") {
+                  image.dataset.fallback = "2";
+                  image.src = pixelSpriteFallbackUrl(pokemon.id);
+                } else if (step === "2") {
+                  image.dataset.fallback = "3";
+                  image.src = artworkUrl(pokemon.id);
+                }
               }}
             />
           </div>
 
           <div className="screen-copy">
-            <h3 key={pokemon.id}>{label}</h3>
+            <h3 key={pokemon.id} onPointerEnter={onNameHover}>
+              {label}
+            </h3>
             <ul className="type-list">
               {types.map((name) => (
                 <li key={name} className="type-tag">
@@ -409,7 +442,7 @@ export default function SpecimenScreen({
       </div>
 
       <p className="screen-foot">
-        Source PokéAPI · National Dex {formatNumber(pokemon.id)} ·{" "}
+        Source PokéAPI · Red/Blue sprite · National Dex {formatNumber(pokemon.id)} ·{" "}
         {entries.length} English {entries.length === 1 ? "entry" : "entries"}
       </p>
     </article>

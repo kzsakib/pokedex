@@ -5,6 +5,7 @@ import SmoothScroll from "./SmoothScroll";
 import { MotionProvider } from "./motionSettings";
 import "./styles.css";
 import "./motion.css";
+import "./cursors.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

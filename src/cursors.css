@@ -1,0 +1,84 @@
+/* ---------- field-unit cursors ----------
+   Inline SVG so they ship with the bundle and scale crisply. Every cursor
+   keeps its keyword fallback (pointer/grab/crosshair) and stays inside the
+   32x32 limit that Firefox enforces. */
+
+/* pokéball — keys, chips, buttons */
+.key,
+button,
+.version-key,
+.evo-module {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='10.5' fill='%23181e22' stroke='%23f2f4f4' stroke-width='2'/%3E%3Cpath d='M3.5 14h21' stroke='%23f2f4f4' stroke-width='2'/%3E%3Ccircle cx='14' cy='14' r='3.4' fill='%23f2f4f4' stroke='%23181e22' stroke-width='1.6'/%3E%3C/svg%3E")
+      14 14,
+    pointer;
+}
+
+/* scan arrow — index rows */
+.index-row {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 2.5l6.6 17 2.5-6.7 6.7-2.5z' fill='%23181e22' stroke='%23f2f4f4' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E")
+      3 3,
+    pointer;
+}
+
+/* reticle — the sprite well and the radar plot */
+.art-well,
+.radar-svg {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='8.5' fill='none' stroke='%23f2f4f4' stroke-width='1.6'/%3E%3Ccircle cx='14' cy='14' r='1.7' fill='%23f2f4f4'/%3E%3Cpath d='M14 1.5v5M14 21.5v5M1.5 14h5M21.5 14h5' stroke='%23f2f4f4' stroke-width='1.6'/%3E%3C/svg%3E")
+      14 14,
+    crosshair;
+}
+
+/* rotate — the random-draw dial (declared after the button rule) */
+.dial {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M22 9.5a9 9 0 1 0 1.8 5' fill='none' stroke='%23181e22' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M23 4.5v5.2h-5.2' fill='none' stroke='%23181e22' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      14 14,
+    grab;
+}
+
+/* the sprite itself is an image, not a control */
+.art-well img {
+  cursor: inherit;
+}
+
+input[type="search"],
+input[type="text"] {
+  cursor: text;
+}
+
+/* ---------- pixel sprite ---------- */
+
+/* Flex rather than grid: a percentage width on a centred grid item resolved
+   against a column sized by that very image and collapsed to 158px. Sizing
+   from the viewport keeps the sprite an honest 4-6x upscale of its 96px art. */
+.art-well {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.art-well img.pixel-sprite {
+  width: clamp(150px, 16vw, 240px);
+  height: auto;
+  aspect-ratio: auto;
+  margin: 0;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.5));
+}
+
+/* Give the 96px sprite a 2x integer scale on desktop: the art column was a
+   fixed 176px, which capped the image at 158px through img{max-width:100%}. */
+@media (min-width: 1101px) {
+  .screen-body {
+    grid-template-columns: minmax(0, 216px) minmax(0, 1fr);
+  }
+
+  .art-well img.pixel-sprite {
+    width: 192px;
+  }
+}
+
+@media (max-width: 760px) {
+  .art-well img.pixel-sprite {
+    width: clamp(140px, 42vw, 180px);
+  }
+}

@@ -6,7 +6,24 @@ import { useMotion } from "./motionSettings";
 /* Split text keeps a real accessible label while animating each unit. */
 export function SplitChars({ text, as: Tag = "span", id, className, delay = 0 }) {
   const ref = useRef(null);
+  const splitRef = useRef(null);
   const { motion } = useMotion();
+  const { contextSafe } = useGSAP({ scope: ref });
+
+  /* Hovering the title sends a short wave through the glyphs. */
+  const wave = contextSafe(() => {
+    const split = splitRef.current;
+    if (!split || !motion) return;
+    gsap.to(split.chars, {
+      y: -10,
+      duration: 0.26,
+      yoyo: true,
+      repeat: 1,
+      stagger: { each: 0.022, from: "start" },
+      ease: "power2.out",
+      overwrite: "auto",
+    });
+  });
 
   useGSAP(
     () => {
@@ -21,6 +38,7 @@ export function SplitChars({ text, as: Tag = "span", id, className, delay = 0 })
         aria: "none",
       });
       split.chars.forEach((node) => node.setAttribute("aria-hidden", "true"));
+      splitRef.current = split;
 
       gsap.from(split.chars, {
         yPercent: 118,
@@ -32,13 +50,22 @@ export function SplitChars({ text, as: Tag = "span", id, className, delay = 0 })
         delay,
       });
 
-      return () => split.revert();
+      return () => {
+        splitRef.current = null;
+        split.revert();
+      };
     },
     { scope: ref, dependencies: [motion, text, delay], revertOnUpdate: true },
   );
 
   return (
-    <Tag ref={ref} id={id} className={className}>
+    <Tag
+      ref={ref}
+      id={id}
+      className={className}
+      onPointerEnter={wave}
+      onFocus={wave}
+    >
       {text}
     </Tag>
   );

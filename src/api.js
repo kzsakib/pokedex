@@ -59,6 +59,17 @@ export const spriteUrl = (id) => `${SPRITE_ROOT}/${id}.png`;
 export const artworkUrl = (id) =>
   `${SPRITE_ROOT}/other/official-artwork/${id}.png`;
 
+/* The record screen shows the original Game Boy sprite, not the modern
+   artwork. The `transparent` set is the same Gen 1 art with its white
+   background removed, so it sits on the dark well without a card behind it;
+   the raw and FireRed variants are fallbacks. */
+export const pixelSpriteUrl = (id) =>
+  `${SPRITE_ROOT}/versions/generation-i/red-blue/transparent/${id}.png`;
+export const pixelSpriteRawUrl = (id) =>
+  `${SPRITE_ROOT}/versions/generation-i/red-blue/${id}.png`;
+export const pixelSpriteFallbackUrl = (id) =>
+  `${SPRITE_ROOT}/versions/generation-iii/firered-leafgreen/${id}.png`;
+
 const VERSION_LABELS = {
   red: "Red",
   blue: "Blue",
