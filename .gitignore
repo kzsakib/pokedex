@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.tmp-browser/
+artifacts/
+.DS_Store
+*.log
+
+# local tooling (staged apt lists for the headless browser)
+.apt/

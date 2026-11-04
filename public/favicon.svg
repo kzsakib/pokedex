@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Pokédex field unit">
+  <rect width="64" height="64" rx="14" fill="#cbd0d2"/>
+  <rect x="7" y="7" width="50" height="50" rx="9" fill="none" stroke="#8d9599" stroke-width="2"/>
+  <circle cx="32" cy="32" r="15" fill="#20272b"/>
+  <circle cx="32" cy="32" r="6" fill="#f15b22"/>
+  <path d="M17 32h9M38 32h9" stroke="#e7eaeb" stroke-width="3" stroke-linecap="round"/>
+</svg>
