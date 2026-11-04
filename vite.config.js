@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  // Project sites are served from /<repo>/, so the deployment build sets
+  // VITE_BASE while local dev and preview keep the root.
+  base: process.env.VITE_BASE || "/",
   server: {
     host: "0.0.0.0",
     port: 3000,
