@@ -1,14 +1,15 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import { useLenis } from "lenis/react";
 import { fetchSpecies, pixelSpriteUrl, readEntries, titleCase } from "./api";
-import { gsap } from "./motion";
-import { useMotion } from "./motionSettings";
+import { gsap, prefersReducedMotion } from "./motion";
 import DecryptedText from "./components/DecryptedText";
+import { TYPES } from "./types";
 
 /* Species records are fetched on first hover and kept for the session so the
    archive never asks PokéAPI twice for the same entry. */
 const entryCache = new Map();
+const SKELETON_CELLS = 44;
 
 function loadEntries(id) {
   if (!entryCache.has(id)) {
@@ -24,54 +25,153 @@ function loadEntries(id) {
   return entryCache.get(id);
 }
 
-export default function Gallery({ items, selectedId, onSelect }) {
+const words = (text) =>
+  text
+    .split(/(\s+)/)
+    .filter((chunk) => chunk.length)
+    .map((chunk, index) => ({ chunk, index, space: !chunk.trim() }));
+
+export default function Gallery({
+  items,
+  total,
+  selectedId,
+  onSelect,
+  query,
+  onQuery,
+  type,
+  onType,
+  onClear,
+  searchRef,
+  feed,
+}) {
   const rootRef = useRef(null);
+  const gridRef = useRef(null);
   const panelRef = useRef(null);
+  const bankRef = useRef(null);
+  const pillRef = useRef(null);
+  const textRef = useRef(null);
   const lenis = useLenis();
-  const { motion } = useMotion();
-  const { contextSafe } = useGSAP({ scope: rootRef });
   const [tip, setTip] = useState(null);
   const requestRef = useRef(0);
   /* One delegated handler for the whole wall: per-cell pointer enter/leave
      handlers race each other when the pointer travels quickly. */
   const hoveredRef = useRef(null);
 
+  /* Card unfolds out of the cell it belongs to. */
   useGSAP(
     () => {
-      if (!motion || !panelRef.current) return;
-      gsap.fromTo(
-        panelRef.current,
-        { autoAlpha: 0, y: 10, scale: 0.97 },
-        { autoAlpha: 1, y: 0, scale: 1, duration: 0.24, ease: "power2.out" },
-      );
+      const panel = panelRef.current;
+      if (!panel) return undefined;
+      if (prefersReducedMotion()) {
+        gsap.set(panel, { autoAlpha: 1, y: 0, scale: 1, clipPath: "inset(0%)" });
+        return undefined;
+      }
+
+      const timeline = gsap.timeline();
+      timeline
+        .fromTo(
+          panel,
+          {
+            autoAlpha: 0,
+            y: tip?.below ? -14 : 16,
+            scale: 0.86,
+            rotateX: tip?.below ? -12 : 12,
+            clipPath: "inset(0% 0% 100% 0%)",
+          },
+          {
+            autoAlpha: 1,
+            y: 0,
+            scale: 1,
+            rotateX: 0,
+            clipPath: "inset(0%)",
+            transformPerspective: 700,
+            duration: 0.42,
+            ease: "expo.out",
+          },
+        )
+        .fromTo(
+          panel.querySelectorAll(".gallery-tip__rule, .gallery-tip__head"),
+          { autoAlpha: 0, y: 7 },
+          {
+            autoAlpha: 1,
+            y: 0,
+            duration: 0.26,
+            stagger: 0.05,
+            ease: "power2.out",
+          },
+          0.08,
+        );
+
+      return () => timeline.kill();
     },
     { scope: rootRef, dependencies: [tip?.key] },
   );
 
-  const hide = contextSafe(() => {
+  /* The record itself arrives word by word out of focus. */
+  useGSAP(
+    () => {
+      const words = textRef.current?.querySelectorAll(".tip-word");
+      if (!words?.length) return undefined;
+      if (prefersReducedMotion()) {
+        gsap.set(words, { autoAlpha: 1, y: 0, filter: "none" });
+        return undefined;
+      }
+      const tween = gsap.fromTo(
+        words,
+        { autoAlpha: 0, y: 9, filter: "blur(6px)" },
+        {
+          autoAlpha: 1,
+          y: 0,
+          filter: "blur(0px)",
+          duration: 0.34,
+          stagger: { each: 0.014, from: "start" },
+          ease: "power2.out",
+          clearProps: "filter",
+        },
+      );
+      return () => tween.kill();
+    },
+    { scope: rootRef, dependencies: [tip?.text] },
+  );
+
+  /* Sliding highlight under the active type chip. */
+  useGSAP(
+    () => {
+      const bank = bankRef.current;
+      const pill = pillRef.current;
+      if (!bank || !pill) return undefined;
+      const active = bank.querySelector('.key--type[aria-pressed="true"]');
+      if (!active || prefersReducedMotion()) {
+        gsap.set(pill, { autoAlpha: 0 });
+        return undefined;
+      }
+      gsap.to(pill, {
+        autoAlpha: 1,
+        x: active.offsetLeft,
+        y: active.offsetTop + active.offsetHeight - 2,
+        width: active.offsetWidth,
+        duration: 0.32,
+        ease: "power3.out",
+      });
+      return undefined;
+    },
+    { scope: bankRef, dependencies: [type, items.length] },
+  );
+
+  const hide = () => {
     hoveredRef.current = null;
     requestRef.current += 1;
-    if (!panelRef.current) {
-      setTip(null);
-      return;
-    }
-    gsap.to(panelRef.current, {
-      autoAlpha: 0,
-      y: 6,
-      duration: 0.15,
-      ease: "power2.in",
-      onComplete: () => setTip(null),
-    });
-  });
+    setTip(null);
+  };
 
-  const show = contextSafe(async (event, item) => {
+  const show = async (cell, item) => {
     const root = rootRef.current;
     if (!root) return;
 
     const rootRect = root.getBoundingClientRect();
-    const cellRect = event.currentTarget.getBoundingClientRect();
+    const cellRect = cell.getBoundingClientRect();
     const centre = cellRect.left - rootRect.left + cellRect.width / 2;
-    const below = cellRect.top - rootRect.top < 150;
+    const below = cellRect.top - rootRect.top < 170;
     const token = requestRef.current + 1;
     requestRef.current = token;
 
@@ -81,7 +181,7 @@ export default function Gallery({ items, selectedId, onSelect }) {
       number: item.number,
       name: item.label,
       text: "",
-      x: Math.min(Math.max(centre, 146), rootRect.width - 146),
+      x: Math.min(Math.max(centre, 152), rootRect.width - 152),
       y: below ? cellRect.bottom - rootRect.top : cellRect.top - rootRect.top,
       below,
     });
@@ -96,58 +196,196 @@ export default function Gallery({ items, selectedId, onSelect }) {
         ? { ...current, text: pick }
         : current,
     );
-  });
+  };
+
+  /* The sprite answers the pointer: a short hop and a scan pass across
+     its plate. */
+  const wake = (cell) => {
+    if (prefersReducedMotion()) return;
+    const sprite = cell.querySelector("img");
+    if (!sprite) return;
+    gsap
+      .timeline({ overwrite: "auto" })
+      .to(sprite, { y: -10, scale: 1.14, duration: 0.14, ease: "power2.out" })
+      .to(sprite, { y: 0, scale: 1, duration: 0.5, ease: "bounce.out" });
+  };
 
   const choose = (id) => {
     hide();
     onSelect(id);
-    const target = document.querySelector(".specimen-col");
-    if (lenis && motion) {
-      lenis.scrollTo(target, { offset: -24, duration: 1.1 });
+    const target = document.getElementById("specimen-bay");
+    if (lenis) {
+      lenis.scrollTo(target, { offset: -18, duration: 1.1 });
     } else {
       target?.scrollIntoView({ behavior: "auto", block: "start" });
     }
   };
 
+  const visibleIds = new Set(items.map((item) => item.id));
+  const focusableId = visibleIds.has(selectedId) ? selectedId : items[0]?.id;
+
+  function step(position) {
+    const bounded = Math.min(Math.max(position, 0), items.length - 1);
+    const cell = gridRef.current?.querySelector(`[data-id="${items[bounded].id}"]`);
+    if (!cell) return;
+    cell.focus({ preventScroll: true });
+    cell.scrollIntoView({ block: "nearest" });
+    onSelect(items[bounded].id);
+  }
+
+  function handleKeyDown(event) {
+    if (!items.length) return;
+    const id = Number(event.target.dataset?.id);
+    const position = items.findIndex((item) => item.id === id);
+    if (position < 0) return;
+
+    const columns =
+      getComputedStyle(gridRef.current).gridTemplateColumns.split(" ").filter(Boolean)
+        .length || 1;
+
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      step(position + 1);
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      step(position - 1);
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      step(position + columns);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      step(position - columns);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      step(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      step(items.length - 1);
+    }
+  }
+
+  /* A filter change must not leave the wall scrolled into a stale tooltip. */
+  useEffect(() => {
+    hide();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length, query, type]);
+
   return (
     <div className="gallery" ref={rootRef}>
-      <div
-        className="gallery-grid"
-        onPointerOver={(event) => {
-          const cell = event.target.closest?.(".gallery-cell");
-          if (!cell) return;
-          const id = Number(cell.dataset.id);
-          if (id === hoveredRef.current) return;
-          const item = items.find((entry) => entry.id === id);
-          if (!item) return;
-          hoveredRef.current = id;
-          show({ currentTarget: cell }, item);
-        }}
-        onPointerLeave={hide}
-      >
-        {items.map((item) => (
+      <div className="archive-filters">
+        <div className="search-slot">
+          <label htmlFor="dex-search">Search</label>
+          <input
+            id="dex-search"
+            ref={searchRef}
+            type="search"
+            value={query}
+            placeholder="Name or number"
+            autoComplete="off"
+            spellCheck="false"
+            aria-describedby="dex-search-hint"
+            onChange={(event) => onQuery(event.target.value)}
+          />
+          <kbd aria-hidden="true">/</kbd>
+        </div>
+
+        <div
+          className="type-bank"
+          role="group"
+          aria-label="Filter by type"
+          ref={bankRef}
+        >
+          <span className="chip-pill" aria-hidden="true" ref={pillRef} />
           <button
-            key={item.id}
             type="button"
-            data-id={item.id}
-            className={`gallery-cell${item.id === selectedId ? " is-selected" : ""}`}
-            aria-current={item.id === selectedId ? "true" : undefined}
-            aria-label={`${item.number} ${titleCase(item.name)}`}
-            onFocus={(event) => show(event, item)}
-            onBlur={hide}
-            onClick={() => choose(item.id)}
+            className="key key--type"
+            aria-pressed={type === "all"}
+            onClick={() => onType("all")}
           >
-            <img
-              src={pixelSpriteUrl(item.id)}
-              alt=""
-              width="96"
-              height="96"
-              loading="lazy"
-              decoding="async"
-            />
+            All
           </button>
-        ))}
+          {TYPES.map((name) => (
+            <button
+              key={name}
+              type="button"
+              className="key key--type"
+              aria-pressed={type === name}
+              onClick={() => onType(name)}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+
+        <p className="hint archive-count" id="dex-search-hint">
+          <span className="archive-count__value">{items.length}</span> of{" "}
+          {total || 151} specimens · hover for a record, pick one to load it ·{" "}
+          <kbd>/</kbd> to search, Esc to clear
+        </p>
       </div>
+
+      {feed === "loading" && !total ? (
+        <div className="gallery-grid gallery-grid--loading" aria-hidden="true">
+          {Array.from({ length: SKELETON_CELLS }, (_, position) => (
+            <span key={position} className="gallery-cell is-skeleton">
+              <span className="skeleton skeleton--fill" />
+            </span>
+          ))}
+        </div>
+      ) : items.length ? (
+        <div
+          className="gallery-grid"
+          ref={gridRef}
+          onPointerOver={(event) => {
+            const cell = event.target.closest?.(".gallery-cell");
+            if (!cell || cell.classList.contains("is-skeleton")) return;
+            const id = Number(cell.dataset.id);
+            if (id === hoveredRef.current) return;
+            const item = items.find((entry) => entry.id === id);
+            if (!item) return;
+            hoveredRef.current = id;
+            wake(cell);
+            show(cell, item);
+          }}
+          onPointerLeave={hide}
+          onKeyDown={handleKeyDown}
+        >
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              data-id={item.id}
+              tabIndex={item.id === focusableId ? 0 : -1}
+              className={`gallery-cell${item.id === selectedId ? " is-selected" : ""}`}
+              aria-current={item.id === selectedId ? "true" : undefined}
+              aria-label={`${item.number} ${titleCase(item.name)}`}
+              onFocus={(event) => {
+                hoveredRef.current = item.id;
+                show(event.currentTarget, item);
+              }}
+              onBlur={hide}
+              onClick={() => choose(item.id)}
+            >
+              <img
+                src={pixelSpriteUrl(item.id)}
+                alt=""
+                width="96"
+                height="96"
+                loading="lazy"
+                decoding="async"
+              />
+              <span className="gallery-cell__sweep" aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="tray-empty" role="status">
+          No specimens match these filters.{" "}
+          <button type="button" className="key key--inline" onClick={onClear}>
+            Clear
+          </button>
+        </p>
+      )}
 
       {tip && (
         <div
@@ -155,16 +393,34 @@ export default function Gallery({ items, selectedId, onSelect }) {
           style={{ left: `${tip.x}px`, top: `${tip.y}px` }}
           role="status"
         >
-          <div className="gallery-tip__panel" ref={panelRef}>
+          <div className="gallery-tip__panel" key={tip.key} ref={panelRef}>
+            <span className="gallery-tip__sweep" aria-hidden="true" />
             <p className="gallery-tip__head">
-              <span>{tip.number}</span>
-              {tip.name}
+              <span className="gallery-tip__no">
+                <DecryptedText text={tip.number} characters="0123456789" speed={0.4} />
+              </span>
+              <span className="gallery-tip__name">
+                <DecryptedText
+                  text={tip.name}
+                  characters="ABCDEFGHJKLMNPQRSTUVWXYZ"
+                  speed={0.55}
+                />
+              </span>
             </p>
-            <p className="gallery-tip__text">
+            <span className="gallery-tip__rule" aria-hidden="true" />
+            <p className="gallery-tip__text" ref={textRef}>
               {tip.text ? (
-                <DecryptedText text={tip.text} speed={0.15} />
+                words(tip.text).map(({ chunk, index, space }) =>
+                  space ? (
+                    " "
+                  ) : (
+                    <span className="tip-word" key={index}>
+                      {chunk}
+                    </span>
+                  ),
+                )
               ) : (
-                "Reading record…"
+                <span className="gallery-tip__wait">Reading record…</span>
               )}
             </p>
           </div>

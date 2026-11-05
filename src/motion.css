@@ -945,61 +945,149 @@
 /* ------------------------------------------------------------------
    Field archive — every Gen 1 specimen on one wall.
    ------------------------------------------------------------------ */
-.gallery-bay {
+.archive-bay,
+.specimen-bay {
+  position: relative;
+  min-width: 0;
+}
+
+/* The archive owns its filters now that it replaced the index tray. */
+.archive-filters {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+  gap: 11px 20px;
+  align-items: center;
+  margin: 8px 0 16px;
+}
+.archive-count {
+  grid-column: 1 / -1;
+}
+.archive-count__value {
+  color: var(--accent-deep);
+  font-variant-numeric: tabular-nums;
+}
+.type-bank {
   position: relative;
 }
-.gallery-hint {
-  margin: 6px 0 12px;
+.skeleton--fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
 }
+
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 7px;
 }
 .gallery-cell {
+  position: relative;
   display: grid;
   place-items: center;
   aspect-ratio: 1;
-  padding: 3px;
-  border: 1px solid rgba(16, 22, 26, 0.13);
-  border-radius: 4px;
-  background: linear-gradient(180deg, #eef1f2, #dee3e5);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(16, 22, 26, 0.16);
+  border-radius: 5px;
+  background:
+    radial-gradient(115% 100% at 50% 34%, #f8fafa 0%, #e9edef 58%, #dbe1e3 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='9' fill='%23f2f4f4' stroke='%23181e22' stroke-width='2'/%3E%3Cpath d='M4 13h18' stroke='%23181e22' stroke-width='2'/%3E%3Ccircle cx='13' cy='13' r='3' fill='%23f2f4f4' stroke='%23181e22' stroke-width='2'/%3E%3C/svg%3E") 13 13, pointer;
   transition:
-    transform 150ms var(--dp-motion-settle),
-    border-color 150ms linear,
-    box-shadow 150ms linear;
+    transform 180ms var(--dp-motion-settle),
+    border-color 160ms linear,
+    box-shadow 160ms linear;
 }
+/* The sprites ship on a 96px canvas with wide transparent margins, so the
+   plate renders them 1:1 — anything smaller cropped the art down to a
+   thumbnail. Pixelated keeps the upscale crisp. */
 .gallery-cell img {
-  width: 40px;
-  height: 40px;
+  width: 96px;
+  height: 96px;
+  max-width: 100%;
   image-rendering: pixelated;
+  filter: drop-shadow(0 2px 2px rgba(8, 14, 18, 0.28)) saturate(1.06)
+    contrast(1.04);
   pointer-events: none;
+  will-change: transform;
+}
+.gallery-cell.is-skeleton {
+  border-style: dashed;
+  border-color: rgba(16, 22, 26, 0.14);
+  background: none;
+  box-shadow: none;
+}
+.gallery-cell__sweep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 18%, transparent) 44%,
+    color-mix(in srgb, var(--accent) 52%, transparent) 50%,
+    transparent 56%
+  );
+}
+.gallery-cell:hover .gallery-cell__sweep,
+.gallery-cell:focus-visible .gallery-cell__sweep {
+  animation: cell-sweep 560ms cubic-bezier(0.33, 0, 0.24, 1) 1;
+}
+@keyframes cell-sweep {
+  0% {
+    opacity: 0;
+    transform: translateY(-105%);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(105%);
+  }
 }
 .gallery-cell:hover,
 .gallery-cell:focus-visible {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   border-color: var(--accent-soft);
-  box-shadow: 0 7px 12px -8px rgba(8, 14, 18, 0.7);
+  box-shadow:
+    0 9px 16px -9px rgba(8, 14, 18, 0.8),
+    0 0 0 1px var(--accent-soft);
 }
 .gallery-cell.is-selected {
   border-color: var(--accent);
   box-shadow:
     0 0 0 1px var(--accent-soft),
-    0 0 12px -2px var(--accent-soft);
+    0 0 14px -2px var(--accent-soft);
+}
+.gallery-cell.is-selected::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-top: 9px solid var(--accent);
+  border-left: 9px solid transparent;
 }
 .gallery-cell:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 @media (max-width: 760px) {
+  .archive-filters {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
+  }
   .gallery-grid {
-    grid-template-columns: repeat(auto-fill, minmax(43px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
     gap: 5px;
   }
   .gallery-cell img {
-    width: 32px;
-    height: 32px;
+    width: 72px;
+    height: 72px;
   }
 }
 
@@ -1009,36 +1097,102 @@
 .gallery-tip {
   position: absolute;
   z-index: 40;
-  width: min(272px, 72vw);
-  transform: translate(-50%, calc(-100% - 10px));
+  width: min(304px, 78vw);
+  transform: translate(-50%, calc(-100% - 12px));
   pointer-events: none;
 }
 .gallery-tip.is-below {
-  transform: translate(-50%, 10px);
+  transform: translate(-50%, 12px);
 }
 .gallery-tip__panel {
-  padding: 9px 11px 10px;
+  position: relative;
+  overflow: hidden;
+  padding: 10px 12px 12px;
   border-radius: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: linear-gradient(180deg, #232a2f, #151b1f);
-  box-shadow: 0 14px 28px -12px rgba(6, 10, 13, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background:
+    linear-gradient(180deg, #262e33 0%, #151b1f 62%, #10161a 100%);
+  box-shadow:
+    0 20px 34px -16px rgba(6, 10, 13, 0.95),
+    0 0 0 1px rgba(8, 14, 18, 0.45);
   color: #eef1f2;
+  will-change: transform, opacity, clip-path;
+}
+.gallery-tip__sweep {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 52%;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 16%, transparent) 84%,
+    color-mix(in srgb, var(--accent) 42%, transparent) 96%,
+    transparent 100%
+  );
+  animation: tip-sweep 760ms cubic-bezier(0.3, 0, 0.2, 1) 1 forwards;
+}
+@keyframes tip-sweep {
+  0% {
+    opacity: 0;
+    transform: translateY(-110%);
+  }
+  28% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(215%);
+  }
 }
 .gallery-tip__head {
   display: flex;
-  gap: 6px;
-  margin: 0 0 5px;
+  align-items: baseline;
+  gap: 7px;
+  margin: 0;
   font-family: var(--dp-typography-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+.gallery-tip__no {
   color: var(--accent-soft);
+  font-variant-numeric: tabular-nums;
+}
+.gallery-tip__name {
+  color: #f5f8f9;
+  font-weight: 600;
+}
+.gallery-tip__rule {
+  display: block;
+  height: 1px;
+  margin: 7px 0 9px;
+  transform-origin: left center;
+  background: linear-gradient(
+    90deg,
+    var(--accent-soft) 0%,
+    rgba(255, 255, 255, 0.14) 46%,
+    transparent 100%
+  );
 }
 .gallery-tip__text {
   margin: 0;
   font-size: 12px;
-  line-height: 1.45;
-  color: #dbe1e4;
+  line-height: 1.5;
+  color: #d7dfe3;
+}
+.tip-word {
+  display: inline-block;
+  will-change: transform, opacity, filter;
+}
+.gallery-tip__wait {
+  font-family: var(--dp-typography-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8b979e;
 }
 
 /* ------------------------------------------------------------------
@@ -1077,7 +1231,7 @@
 }
 .opening-copy > * {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 .opening-copy::before {
   content: "";
@@ -1116,6 +1270,8 @@
   right: -16px;
   top: -4%;
   height: 2px;
+  /* Behind the masthead copy: the sweep should read as a pass over the
+     blueprint, not as a line drawn across the wordmark. */
   z-index: 1;
   pointer-events: none;
   background: linear-gradient(
@@ -1151,14 +1307,23 @@
    Vent grille as a live level meter.
    ------------------------------------------------------------------ */
 .vents span {
-  transform-origin: left center;
-  background: linear-gradient(
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  /* Full-width slots; the animation travels a light band along the slot
+     instead of shrinking the bar. */
+  background-image: linear-gradient(
     90deg,
-    var(--accent),
-    color-mix(in srgb, var(--accent) 20%, #c6ced1)
+    var(--accent) 0%,
+    var(--accent) 26%,
+    color-mix(in srgb, var(--accent) 16%, #dfe4e6) 48%,
+    var(--accent) 72%,
+    var(--accent) 100%
   );
-  opacity: 0.55;
-  will-change: transform, opacity;
+  background-size: 260% 100%;
+  background-position: 0% 0;
+  opacity: 0.42;
+  will-change: background-position, opacity;
 }
 
 /* ------------------------------------------------------------------
@@ -1166,6 +1331,23 @@
    ------------------------------------------------------------------ */
 .dial-face {
   gap: 4px;
+  will-change: transform;
+}
+
+/* The record bay spans the full chassis now, so the art window gets the
+   room the two-column bench used to deny it. */
+.specimen-bay .screen-body {
+  grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+  gap: 24px;
+}
+.specimen-bay .screen-copy h3 {
+  font-size: clamp(28px, 3.4vw, 42px);
+}
+@media (max-width: 760px) {
+  .specimen-bay .screen-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
 }
 .dial-symbol {
   font-size: 16px;

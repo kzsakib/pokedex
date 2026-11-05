@@ -27,11 +27,10 @@ import ClickSpark from "./components/ClickSpark";
 import CountUp from "./components/CountUp";
 import ShinyText from "./components/ShinyText";
 import EvolutionTray from "./EvolutionTray";
-import IndexBay from "./IndexBay";
 import SpecimenScreen from "./SpecimenScreen";
 
 const LEDE =
-  "A field instrument for the original 151. Search the index, read the specimen record, switch between Pokédex entries by game, and trace the evolution line. Every reading below streams live from PokéAPI.";
+  "A field instrument for the original 151. Search the field archive, load a specimen record, switch between Pokédex entries by game, and trace the evolution line. Every reading below streams live from PokéAPI.";
 
 const DEFAULT_ENTRY = 25;
 
@@ -244,21 +243,20 @@ export default function App() {
   });
 
   /* The vent grille doubles as a level meter: it answers the feed, the boot
-     sequence and the dial instead of sitting there as decoration. */
+     sequence and the dial instead of sitting there as decoration. The bars
+     stay full width; the light band travels along them. */
   const flashVents = contextSafe((strength = 1) => {
     const bars = ventsRef.current?.querySelectorAll("span");
     if (!motion || !bars?.length) return;
     gsap.fromTo(
       bars,
-      { scaleX: 0.18, opacity: 0.5 },
+      { backgroundPositionX: "0%", opacity: 0.45 },
       {
-        scaleX: () => 0.4 + Math.random() * 0.6,
+        backgroundPositionX: "100%",
         opacity: 1,
-        duration: 0.18 + strength * 0.05,
-        stagger: 0.035,
-        yoyo: true,
-        repeat: 1,
-        ease: "power2.out",
+        duration: 0.42 + strength * 0.22,
+        stagger: 0.045,
+        ease: "power2.inOut",
         overwrite: "auto",
       },
     );
@@ -277,6 +275,7 @@ export default function App() {
     setType("all");
 
     const dial = dialRef.current;
+    const face = dial?.querySelector(".dial-face");
     const readout = dial?.querySelector(".dial-readout");
     const ticks = dial?.querySelector(".dial-ticks");
 
@@ -287,19 +286,21 @@ export default function App() {
     }
 
     /* The dial is a real instrument: it winds through whole turns while the
-       readout rolls like an odometer, then settles on the drawn entry. */
+       readout rolls like an odometer, then settles on the drawn entry. Only
+       the face and its tick ring turn — rotating the housing would swing the
+       cast shadow around with it. */
     dial.classList.add("is-spinning");
     const proxy = { progress: 0 };
     gsap
       .timeline({
         onComplete: () => {
           dial.classList.remove("is-spinning");
-          gsap.set(dial, { clearProps: "transform" });
+          gsap.set(face, { clearProps: "transform" });
           gsap.set(ticks, { clearProps: "transform" });
           if (readout) readout.textContent = target.number;
         },
       })
-      .to(dial, { rotate: 1080, duration: 1, ease: "power3.inOut" }, 0)
+      .to(face, { rotate: 1080, duration: 1, ease: "power3.inOut" }, 0)
       .to(ticks, { rotate: 1080, duration: 1, ease: "power3.inOut" }, 0)
       .to(
         proxy,
@@ -340,8 +341,7 @@ export default function App() {
       const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
       timeline
         .from(".vents span", {
-          scaleX: 0,
-          transformOrigin: "left center",
+          autoAlpha: 0,
           duration: 0.35,
           stagger: 0.04,
         })
@@ -350,7 +350,17 @@ export default function App() {
           { scale: 0, rotate: -90, duration: 0.4, stagger: 0.05 },
           0,
         )
-        .from(".dial", { scale: 0.72, autoAlpha: 0, duration: 0.5 }, 0.05)
+        .fromTo(
+          ".dial",
+          { scale: 0.72, autoAlpha: 0 },
+          {
+            scale: 1,
+            autoAlpha: 1,
+            duration: 0.5,
+            clearProps: "transform,opacity,visibility",
+          },
+          0.05,
+        )
         .from(
           ".bay",
           { y: 18, autoAlpha: 0, duration: 0.5, stagger: 0.06 },
@@ -487,8 +497,8 @@ export default function App() {
 
   return (
     <div className="page" ref={pageRef} style={accentStyle}>
-      <a className="skip-link" href="#index-bay">
-        Skip to index
+      <a className="skip-link" href="#archive-bay">
+        Skip to archive
       </a>
 
       <div className="scroll-progress" aria-hidden="true">
@@ -538,14 +548,14 @@ export default function App() {
                 <span className="dial-symbol" aria-hidden="true">
                   ⤨
                 </span>
-                <span className="dial-label">Draw one</span>
+                <span className="dial-label">Randomize</span>
                 <span className="dial-readout" aria-hidden="true">
                   {selectedEntry?.number ?? "#025"}
                 </span>
               </span>
             </button>
             <p className="control-hint" id="dial-hint">
-              Draws a random entry from the index.
+              Picks a random specimen from the archive.
             </p>
             <button type="button" className="key key--wide" onClick={clearFilters}>
               Clear filters
@@ -609,74 +619,53 @@ export default function App() {
           )}
         </section>
 
-        <div className="bay workbench">
-          <section className="index-col" id="index-bay" aria-labelledby="index-title">
-            <h2 className="bay-tag bay-tag--rule" id="index-title">
-              <span className="bay-index" aria-hidden="true">
-                02
-              </span>
-              <span className="bay-label">Index</span>
-              <span className="bay-rule" aria-hidden="true" />
-            </h2>
-            <IndexBay
-              items={filtered}
-              entries={entries}
-              selectedId={selectedId}
-              onSelect={select}
-              query={query}
-              onQuery={setQuery}
-              type={type}
-              onType={setType}
-              onClear={clearFilters}
-              searchRef={searchRef}
-              feed={feed}
-            />
-          </section>
-
-          <section className="specimen-col" aria-labelledby="specimen-title">
-            <h2 className="bay-tag bay-tag--rule" id="specimen-title">
-              <span className="bay-index" aria-hidden="true">
-                03
-              </span>
-              <span className="bay-label">Specimen record</span>
-              <span className="bay-rule" aria-hidden="true" />
-            </h2>
-            <div className="bezel">
-              <SpecimenScreen
-                pokemon={pokemon}
-                record={record}
-                abilities={abilityList}
-                percentiles={percentiles}
-                loading={!pokemon && faultId !== selectedId}
-                fault={faultId === selectedId}
-                onRetry={() => {
-                  setFaultId(null);
-                  setAttempt((value) => value + 1);
-                }}
-              />
-            </div>
-            <EvolutionTray
-              stages={line}
-              selectedId={selectedId}
-              onSelect={select}
-            />
-          </section>
-        </div>
-
-        <section className="bay gallery-bay" aria-labelledby="gallery-title">
-          <h2 className="bay-tag bay-tag--rule" id="gallery-title">
+        <section className="bay archive-bay" id="archive-bay" aria-labelledby="archive-title">
+          <h2 className="bay-tag bay-tag--rule" id="archive-title">
             <span className="bay-index" aria-hidden="true">
-              04
+              02
             </span>
             <span className="bay-label">Field archive</span>
             <span className="bay-rule" aria-hidden="true" />
           </h2>
-          <p className="hint gallery-hint">
-            Every specimen in the registry on one wall. Hover for a record, pick
-            one to load it.
-          </p>
           <Gallery
-            items={index}
+            items={filtered}
+            total={index.length}
+            selectedId={selectedId}
+            onSelect={select}
+            query={query}
+            onQuery={setQuery}
+            type={type}
+            onType={setType}
+            onClear={clearFilters}
+            searchRef={searchRef}
+            feed={feed}
+          />
+        </section>
+
+        <section className="bay specimen-bay" id="specimen-bay" aria-labelledby="specimen-title">
+          <h2 className="bay-tag bay-tag--rule" id="specimen-title">
+            <span className="bay-index" aria-hidden="true">
+              03
+            </span>
+            <span className="bay-label">Specimen record</span>
+            <span className="bay-rule" aria-hidden="true" />
+          </h2>
+          <div className="bezel">
+            <SpecimenScreen
+              pokemon={pokemon}
+              record={record}
+              abilities={abilityList}
+              percentiles={percentiles}
+              loading={!pokemon && faultId !== selectedId}
+              fault={faultId === selectedId}
+              onRetry={() => {
+                setFaultId(null);
+                setAttempt((value) => value + 1);
+              }}
+            />
+          </div>
+          <EvolutionTray
+            stages={line}
             selectedId={selectedId}
             onSelect={select}
           />
@@ -686,7 +675,7 @@ export default function App() {
           <div>
             <p className="bay-tag">
               <span className="bay-index" aria-hidden="true">
-                05
+                04
               </span>
               Field unit
             </p>
