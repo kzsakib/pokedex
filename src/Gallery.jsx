@@ -32,6 +32,9 @@ export default function Gallery({ items, selectedId, onSelect }) {
   const { contextSafe } = useGSAP({ scope: rootRef });
   const [tip, setTip] = useState(null);
   const requestRef = useRef(0);
+  /* One delegated handler for the whole wall: per-cell pointer enter/leave
+     handlers race each other when the pointer travels quickly. */
+  const hoveredRef = useRef(null);
 
   useGSAP(
     () => {
@@ -46,6 +49,7 @@ export default function Gallery({ items, selectedId, onSelect }) {
   );
 
   const hide = contextSafe(() => {
+    hoveredRef.current = null;
     requestRef.current += 1;
     if (!panelRef.current) {
       setTip(null);
@@ -107,17 +111,29 @@ export default function Gallery({ items, selectedId, onSelect }) {
 
   return (
     <div className="gallery" ref={rootRef}>
-      <div className="gallery-grid">
+      <div
+        className="gallery-grid"
+        onPointerOver={(event) => {
+          const cell = event.target.closest?.(".gallery-cell");
+          if (!cell) return;
+          const id = Number(cell.dataset.id);
+          if (id === hoveredRef.current) return;
+          const item = items.find((entry) => entry.id === id);
+          if (!item) return;
+          hoveredRef.current = id;
+          show({ currentTarget: cell }, item);
+        }}
+        onPointerLeave={hide}
+      >
         {items.map((item) => (
           <button
             key={item.id}
             type="button"
+            data-id={item.id}
             className={`gallery-cell${item.id === selectedId ? " is-selected" : ""}`}
             aria-current={item.id === selectedId ? "true" : undefined}
             aria-label={`${item.number} ${titleCase(item.name)}`}
-            onPointerEnter={(event) => show(event, item)}
             onFocus={(event) => show(event, item)}
-            onPointerLeave={hide}
             onBlur={hide}
             onClick={() => choose(item.id)}
           >
