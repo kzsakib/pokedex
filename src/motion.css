@@ -941,3 +941,317 @@
 [data-motion="off"] .boot-overlay {
   display: none;
 }
+
+/* ------------------------------------------------------------------
+   Field archive — every Gen 1 specimen on one wall.
+   ------------------------------------------------------------------ */
+.gallery-bay {
+  position: relative;
+}
+.gallery-hint {
+  margin: 6px 0 12px;
+}
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 6px;
+}
+.gallery-cell {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  padding: 3px;
+  border: 1px solid rgba(16, 22, 26, 0.13);
+  border-radius: 4px;
+  background: linear-gradient(180deg, #eef1f2, #dee3e5);
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='9' fill='%23f2f4f4' stroke='%23181e22' stroke-width='2'/%3E%3Cpath d='M4 13h18' stroke='%23181e22' stroke-width='2'/%3E%3Ccircle cx='13' cy='13' r='3' fill='%23f2f4f4' stroke='%23181e22' stroke-width='2'/%3E%3C/svg%3E") 13 13, pointer;
+  transition:
+    transform 150ms var(--dp-motion-settle),
+    border-color 150ms linear,
+    box-shadow 150ms linear;
+}
+.gallery-cell img {
+  width: 40px;
+  height: 40px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.gallery-cell:hover,
+.gallery-cell:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--accent-soft);
+  box-shadow: 0 7px 12px -8px rgba(8, 14, 18, 0.7);
+}
+.gallery-cell.is-selected {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px var(--accent-soft),
+    0 0 12px -2px var(--accent-soft);
+}
+.gallery-cell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (max-width: 760px) {
+  .gallery-grid {
+    grid-template-columns: repeat(auto-fill, minmax(43px, 1fr));
+    gap: 5px;
+  }
+  .gallery-cell img {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+.gallery {
+  position: relative;
+}
+.gallery-tip {
+  position: absolute;
+  z-index: 40;
+  width: min(272px, 72vw);
+  transform: translate(-50%, calc(-100% - 10px));
+  pointer-events: none;
+}
+.gallery-tip.is-below {
+  transform: translate(-50%, 10px);
+}
+.gallery-tip__panel {
+  padding: 9px 11px 10px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, #232a2f, #151b1f);
+  box-shadow: 0 14px 28px -12px rgba(6, 10, 13, 0.9);
+  color: #eef1f2;
+}
+.gallery-tip__head {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 5px;
+  font-family: var(--dp-typography-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+}
+.gallery-tip__text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #dbe1e4;
+}
+
+/* ------------------------------------------------------------------
+   Interactive masthead — decodable title, Pokéball é, weight proximity.
+   ------------------------------------------------------------------ */
+.split-char {
+  will-change: font-variation-settings;
+}
+.split-char.has-ball {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.64em;
+  margin-right: 0.02em;
+  overflow: visible;
+}
+.title-ball {
+  display: block;
+  width: 0.6em;
+  height: 0.6em;
+  will-change: transform;
+  filter: drop-shadow(0 2px 3px rgba(8, 14, 18, 0.25));
+}
+.title-ball svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.title-ball circle:first-child {
+  fill: var(--accent-soft);
+}
+
+/* Faint blueprint grid behind the masthead, and a slow scanner pass. */
+.opening-copy {
+  position: relative;
+}
+.opening-copy > * {
+  position: relative;
+  z-index: 1;
+}
+.opening-copy::before {
+  content: "";
+  position: absolute;
+  inset: -14px -16px -18px -18px;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      rgba(16, 22, 26, 0.055) 0 1px,
+      transparent 1px 30px
+    ),
+    repeating-linear-gradient(
+      180deg,
+      rgba(16, 22, 26, 0.055) 0 1px,
+      transparent 1px 30px
+    );
+  -webkit-mask-image: radial-gradient(
+    115% 95% at 18% 8%,
+    #000 0%,
+    rgba(0, 0, 0, 0.55) 55%,
+    transparent 82%
+  );
+  mask-image: radial-gradient(
+    115% 95% at 18% 8%,
+    #000 0%,
+    rgba(0, 0, 0, 0.55) 55%,
+    transparent 82%
+  );
+}
+.opening-copy::after {
+  content: "";
+  position: absolute;
+  left: -18px;
+  right: -16px;
+  top: -4%;
+  height: 2px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 70%, transparent) 30%,
+    color-mix(in srgb, var(--accent) 90%, transparent) 50%,
+    color-mix(in srgb, var(--accent) 70%, transparent) 70%,
+    transparent 100%
+  );
+  box-shadow: 0 0 22px 4px color-mix(in srgb, var(--accent) 18%, transparent);
+  animation: header-scan 7.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  opacity: 0;
+}
+@keyframes header-scan {
+  0% {
+    top: -4%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.8;
+  }
+  72% {
+    opacity: 0.45;
+  }
+  100% {
+    top: 102%;
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Vent grille as a live level meter.
+   ------------------------------------------------------------------ */
+.vents span {
+  transform-origin: left center;
+  background: linear-gradient(
+    90deg,
+    var(--accent),
+    color-mix(in srgb, var(--accent) 20%, #c6ced1)
+  );
+  opacity: 0.55;
+  will-change: transform, opacity;
+}
+
+/* ------------------------------------------------------------------
+   The dial reads out the draw like an odometer.
+   ------------------------------------------------------------------ */
+.dial-face {
+  gap: 4px;
+}
+.dial-symbol {
+  font-size: 16px;
+  line-height: 1;
+}
+.dial-label {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+.dial-readout {
+  font-family: var(--dp-typography-mono);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-deep);
+}
+.dial.is-spinning {
+  transition: box-shadow 160ms ease;
+}
+.dial.is-spinning .dial-readout {
+  color: var(--accent);
+  text-shadow: 0 0 9px color-mix(in srgb, var(--accent) 65%, transparent);
+}
+.dial.is-spinning .dial-symbol {
+  opacity: 0.4;
+}
+
+/* ------------------------------------------------------------------
+   Measurement rail — the ruler that doubles as scroll progress.
+   ------------------------------------------------------------------ */
+.rail {
+  position: fixed;
+  left: max(10px, env(safe-area-inset-left));
+  top: 50%;
+  width: 34px;
+  height: min(46vh, 400px);
+  transform: translateY(-50%);
+  z-index: 55;
+  pointer-events: none;
+  display: none;
+}
+@media (min-width: 1240px) {
+  .rail {
+    display: block;
+  }
+}
+.rail-ticks {
+  position: absolute;
+  inset: 0;
+  width: 8px;
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgba(16, 22, 26, 0.55) 0 1px,
+    transparent 1px 11px
+  );
+}
+.rail-ticks::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 20px;
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgba(16, 22, 26, 0.3) 0 1px,
+    transparent 1px 55px
+  );
+}
+.rail-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--accent);
+  box-shadow: 0 0 9px var(--accent-soft);
+  transform: scaleY(0);
+  transform-origin: top center;
+}
+.rail-head {
+  position: absolute;
+  left: -2px;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-soft);
+}

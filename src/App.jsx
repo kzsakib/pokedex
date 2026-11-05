@@ -17,7 +17,10 @@ import {
 } from "./api";
 import { ScrollTrigger, gsap } from "./motion";
 import { useMotion } from "./motionSettings";
-import { SplitChars, SplitWords } from "./SplitText";
+import { SplitWords } from "./SplitText";
+import InteractiveTitle from "./InteractiveTitle";
+import Gallery from "./Gallery";
+import RailRuler from "./RailRuler";
 import { accentVars } from "./typeColors";
 import BootScreen from "./components/BootScreen";
 import ClickSpark from "./components/ClickSpark";
@@ -33,10 +36,11 @@ const LEDE =
 const DEFAULT_ENTRY = 25;
 
 export default function App() {
-  const { motion, toggleMotion } = useMotion();
+  const { motion } = useMotion();
   const pageRef = useRef(null);
   const shellRef = useRef(null);
   const dialRef = useRef(null);
+  const ventsRef = useRef(null);
   const searchRef = useRef(null);
   const progressRef = useRef(null);
 
@@ -239,6 +243,27 @@ export default function App() {
     setFeedAttempt((value) => value + 1);
   });
 
+  /* The vent grille doubles as a level meter: it answers the feed, the boot
+     sequence and the dial instead of sitting there as decoration. */
+  const flashVents = contextSafe((strength = 1) => {
+    const bars = ventsRef.current?.querySelectorAll("span");
+    if (!motion || !bars?.length) return;
+    gsap.fromTo(
+      bars,
+      { scaleX: 0.18, opacity: 0.5 },
+      {
+        scaleX: () => 0.4 + Math.random() * 0.6,
+        opacity: 1,
+        duration: 0.18 + strength * 0.05,
+        stagger: 0.035,
+        yoyo: true,
+        repeat: 1,
+        ease: "power2.out",
+        overwrite: "auto",
+      },
+    );
+  });
+
   const drawRandom = contextSafe(() => {
     if (!index.length) return;
     const currentPosition = index.findIndex((item) => item.id === selectedId);
@@ -246,26 +271,67 @@ export default function App() {
     if (index.length > 1 && nextPosition === currentPosition) {
       nextPosition = (nextPosition + 1) % index.length;
     }
+    const target = index[nextPosition];
+
     setQuery("");
     setType("all");
-    select(index[nextPosition].id);
 
-    if (motion && dialRef.current) {
-      gsap.fromTo(
-        dialRef.current,
-        { rotate: -16 },
-        { rotate: 0, duration: 0.55, ease: "back.out(2.6)" },
-      );
-      const ticks = dialRef.current.querySelector(".dial-ticks");
-      if (ticks) {
-        gsap.fromTo(
-          ticks,
-          { rotate: -60 },
-          { rotate: 0, duration: 0.55, ease: "power2.out" },
-        );
-      }
+    const dial = dialRef.current;
+    const readout = dial?.querySelector(".dial-readout");
+    const ticks = dial?.querySelector(".dial-ticks");
+
+    if (!motion || !dial) {
+      select(target.id);
+      if (readout) readout.textContent = target.number;
+      return;
     }
+
+    /* The dial is a real instrument: it winds through whole turns while the
+       readout rolls like an odometer, then settles on the drawn entry. */
+    dial.classList.add("is-spinning");
+    const proxy = { progress: 0 };
+    gsap
+      .timeline({
+        onComplete: () => {
+          dial.classList.remove("is-spinning");
+          gsap.set(dial, { clearProps: "transform" });
+          gsap.set(ticks, { clearProps: "transform" });
+          if (readout) readout.textContent = target.number;
+        },
+      })
+      .to(dial, { rotate: 1080, duration: 1, ease: "power3.inOut" }, 0)
+      .to(ticks, { rotate: 1080, duration: 1, ease: "power3.inOut" }, 0)
+      .to(
+        proxy,
+        {
+          progress: 1,
+          duration: 1,
+          ease: "none",
+          onUpdate: () => {
+            if (!readout || proxy.progress > 0.9) return;
+            readout.textContent = `#${String(
+              Math.floor(Math.random() * ENTRY_LIMIT) + 1,
+            ).padStart(3, "0")}`;
+          },
+        },
+        0,
+      )
+      .add(() => {
+        select(target.id);
+        flashVents(1);
+      }, 0.84);
   });
+
+  /* Keep the dial readout honest when the entry changes by any other route. */
+  useEffect(() => {
+    const readout = dialRef.current?.querySelector(".dial-readout");
+    if (!readout || dialRef.current?.classList.contains("is-spinning")) return;
+    if (selectedEntry) readout.textContent = selectedEntry.number;
+  }, [selectedEntry]);
+
+  useEffect(() => {
+    if (booted && scanned > 0) flashVents(0.55);
+  }, [scanned, booted, flashVents]);
 
   /* Chassis boot: every bay settles in once the boot overlay clears. */
   useGSAP(
@@ -433,6 +499,7 @@ export default function App() {
 
       <main className="chassis" ref={shellRef} style={accentStyle}>
         <div className="seam" aria-hidden="true" />
+        <RailRuler />
         <span className="screw screw--tl" aria-hidden="true" />
         <span className="screw screw--tr" aria-hidden="true" />
         <span className="screw screw--bl" aria-hidden="true" />
@@ -446,12 +513,12 @@ export default function App() {
               </span>
               National registry
             </p>
-            <SplitChars as="h1" id="page-title" text="Pokédex" />
+            <InteractiveTitle />
             <SplitWords className="lede" delay={0.25} text={LEDE} />
           </div>
 
           <div className="controls">
-            <div className="vents" aria-hidden="true">
+            <div className="vents" aria-hidden="true" ref={ventsRef}>
               <span />
               <span />
               <span />
@@ -472,6 +539,9 @@ export default function App() {
                   ⤨
                 </span>
                 <span className="dial-label">Draw one</span>
+                <span className="dial-readout" aria-hidden="true">
+                  {selectedEntry?.number ?? "#025"}
+                </span>
               </span>
             </button>
             <p className="control-hint" id="dial-hint">
@@ -479,15 +549,6 @@ export default function App() {
             </p>
             <button type="button" className="key key--wide" onClick={clearFilters}>
               Clear filters
-            </button>
-            <button
-              type="button"
-              className="key key--wide key--motion"
-              aria-pressed={motion}
-              onClick={toggleMotion}
-            >
-              <span className="lamp" aria-hidden="true" />
-              Motion {motion ? "on" : "off"}
             </button>
           </div>
         </section>
@@ -602,11 +663,30 @@ export default function App() {
           </section>
         </div>
 
+        <section className="bay gallery-bay" aria-labelledby="gallery-title">
+          <h2 className="bay-tag bay-tag--rule" id="gallery-title">
+            <span className="bay-index" aria-hidden="true">
+              04
+            </span>
+            <span className="bay-label">Field archive</span>
+            <span className="bay-rule" aria-hidden="true" />
+          </h2>
+          <p className="hint gallery-hint">
+            Every specimen in the registry on one wall. Hover for a record, pick
+            one to load it.
+          </p>
+          <Gallery
+            items={index}
+            selectedId={selectedId}
+            onSelect={select}
+          />
+        </section>
+
         <footer className="bay closing">
           <div>
             <p className="bay-tag">
               <span className="bay-index" aria-hidden="true">
-                04
+                05
               </span>
               Field unit
             </p>

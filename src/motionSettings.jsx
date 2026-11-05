@@ -1,31 +1,22 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo } from "react";
 
-const MotionContext = createContext({ motion: true, toggleMotion: () => {} });
-const STORAGE_KEY = "pokedex.motion";
+const MotionContext = createContext({ motion: true });
 
-/* Motion defaults to on and is persisted, so the animations are always there
-   unless the visitor explicitly turns them off with the chassis switch. */
+/* Motion is part of the instrument now: the chassis switch is gone, so the
+   flag stays true and the vendored ReactBits components keep reading it from
+   window. The one opt-out left is the OS reduce-motion preference, which the
+   text effects check before typing or scrambling. */
 export function MotionProvider({ children }) {
-  const [motion, setMotion] = useState(true);
-
   useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === "off") setMotion(false);
+    document.documentElement.dataset.motion = "on";
+    window.__POKEDEX_MOTION__ = true;
   }, []);
 
-  if (typeof window !== "undefined") {
-    window.__POKEDEX_MOTION__ = motion;
-  }
+  const value = useMemo(() => ({ motion: true }), []);
 
-  useEffect(() => {
-    document.documentElement.dataset.motion = motion ? "on" : "off";
-    window.localStorage.setItem(STORAGE_KEY, motion ? "on" : "off");
-  }, [motion]);
-
-  const toggleMotion = useCallback(() => setMotion((value) => !value), []);
-  const value = useMemo(() => ({ motion, toggleMotion }), [motion, toggleMotion]);
-
-  return <MotionContext.Provider value={value}>{children}</MotionContext.Provider>;
+  return (
+    <MotionContext.Provider value={value}>{children}</MotionContext.Provider>
+  );
 }
 
 export const useMotion = () => useContext(MotionContext);
