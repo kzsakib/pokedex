@@ -1,26 +1,5 @@
-@font-face {
-  font-family: "Industrial Host";
-  src: url("./assets/fonts/host-grotesk-latin.woff2") format("woff2");
-  font-weight: 300 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Industrial Plex";
-  src: url("./assets/fonts/ibm-plex-mono-400-latin.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Industrial Plex";
-  src: url("./assets/fonts/ibm-plex-mono-600-latin.woff2") format("woff2");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
+/* Font families live in typography.css: Bricolage Grotesque for display
+   and body, Martian Mono for labels, Doto for LED readings. */
 
 :root {
   --dp-color-chassis: #cbd0d2;
@@ -33,9 +12,8 @@
   --dp-color-on-field-muted: #d8dee1;
   --dp-color-accent: #f15b22;
 
-  --dp-typography-sans: "Industrial Host", "Host Grotesk", system-ui, sans-serif;
-  --dp-typography-mono: "Industrial Plex", "IBM Plex Mono", ui-monospace,
-    monospace;
+  --dp-typography-sans: var(--font-body);
+  --dp-typography-mono: var(--font-mono);
   --dp-typography-body: 17px;
   --dp-typography-reading: 16px;
   --dp-typography-metadata: 13px;

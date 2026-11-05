@@ -1,0 +1,652 @@
+/* ------------------------------------------------------------------
+   Specimen record — bento grid on the dark screen.
+
+   4 columns on desktop, 2 on tablet, 1 on mobile. Every tile shares one
+   surface, one radius, one gutter; only the readings change colour.
+   ------------------------------------------------------------------ */
+
+.bento-screen {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 14px;
+}
+
+.bento-terminal {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.55;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(
+    118% 96% at 50% 34%,
+    #000 24%,
+    rgba(0, 0, 0, 0.5) 62%,
+    transparent 92%
+  );
+  mask-image: radial-gradient(
+    118% 96% at 50% 34%,
+    #000 24%,
+    rgba(0, 0, 0, 0.5) 62%,
+    transparent 92%
+  );
+}
+
+.bento-screen > *:not(.bento-terminal) {
+  position: relative;
+  z-index: 1;
+}
+
+.bento {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(96px, auto);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.bento-tile {
+  position: relative;
+  min-width: 0;
+  padding: 13px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background:
+    linear-gradient(180deg, #1b2226 0%, #161c20 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 12px 26px -20px rgba(0, 0, 0, 0.95);
+  transition:
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    transform 220ms var(--dp-motion-settle);
+}
+
+.bento-tile:hover {
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 16px 30px -20px rgba(0, 0, 0, 1),
+    0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.bento-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bento-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #96a3aa;
+}
+
+.bento-note {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #74838a;
+  white-space: nowrap;
+}
+
+/* ---------- 1. sprite tile ---------- */
+
+.bento-sprite {
+  grid-column: span 2;
+  grid-row: span 2;
+  display: grid;
+  overflow: hidden;
+  padding: 0;
+  min-height: 292px;
+}
+
+.bento-sprite__glow {
+  position: absolute;
+  inset: -8%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      46% 46% at 50% 44%,
+      color-mix(in srgb, var(--type-glow) 38%, transparent) 0%,
+      transparent 72%
+    ),
+    radial-gradient(
+      52% 52% at 84% 92%,
+      color-mix(in srgb, var(--type-second) 26%, transparent) 0%,
+      transparent 70%
+    );
+}
+
+.bento-sprite__art {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding-bottom: 26px;
+}
+
+.bento-sprite__img {
+  grid-area: 1 / 1;
+  width: clamp(148px, 13vw, 188px);
+  height: clamp(148px, 13vw, 188px);
+  image-rendering: pixelated;
+  opacity: 0;
+  transition: opacity 280ms ease;
+  filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.55));
+}
+
+.bento-sprite__img.is-on {
+  opacity: 1;
+}
+
+.bento-sprite__meta {
+  position: absolute;
+  left: 15px;
+  bottom: 13px;
+  right: 15px;
+  z-index: 2;
+}
+
+.bento-sprite__no {
+  margin: 0;
+  font-family: var(--font-led);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--accent-soft);
+}
+
+.bento-sprite__name {
+  margin: 1px 0 0;
+  font-size: clamp(24px, 2.3vw, 33px);
+  line-height: 1;
+  color: #f4f8f9;
+}
+
+.bento-sprite__genus {
+  margin: 4px 0 9px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #93a1a8;
+}
+
+.bento-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bento-type {
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--chip) 62%, transparent);
+  background: color-mix(in srgb, var(--chip) 32%, #0e1417);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #eff4f5;
+}
+
+.shiny-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(9, 14, 17, 0.66);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #cfd9dd;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition:
+    background 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease;
+}
+
+.shiny-toggle__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #5d6b72;
+  transition: background 180ms ease;
+}
+
+.shiny-toggle:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  color: #f2f7f8;
+}
+
+.shiny-toggle.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #101619;
+}
+
+.shiny-toggle.is-on .shiny-toggle__dot {
+  background: #101619;
+}
+
+.shiny-toggle:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+/* ---------- 2. stats tile ---------- */
+
+.bento-stats {
+  grid-column: span 2;
+  grid-row: span 2;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.stat-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stat-item {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 30px;
+  grid-template-areas:
+    "name bar reading"
+    "rank rank rank";
+  align-items: center;
+  gap: 1px 9px;
+}
+
+.stat-name {
+  grid-area: name;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  color: #a5b2b8;
+}
+
+.stat-bar {
+  grid-area: bar;
+  display: block;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.stat-bar__fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--tone-color, #7e8b92);
+  transition: background 240ms ease;
+}
+
+.stat-reading {
+  grid-area: reading;
+  text-align: right;
+  font-size: 15px;
+  line-height: 1;
+  color: #eef4f6;
+}
+
+.stat-rank {
+  grid-area: rank;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6d7a81;
+}
+
+.stat-item[data-tone="high"] {
+  --tone-color: #74d99f;
+}
+
+.stat-item[data-tone="mid"] {
+  --tone-color: var(--accent);
+}
+
+.stat-item[data-tone="low"] {
+  --tone-color: #6a777e;
+}
+
+/* ---------- 3. measurement tiles ---------- */
+
+.bento-metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+
+.bento-figure {
+  margin: 0;
+  font-size: clamp(23px, 2.3vw, 31px);
+  font-weight: 700;
+  line-height: 1;
+  color: #f1f6f7;
+}
+
+.bento-unit {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6f7c83;
+}
+
+.bento-metric--led .bento-figure {
+  color: var(--accent-soft);
+  letter-spacing: 0.06em;
+}
+
+/* ---------- 4. abilities ---------- */
+
+.bento-abilities {
+  grid-column: span 2;
+}
+
+.bento-abilities .abilities {
+  min-width: 0;
+}
+
+.bento-abilities .abilities-head {
+  display: none;
+}
+
+.bento-abilities .ability-list {
+  display: grid;
+  gap: 9px;
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bento-abilities .ability {
+  padding-left: 9px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.bento-abilities .ability-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #eaf1f3;
+}
+
+.bento-abilities .ability-text {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #a6b2b8;
+}
+
+.bento-abilities .ability-tag {
+  padding: 2px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #29343a;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #ccd7dc;
+}
+
+/* ---------- 5. type matchups ---------- */
+
+.bento-matchup {
+  grid-column: span 2;
+}
+
+.matchup-strip {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(0, 1fr));
+  gap: 3px;
+  margin: 10px 0 9px;
+  padding: 0;
+  list-style: none;
+}
+
+.matchup-cell {
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  padding: 5px 0 4px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--cell-bg, #1d2529);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease;
+}
+
+.matchup-cell:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.matchup-cell__type {
+  font-family: var(--font-mono);
+  font-size: 6.5px;
+  letter-spacing: 0.02em;
+  color: var(--cell-type, #cbd5da);
+  opacity: 0.92;
+}
+
+.matchup-cell__mult {
+  font-size: 9px;
+  line-height: 1;
+  color: #eef3f5;
+}
+
+.matchup-cell[data-tone="immune"] {
+  --cell-bg: #101619;
+}
+
+.matchup-cell[data-tone="resist-low"] {
+  --cell-bg: #12301e;
+}
+
+.matchup-cell[data-tone="resist"] {
+  --cell-bg: #1a3d28;
+}
+
+.matchup-cell[data-tone="neutral"] {
+  --cell-bg: #1e262b;
+}
+
+.matchup-cell[data-tone="weak"] {
+  --cell-bg: #45261a;
+}
+
+.matchup-cell[data-tone="weak-high"] {
+  --cell-bg: #5d2113;
+}
+
+.matchup-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.06em;
+  color: #7d8a91;
+}
+
+.matchup-legend li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.matchup-legend__swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--cell-bg, #1e262b);
+}
+
+.matchup-legend li[data-tone="immune"] {
+  --cell-bg: #101619;
+}
+
+.matchup-legend li[data-tone="resist-low"] {
+  --cell-bg: #12301e;
+}
+
+.matchup-legend li[data-tone="resist"] {
+  --cell-bg: #1a3d28;
+}
+
+.matchup-legend li[data-tone="neutral"] {
+  --cell-bg: #1e262b;
+}
+
+.matchup-legend li[data-tone="weak"] {
+  --cell-bg: #45261a;
+}
+
+.matchup-legend li[data-tone="weak-high"] {
+  --cell-bg: #5d2113;
+}
+
+/* ---------- 6. flavor ---------- */
+
+.bento-flavor {
+  grid-column: 1 / -1;
+}
+
+.version-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8b979e;
+}
+
+.version-select select {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #1d252a;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #e8eff2;
+  cursor: pointer;
+}
+
+.version-select select:hover {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.bento-entry {
+  max-width: 60ch;
+  margin: 10px 0 7px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #e7eff2;
+}
+
+.bento-flavor__foot {
+  text-transform: none;
+  letter-spacing: 0.04em;
+  color: #74838a;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 1080px) {
+  .bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bento-sprite,
+  .bento-stats,
+  .bento-abilities,
+  .bento-matchup {
+    grid-column: span 2;
+  }
+
+  .bento-sprite {
+    grid-row: span 1;
+  }
+
+  .bento-stats {
+    grid-row: span 1;
+  }
+
+  .bento-metric {
+    grid-column: span 1;
+  }
+
+  .matchup-strip {
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .bento {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .bento-sprite {
+    min-height: 250px;
+  }
+
+  .bento-sprite__img {
+    width: 148px;
+    height: 148px;
+  }
+
+  .matchup-strip {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .bento-entry {
+    font-size: 14px;
+  }
+}

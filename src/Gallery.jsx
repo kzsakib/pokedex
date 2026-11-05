@@ -198,17 +198,7 @@ export default function Gallery({
     );
   };
 
-  /* The sprite answers the pointer: a short hop and a scan pass across
-     its plate. */
-  const wake = (cell) => {
-    if (prefersReducedMotion()) return;
-    const sprite = cell.querySelector("img");
-    if (!sprite) return;
-    gsap
-      .timeline({ overwrite: "auto" })
-      .to(sprite, { y: -10, scale: 1.14, duration: 0.14, ease: "power2.out" })
-      .to(sprite, { y: 0, scale: 1, duration: 0.5, ease: "bounce.out" });
-  };
+  
 
   const choose = (id) => {
     hide();
@@ -359,6 +349,8 @@ export default function Gallery({
               className={`gallery-cell${item.id === selectedId ? " is-selected" : ""}`}
               aria-current={item.id === selectedId ? "true" : undefined}
               aria-label={`${item.number} ${titleCase(item.name)}`}
+              data-cursor-label={`${item.number} ${titleCase(item.name)}`}
+              class="cursor-target"
               onFocus={(event) => {
                 hoveredRef.current = item.id;
                 show(event.currentTarget, item);
@@ -374,7 +366,6 @@ export default function Gallery({
                 loading="lazy"
                 decoding="async"
               />
-              <span className="gallery-cell__sweep" aria-hidden="true" />
             </button>
           ))}
         </div>

@@ -2,20 +2,26 @@ import { useEffect, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import {
   artworkUrl,
+  entriesByGeneration,
   formatNumber,
   pixelSpriteFallbackUrl,
   pixelSpriteRawUrl,
   pixelSpriteUrl,
   titleCase,
 } from "./api";
+import { percentileFor } from "./census";
 import { typeAccent } from "./typeColors";
-import { gsap, SplitText as GSAPSplitText } from "./motion";
+import {
+  formatMultiplier,
+  matchupStrip,
+  multiplierTone,
+} from "./typeChart";
+import { gsap } from "./motion";
 import { useMotion } from "./motionSettings";
 import DecryptedText from "./components/DecryptedText";
 import TextType from "./components/TextType";
+import FaultyTerminal from "./components/FaultyTerminal";
 import AbilityList from "./AbilityList";
-import StatRadar from "./StatRadar";
-import VersionTray from "./VersionTray";
 
 const STAT_LABELS = {
   hp: "HP",
@@ -26,206 +32,116 @@ const STAT_LABELS = {
   speed: "SPE",
 };
 
-const statCap = (name) => (name === "hp" ? 255 : 180);
+const statTone = (percentile) => {
+  if (percentile == null) return "unknown";
+  if (percentile >= 75) return "high";
+  if (percentile >= 40) return "mid";
+  return "low";
+};
 
 export default function SpecimenScreen({
   pokemon,
   record,
   abilities,
-  percentiles,
   loading,
   fault,
   onRetry,
+  statsIndex,
+  statsScope = "registry",
 }) {
   const { motion } = useMotion();
   const screenRef = useRef(null);
-  const nameSplitRef = useRef(null);
-  const [entryIndex, setEntryIndex] = useState(0);
-  const [activeStat, setActiveStat] = useState(null);
-
-  const { contextSafe } = useGSAP({ scope: screenRef });
+  const [version, setVersion] = useState(null);
+  const [shiny, setShiny] = useState(false);
 
   useEffect(() => {
-    setEntryIndex(0);
-    setActiveStat(null);
+    setShiny(false);
+    setVersion(null);
   }, [pokemon?.id]);
 
-  /* One timeline per specimen: the scan wipes the artwork, the name rises,
-     the meta staggers, then the bars and their numbers count together. */
+  const entries = record?.entries ?? [];
+  const groups = entriesByGeneration(entries);
+  const entry =
+    entries.find((item) => item.version === version) ?? entries[0] ?? null;
+
+  /* Tiles arrive as a group, then the readings count in. */
   useGSAP(
     () => {
       const root = screenRef.current;
       if (!root || !pokemon || !motion) return undefined;
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+        return undefined;
+      }
 
-      nameSplitRef.current?.revert();
-      nameSplitRef.current = null;
-
-      const art = root.querySelector(".art-well img");
-      const scan = root.querySelector(".scan-line");
-      const nameElement = root.querySelector(".screen-copy h3");
-      const meta = root.querySelectorAll(".type-tag, .measures > div");
-      const rows = Array.from(root.querySelectorAll(".stat-row"));
-      const totalElement = root.querySelector(".stats-total-value");
-      const totalValue = Number(root.dataset.total ?? 0);
+      const tiles = root.querySelectorAll(".bento-tile");
+      const bars = root.querySelectorAll(".stat-bar__fill");
+      const values = root.querySelectorAll(".stat-reading");
+      const figures = root.querySelectorAll(".bento-figure");
+      const cells = root.querySelectorAll(".matchup-cell");
 
       const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
 
-      if (art) {
-        timeline.fromTo(
-          art,
-          { autoAlpha: 0, scale: 0.86, filter: "blur(8px)" },
-          {
-            autoAlpha: 1,
-            scale: 1,
-            filter: "blur(0px)",
-            duration: 0.5,
-            clearProps: "filter,transform,visibility",
-          },
-          0,
-        );
-      }
-
-      if (scan) {
-        timeline
-          .fromTo(
-            scan,
-            { yPercent: -140, opacity: 0 },
-            { yPercent: 140, opacity: 0.9, duration: 0.6, ease: "power2.inOut" },
-            0,
-          )
-          .to(scan, { opacity: 0, duration: 0.16 }, 0.52);
-      }
-
-      if (nameElement) {
-        const split = new GSAPSplitText(nameElement, {
-          type: "chars",
-          charsClass: "split-char",
-        });
-        nameSplitRef.current = split;
-        timeline.from(
-          split.chars,
-          {
-            yPercent: 110,
-            rotateX: -70,
-            opacity: 0,
-            stagger: 0.022,
-            duration: 0.5,
-          },
-          0.06,
-        );
-      }
-
-      if (meta.length) {
-        timeline.from(
-          meta,
-          { y: 10, autoAlpha: 0, stagger: 0.04, duration: 0.38 },
-          0.1,
-        );
-      }
-
-      rows.forEach((row, index) => {
-        const fill = row.querySelector(".stat-fill");
-        const valueElement = row.querySelector(".stat-value");
-        const value = Number(row.dataset.value ?? 0);
-        const percent = Number(row.dataset.pct ?? 0);
-        const at = 0.16 + index * 0.05;
-
-        if (fill) {
-          timeline.fromTo(
-            fill,
-            { width: "0%" },
-            { width: `${percent}%`, duration: 0.72 },
-            at,
-          );
-        }
-
-        if (valueElement) {
-          const proxy = { value: 0 };
-          timeline.to(
-            proxy,
-            {
-              value,
-              duration: 0.72,
-              onUpdate: () => {
-                valueElement.textContent = String(Math.round(proxy.value));
-              },
-              onComplete: () => {
-                valueElement.textContent = String(value);
-              },
-            },
-            at,
-          );
-        }
+      timeline.from(tiles, {
+        y: 16,
+        autoAlpha: 0,
+        duration: 0.4,
+        stagger: 0.035,
       });
 
-      if (totalElement) {
+      timeline.from(
+        bars,
+        { scaleX: 0, transformOrigin: "left center", duration: 0.6, stagger: 0.06 },
+        0.12,
+      );
+
+      values.forEach((node, index) => {
+        const target = Number(node.dataset.value ?? 0);
         const proxy = { value: 0 };
         timeline.to(
           proxy,
           {
-            value: totalValue,
-            duration: 0.9,
+            value: target,
+            duration: 0.6,
             onUpdate: () => {
-              totalElement.textContent = String(Math.round(proxy.value));
+              node.textContent = String(Math.round(proxy.value));
             },
             onComplete: () => {
-              totalElement.textContent = String(totalValue);
+              node.textContent = String(target);
             },
           },
-          0.2,
+          0.14 + index * 0.05,
         );
-      }
+      });
 
-      return () => {
-        timeline.kill();
-        nameSplitRef.current?.revert();
-        nameSplitRef.current = null;
-      };
+      figures.forEach((node, index) => {
+        const target = Number(node.dataset.value ?? 0);
+        const proxy = { value: 0 };
+        timeline.to(
+          proxy,
+          {
+            value: target,
+            duration: 0.7,
+            onUpdate: () => {
+              node.textContent = String(Math.round(proxy.value));
+            },
+            onComplete: () => {
+              node.textContent = String(target);
+            },
+          },
+          0.2 + index * 0.06,
+        );
+      });
+
+      timeline.from(
+        cells,
+        { autoAlpha: 0, scale: 0.9, duration: 0.3, stagger: 0.012 },
+        0.24,
+      );
+
+      return () => timeline.kill();
     },
     { scope: screenRef, dependencies: [motion, pokemon?.id] },
   );
-
-  const onArtLoad = contextSafe((event) => {
-    if (!motion) return;
-    gsap.fromTo(
-      event.currentTarget,
-      { autoAlpha: 0, filter: "blur(6px)" },
-      {
-        autoAlpha: 1,
-        filter: "blur(0px)",
-        duration: 0.45,
-        ease: "power2.out",
-        clearProps: "filter,visibility",
-      },
-    );
-  });
-
-  /* Hovering the species name re-runs a short wave through its letters. */
-  const onNameHover = contextSafe(() => {
-    const split = nameSplitRef.current;
-    if (!motion || !split) return;
-    gsap.to(split.chars, {
-      y: -6,
-      duration: 0.22,
-      yoyo: true,
-      repeat: 1,
-      stagger: 0.018,
-      ease: "power2.out",
-      overwrite: "auto",
-    });
-  });
-
-  /* Cursor-follow glow on the dark card. */
-  const onGlowMove = contextSafe((event) => {
-    if (!motion) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    gsap.to(event.currentTarget, {
-      "--glow-x": `${(((event.clientX - rect.left) / rect.width) * 100).toFixed(1)}%`,
-      "--glow-y": `${(((event.clientY - rect.top) / rect.height) * 100).toFixed(1)}%`,
-      duration: 0.3,
-      ease: "power2.out",
-    });
-  });
 
   if (fault) {
     return (
@@ -262,24 +178,39 @@ export default function SpecimenScreen({
 
   const label = titleCase(pokemon.name);
   const types = pokemon.types.map((slot) => slot.type.name);
-  const entries = record?.entries ?? [];
-  const entry = entries[Math.min(entryIndex, entries.length - 1)] ?? null;
   const total = pokemon.stats.reduce((sum, stat) => sum + stat.base_stat, 0);
-  const best = Math.max(...pokemon.stats.map((stat) => stat.base_stat));
-  const radarStats = pokemon.stats.map((stat) => ({
-    key: stat.stat.name,
-    label: STAT_LABELS[stat.stat.name] ?? stat.stat.name,
-    value: stat.base_stat,
-    ratio: Math.min(1, stat.base_stat / statCap(stat.stat.name)),
-  }));
+  const strip = matchupStrip(types);
+  const shinyUrl =
+    pokemon.sprites?.front_shiny ??
+    pokemon.sprites?.other?.["official-artwork"]?.front_shiny ??
+    null;
+  const scopeLabel = statsScope === "all" ? "Pokémon" : "the registry";
 
   return (
-    <article
-      className="screen"
-      ref={screenRef}
-      data-total={total}
-      onPointerMove={onGlowMove}
-    >
+    <article className="screen bento-screen" ref={screenRef}>
+      {/* The phosphor field sits in the gutters between tiles, tinted by the
+          specimen's primary type. */}
+      <div className="bento-terminal" aria-hidden="true">
+        <FaultyTerminal
+          tint={typeAccent(types[0])}
+          glyphs="blocks"
+          scale={1.7}
+          gridMul={[2, 1]}
+          digitSize={1.15}
+          timeScale={0.32}
+          brightness={0.62}
+          glow={0.5}
+          persistence={0.45}
+          mouseStrength={0.22}
+          mouseGlow={0.5}
+          scanlineIntensity={0.22}
+          curvature={0.06}
+          vignette={0.4}
+          clickEffect="glitch"
+          variation={pokemon.id}
+        />
+      </div>
+
       <header className="screen-head">
         <p className="screen-no">
           <DecryptedText text={formatNumber(pokemon.id)} />
@@ -287,17 +218,24 @@ export default function SpecimenScreen({
         <p className="screen-genus">{record?.genus || "Specimen"}</p>
       </header>
 
-      <div className="screen-stack">
-        <div className="screen-body">
-          <div className="art-well">
-            <span className="scan-line" aria-hidden="true" />
+      <div className="bento">
+        {/* 1 — sprite ------------------------------------------------ */}
+        <section
+          className="bento-tile bento-sprite"
+          aria-labelledby="bento-name"
+          style={{
+            "--type-glow": typeAccent(types[0]),
+            "--type-second": typeAccent(types[1] ?? types[0]),
+          }}
+        >
+          <span className="bento-sprite__glow" aria-hidden="true" />
+          <div className="bento-sprite__art">
             <img
-              className="pixel-sprite"
+              className={`bento-sprite__img${shiny ? "" : " is-on"}`}
               src={pixelSpriteUrl(pokemon.id)}
               alt={`${label} Red/Blue sprite`}
-              width="40"
-              height="40"
-              onLoad={onArtLoad}
+              width="96"
+              height="96"
               onError={(event) => {
                 const image = event.currentTarget;
                 const step = image.dataset.fallback ?? "0";
@@ -313,137 +251,232 @@ export default function SpecimenScreen({
                 }
               }}
             />
+            {shinyUrl && (
+              <img
+                className={`bento-sprite__img bento-sprite__img--shiny${shiny ? " is-on" : ""}`}
+                src={shinyUrl}
+                alt=""
+                aria-hidden="true"
+                width="96"
+                height="96"
+                loading="lazy"
+              />
+            )}
           </div>
 
-          <div className="screen-copy">
-            <h3 key={pokemon.id} onPointerEnter={onNameHover}>
+          <div className="bento-sprite__meta">
+            <p className="bento-sprite__no">{formatNumber(pokemon.id)}</p>
+            <h3 id="bento-name" className="bento-sprite__name">
               {label}
             </h3>
-            <ul className="type-list">
+            <p className="bento-sprite__genus">{record?.genus || "Specimen"}</p>
+            <ul className="bento-types">
               {types.map((name) => (
-                <li key={name} className="type-tag">
-                  <span
-                    className="lamp lamp--chip"
-                    aria-hidden="true"
-                    style={{ "--chip": typeAccent(name) }}
-                  />
+                <li
+                  key={name}
+                  className="bento-type"
+                  style={{ "--chip": typeAccent(name) }}
+                >
                   {name}
                 </li>
               ))}
             </ul>
-
-            <dl className="measures">
-              <div>
-                <dt>Height</dt>
-                <dd>{(pokemon.height / 10).toFixed(1)} m</dd>
-              </div>
-              <div>
-                <dt>Weight</dt>
-                <dd>{(pokemon.weight / 10).toFixed(1)} kg</dd>
-              </div>
-              <div>
-                <dt>Base exp</dt>
-                <dd>{pokemon.base_experience ?? "—"}</dd>
-              </div>
-            </dl>
           </div>
-        </div>
 
-        <section className="entry-block" aria-labelledby="entry-title">
-          <div className="entry-head">
-            <h4 className="stats-title" id="entry-title">
-              Pokédex entry
-            </h4>
-            <p className="entry-version">
-              {entry ? entry.label : "Reading"}
-              {entries.length > 1 ? ` · ${entryIndex + 1}/${entries.length}` : ""}
-            </p>
-          </div>
-          <TextType
-            key={`${pokemon.id}-${entryIndex}`}
-            className="entry-text"
-            text={entry?.text || "No English entry on record for this species."}
-          />
-          <VersionTray
-            versions={entries}
-            index={entryIndex}
-            onChange={setEntryIndex}
-          />
+          <button
+            type="button"
+            className={`shiny-toggle${shiny ? " is-on" : ""} cursor-target`}
+            aria-pressed={shiny}
+            aria-label={
+              shinyUrl
+                ? `Show shiny ${label}`
+                : `No shiny sprite on record for ${label}`
+            }
+            data-cursor-label={shiny ? "Default" : "Shiny"}
+            disabled={!shinyUrl}
+            onClick={() => setShiny((current) => !current)}
+          >
+            <span className="shiny-toggle__dot" aria-hidden="true" />
+            Shiny
+          </button>
         </section>
 
-        <div className="stats">
-          <div className="stats-head">
-            <h4 className="stats-title">Base stats</h4>
-            <p className="stats-total">
-              Total{" "}
-              <span className="stats-total-value">{total}</span>
+        {/* 2 — stats ------------------------------------------------- */}
+        <section className="bento-tile bento-stats" aria-labelledby="bento-stats">
+          <div className="bento-head">
+            <h4 className="bento-label" id="bento-stats">
+              Base stats
+            </h4>
+            <p className="bento-note">
+              Total <span className="stats-total-value">{total}</span>
             </p>
           </div>
 
-          <div className="stats-body">
-            <StatRadar
-              stats={radarStats}
-              active={activeStat}
-              total={total}
-              percentiles={percentiles}
-              label={label}
-            />
+          <ul className="stat-list">
+            {pokemon.stats.map((stat) => {
+              const name = stat.stat.name;
+              const percentile = percentileFor(statsIndex, name, stat.base_stat);
+              const tone = statTone(percentile);
+              return (
+                <li key={name} className="stat-item" data-tone={tone}>
+                  <span className="stat-name">
+                    {STAT_LABELS[name] ?? name}
+                  </span>
+                  <span className="stat-bar" aria-hidden="true">
+                    <span
+                      className="stat-bar__fill"
+                      style={{
+                        width: `${percentile ?? Math.min(100, (stat.base_stat / 180) * 100)}%`,
+                      }}
+                    />
+                  </span>
+                  <span className="stat-reading" data-value={stat.base_stat}>
+                    {stat.base_stat}
+                  </span>
+                  <span className="stat-rank">
+                    {percentile == null
+                      ? "ranking…"
+                      : name === "speed"
+                        ? `faster than ${percentile}% of ${scopeLabel}`
+                        : `higher than ${percentile}% of ${scopeLabel}`}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
 
-            <div className="stat-rows">
-              {pokemon.stats.map((stat) => {
-                const name = stat.stat.name;
-                const statLabel = STAT_LABELS[name] ?? name;
-                const percent = Math.min(
-                  100,
-                  Math.round((stat.base_stat / statCap(name)) * 100),
-                );
-                const pressed = activeStat === name;
-
-                return (
-                  <button
-                    key={name}
-                    type="button"
-                    className={`stat-row${stat.base_stat === best ? " is-max" : ""}`}
-                    aria-pressed={pressed}
-                    data-value={stat.base_stat}
-                    data-pct={percent}
-                    onClick={() =>
-                      setActiveStat((current) => (current === name ? null : name))
-                    }
-                    onMouseEnter={() => setActiveStat(name)}
-                    onMouseLeave={() =>
-                      setActiveStat((current) =>
-                        current === name ? null : current,
-                      )
-                    }
-                    onFocus={() => setActiveStat(name)}
-                    onBlur={() =>
-                      setActiveStat((current) =>
-                        current === name ? null : current,
-                      )
-                    }
-                  >
-                    <span className="stat-label">{statLabel}</span>
-                    <span className="stat-track" aria-hidden="true">
-                      <span
-                        className="stat-fill js-bar"
-                        style={{ width: `${percent}%` }}
-                      />
-                    </span>
-                    <span className="stat-value">{stat.base_stat}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+        {/* 3 — measurements ------------------------------------------ */}
+        <div className="bento-tile bento-metric">
+          <p className="bento-label">Height</p>
+          <p className="bento-figure" data-value={pokemon.height}>
+            {(pokemon.height / 10).toFixed(1)}
+          </p>
+          <p className="bento-unit">metres</p>
         </div>
 
-        <AbilityList abilities={abilities} />
+        <div className="bento-tile bento-metric">
+          <p className="bento-label">Weight</p>
+          <p className="bento-figure" data-value={pokemon.weight}>
+            {(pokemon.weight / 10).toFixed(1)}
+          </p>
+          <p className="bento-unit">kilograms</p>
+        </div>
+
+        <div className="bento-tile bento-metric">
+          <p className="bento-label">Base exp</p>
+          <p className="bento-figure" data-value={pokemon.base_experience ?? 0}>
+            {pokemon.base_experience ?? "—"}
+          </p>
+          <p className="bento-unit">yield on defeat</p>
+        </div>
+
+        <div className="bento-tile bento-metric bento-metric--led">
+          <p className="bento-label">Species ID</p>
+          <p className="bento-figure">{String(pokemon.id).padStart(4, "0")}</p>
+          <p className="bento-unit">national dex</p>
+        </div>
+
+        {/* 4 — abilities --------------------------------------------- */}
+        <section className="bento-tile bento-abilities" aria-labelledby="bento-abilities">
+          <div className="bento-head">
+            <h4 className="bento-label" id="bento-abilities">
+              Abilities
+            </h4>
+            <p className="bento-note">{abilities?.length ?? 0} on record</p>
+          </div>
+          <AbilityList abilities={abilities} />
+        </section>
+
+        {/* 5 — type matchups ----------------------------------------- */}
+        <section className="bento-tile bento-matchup" aria-labelledby="bento-matchup">
+          <div className="bento-head">
+            <h4 className="bento-label" id="bento-matchup">
+              Type matchups
+            </h4>
+            <p className="bento-note">incoming damage</p>
+          </div>
+
+          <ul className="matchup-strip">
+            {strip.map((cell) => (
+              <li
+                key={cell.type}
+                className="matchup-cell"
+                data-tone={multiplierTone(cell.multiplier)}
+                aria-label={`${cell.type} moves deal ${formatMultiplier(cell.multiplier)} damage`}
+                style={{ "--cell-type": typeAccent(cell.type) }}
+              >
+                <span className="matchup-cell__type" aria-hidden="true">
+                  {cell.short}
+                </span>
+                <span className="matchup-cell__mult" aria-hidden="true">
+                  {formatMultiplier(cell.multiplier)}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <ul className="matchup-legend" aria-hidden="true">
+            {[
+              ["immune", "0×"],
+              ["resist-low", "¼×"],
+              ["resist", "½×"],
+              ["neutral", "1×"],
+              ["weak", "2×"],
+              ["weak-high", "4×"],
+            ].map(([tone, text]) => (
+              <li key={tone} data-tone={tone}>
+                <span className="matchup-legend__swatch" />
+                {text}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* 6 — flavor ------------------------------------------------ */}
+        <section className="bento-tile bento-flavor" aria-labelledby="bento-entry">
+          <div className="bento-head">
+            <h4 className="bento-label" id="bento-entry">
+              Pokédex entry
+            </h4>
+            {groups.length > 0 && (
+              <label className="version-select">
+                <span>Game</span>
+                <select
+                  value={entry?.version ?? ""}
+                  onChange={(event) => setVersion(event.target.value)}
+                  aria-label="Choose the game this entry is read from"
+                  className="cursor-target"
+                  data-cursor-label="Switch game"
+                >
+                  {groups.map((group) => (
+                    <optgroup key={group.id} label={group.label}>
+                      {group.entries.map((item) => (
+                        <option key={item.version} value={item.version}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+
+          <TextType
+            key={`${pokemon.id}-${entry?.version ?? "none"}`}
+            className="entry-text bento-entry"
+            text={entry?.text || "No English entry on record for this species."}
+          />
+
+          <p className="bento-note bento-flavor__foot">
+            {entry ? `${entry.label} · ${entries.length} English entries` : "No entry"}
+          </p>
+        </section>
       </div>
 
       <p className="screen-foot">
-        Source PokéAPI · Red/Blue sprite · National Dex {formatNumber(pokemon.id)} ·{" "}
-        {entries.length} English {entries.length === 1 ? "entry" : "entries"}
+        Source PokéAPI · Red/Blue sprite · National Dex {formatNumber(pokemon.id)}
       </p>
     </article>
   );

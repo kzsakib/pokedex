@@ -16,6 +16,8 @@ import {
   titleCase,
 } from "./api";
 import { ScrollTrigger, gsap } from "./motion";
+import { useLenis } from "lenis/react";
+import TargetCursor from "./components/TargetCursor";
 import { useMotion } from "./motionSettings";
 import { SplitWords } from "./SplitText";
 import InteractiveTitle from "./InteractiveTitle";
@@ -42,6 +44,7 @@ export default function App() {
   const ventsRef = useRef(null);
   const searchRef = useRef(null);
   const progressRef = useRef(null);
+  const { lenis } = useLenis();
 
   const [index, setIndex] = useState([]);
   const [entries, setEntries] = useState({});
@@ -194,6 +197,18 @@ export default function App() {
     });
   }, [index, entries, query, type]);
 
+  /* Stats index & scope for percentiles across the live archive. */
+  const statsIndex = useMemo(() => {
+    if (!Object.keys(entries).length) return { scope: "the registry", data: [] };
+    const rows = Object.entries(entries)
+      .map(([id, p]) => {
+        const stats = p?.stats?.map((s) => ({ name: s.stat.name, base_stat: s.base_stat })) ?? [];
+        return { id, stats };
+      })
+      .filter((r) => r.stats.length > 0);
+    return { scope: "Pokémon", data: rows };
+  }, [entries]);
+
   const selectedEntry = index.find((item) => item.id === selectedId);
   const pokemon = entries[selectedId] ?? null;
   const record = records[selectedId] ?? null;
@@ -203,24 +218,21 @@ export default function App() {
   /* How this specimen's base stats rank across the scanned registry. */
   const percentiles = useMemo(() => {
     if (!pokemon) return {};
-    const scannedEntries = Object.values(entries);
+    const { data: scannedEntries = [] } = statsIndex ?? {};
     if (!scannedEntries.length) return {};
 
     return Object.fromEntries(
       pokemon.stats.map((stat) => {
         const key = stat.stat.name;
         const values = scannedEntries
-          .map(
-            (entry) =>
-              entry.stats?.find((slot) => slot.stat.name === key)?.base_stat,
-          )
+          .map((entry) => entry.stats?.find((slot) => slot.stat.name === key)?.base_stat)
           .filter((value) => typeof value === "number");
         if (!values.length) return [key, null];
         const below = values.filter((value) => value < stat.base_stat).length;
         return [key, Math.round((below / values.length) * 100)];
       }),
     );
-  }, [entries, pokemon]);
+  }, [statsIndex, pokemon]);
 
   const primaryType = pokemon?.types?.[0]?.type.name;
   const accentStyle = useMemo(() => accentVars(primaryType), [primaryType]);
@@ -329,6 +341,23 @@ export default function App() {
     if (!readout || dialRef.current?.classList.contains("is-spinning")) return;
     if (selectedEntry) readout.textContent = selectedEntry.number;
   }, [selectedEntry]);
+
+  /* After randomize selects a new entry, scroll specimen-bay into view. */
+  useEffect(() => {
+    const scheduled = setTimeout(() => {
+      if (lenis) {
+        lenis.scrollTo("#specimen-bay", {
+          offset: -80,
+          duration: 1,
+          easing: (t) => Math.min(1, 0.1 + 0.9 * t),
+        });
+      } else {
+        const target = document.getElementById("specimen-bay");
+        target?.scrollIntoView({ behavior: "auto", block: "start" });
+      }
+    }, 0);
+    return () => clearTimeout(scheduled);
+  }, [selectedId, lenis]);
 
   useEffect(() => {
     if (booted && scanned > 0) flashVents(0.55);
@@ -500,6 +529,8 @@ export default function App() {
       <a className="skip-link" href="#archive-bay">
         Skip to archive
       </a>
+
+      <TargetCursor />
 
       <div className="scroll-progress" aria-hidden="true">
         <span ref={progressRef} />

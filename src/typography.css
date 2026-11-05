@@ -1,0 +1,97 @@
+/* ------------------------------------------------------------------
+   Type system — three OFL variable families, self-hosted through
+   Fontsource so the document fetches nothing from a font CDN.
+
+   Bricolage Grotesque  display + body (wght 200–800, opsz)
+   Martian Mono         labels, buttons, chips, captions
+   Doto                 LED readouts only: numbers and the dial
+   ------------------------------------------------------------------ */
+
+:root {
+  --font-display: "Bricolage Grotesque Variable", system-ui, sans-serif;
+  --font-body: "Bricolage Grotesque Variable", system-ui, sans-serif;
+  --font-mono: "Martian Mono Variable", ui-monospace, monospace;
+  --font-led: "Doto Variable", var(--font-mono);
+
+  /* Label scale, shared by every mono caption in the interface. */
+  --type-label-size: 10.5px;
+  --type-label-tracking: 0.08em;
+  --type-label-weight: 500;
+}
+
+body {
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+/* Display type: the wordmark and specimen names. Bricolage carries an
+   optical-size axis, so large settings expand the counters and tighten
+   the joins without hand-hinting. */
+.title,
+.screen-copy h3,
+.bento-sprite__name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variation-settings:
+    "opsz" 96,
+    "wght" 780;
+}
+
+/* Every small uppercase label in the instrument. */
+.bay-tag,
+.bay-label,
+.key,
+.key--type,
+.fact dt,
+.hint,
+.control-hint,
+.screen-genus,
+.screen-foot,
+.stats-title,
+.type-tag,
+.index-type,
+.error-copy,
+.bento-label,
+.bento-legend,
+.gallery-tip__head,
+.meta-chip,
+.version-select,
+.evo-caption {
+  font-family: var(--font-mono);
+  font-size: var(--type-label-size);
+  letter-spacing: var(--type-label-tracking);
+  font-weight: var(--type-label-weight);
+}
+
+/* Doto is reserved for readings: dex numbers, stat values, counters and
+   the dial. Never body copy. */
+.screen-no,
+.stat-value,
+.stats-total-value,
+.fact dd,
+.dial-label,
+.dial-readout,
+.archive-count__value,
+.bento-figure,
+.bento-sprite__no,
+.matchup-cell__mult {
+  font-family: var(--font-led);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.screen-no,
+.bento-sprite__no {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.stat-value,
+.bento-figure,
+.stats-total-value,
+.fact dd,
+.archive-count__value {
+  font-weight: 700;
+}

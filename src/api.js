@@ -110,6 +110,57 @@ const VERSION_LABELS = {
   violet: "Violet",
 };
 
+/* Game versions grouped the way a player thinks of them, so the entry
+   selector can offer one optgroup per generation. */
+export const GENERATIONS = [
+  { id: 1, label: "Generation I", versions: ["red", "blue", "yellow"] },
+  { id: 2, label: "Generation II", versions: ["gold", "silver", "crystal"] },
+  {
+    id: 3,
+    label: "Generation III",
+    versions: ["ruby", "sapphire", "emerald", "firered", "leafgreen"],
+  },
+  {
+    id: 4,
+    label: "Generation IV",
+    versions: ["diamond", "pearl", "platinum", "heartgold", "soulsilver"],
+  },
+  {
+    id: 5,
+    label: "Generation V",
+    versions: ["black", "white", "black-2", "white-2"],
+  },
+  {
+    id: 6,
+    label: "Generation VI",
+    versions: ["x", "y", "omega-ruby", "alpha-sapphire"],
+  },
+  {
+    id: 7,
+    label: "Generation VII",
+    versions: ["sun", "moon", "ultra-sun", "ultra-moon"],
+  },
+  {
+    id: 8,
+    label: "Generation VIII",
+    versions: [
+      "sword",
+      "shield",
+      "brilliant-diamond",
+      "shining-pearl",
+      "legends-arceus",
+    ],
+  },
+  { id: 9, label: "Generation IX", versions: ["scarlet", "violet"] },
+];
+
+const GENERATION_OF_VERSION = GENERATIONS.reduce((map, generation) => {
+  generation.versions.forEach((version) => {
+    map[version] = generation;
+  });
+  return map;
+}, {});
+
 const tidy = (text = "") =>
   text.replace(/[\n\f\r]+/g, " ").replace(/\s{2,}/g, " ").trim();
 
@@ -122,12 +173,23 @@ export function readEntries(species) {
 
   return entries.map((entry) => {
     const version = entry.version?.name ?? "unknown";
+    const generation = GENERATION_OF_VERSION[version];
     return {
       version,
       label: VERSION_LABELS[version] ?? titleCase(version),
       text: tidy(entry.flavor_text),
+      generation: generation?.id ?? 0,
+      generationLabel: generation?.label ?? "Later releases",
     };
   });
+}
+
+/* Entries bucketed for a grouped <select>: one optgroup per generation. */
+export function entriesByGeneration(entries = []) {
+  return GENERATIONS.map((generation) => ({
+    ...generation,
+    entries: entries.filter((entry) => entry.generation === generation.id),
+  })).filter((group) => group.entries.length);
 }
 
 export function readAbilityText(ability) {
