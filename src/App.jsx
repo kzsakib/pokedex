@@ -30,6 +30,7 @@ import InteractiveTitle from "./InteractiveTitle";
 import Gallery from "./Gallery";
 import RailRuler from "./RailRuler";
 import { accentVars } from "./typeColors";
+import { playSfx, toggleMuted, useSound } from "./audio";
 import BootScreen from "./components/BootScreen";
 import ClickSpark from "./components/ClickSpark";
 import CountUp from "./components/CountUp";
@@ -67,6 +68,10 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(DEFAULT_ENTRY);
   const [query, setQuery] = useState("");
   const [type, setType] = useState("all");
+  /* A hovered type chip previews its palette over the selected specimen's
+     accent; leaving the chip drops straight back to the persistent pick. */
+  const [hoverType, setHoverType] = useState(null);
+  const muted = useSound();
   const [faultId, setFaultId] = useState(null);
   const [attempt, setAttempt] = useState(0);
 
@@ -248,7 +253,21 @@ export default function App() {
   const line = lines[selectedId] ?? [];
 
   const primaryType = pokemon?.types?.[0]?.type.name;
-  const accentStyle = useMemo(() => accentVars(primaryType), [primaryType]);
+  const accentType = hoverType ?? primaryType;
+  const accentStyle = useMemo(() => accentVars(accentType), [accentType]);
+
+  /* Which archive cells belong to the previewed type. Null means the wall
+     is not previewing and every cell reads at full strength. */
+  const hotIds = useMemo(() => {
+    if (!hoverType) return null;
+    const ids = new Set();
+    Object.entries(entries).forEach(([id, data]) => {
+      if (data?.types?.some((slot) => slot.type.name === hoverType)) {
+        ids.add(Number(id));
+      }
+    });
+    return ids;
+  }, [hoverType, entries]);
 
   const { contextSafe } = useGSAP({ scope: shellRef });
 
@@ -256,6 +275,63 @@ export default function App() {
     setSelectedId(id);
     setFaultId((current) => (current === id ? null : current));
   }, []);
+
+  const previewType = useCallback((name) => {
+    setHoverType((current) => (current === name ? current : name));
+  }, []);
+
+  /* A preview must never outlive the pointer: leaving the window or losing
+     focus drops it even if the chip's own leave event was missed. */
+  useEffect(() => {
+    if (!hoverType) return undefined;
+    const clear = () => setHoverType(null);
+    document.documentElement.addEventListener("pointerleave", clear);
+    window.addEventListener("blur", clear);
+    return () => {
+      document.documentElement.removeEventListener("pointerleave", clear);
+      window.removeEventListener("blur", clear);
+    };
+  }, [hoverType]);
+
+  /* One delegated ear for the whole interface: every key, chip, link and
+     select gets the same hover tick and press, no per-element wiring. */
+  useEffect(() => {
+    const HOVERABLE = "button, a[href], select, summary, .key";
+    const PRESSABLE = "button, a[href], select, input, .key";
+    let last = null;
+
+    const onOver = (event) => {
+      const target = event.target.closest?.(HOVERABLE);
+      if (!target || target === last) return;
+      if (target.closest(".gallery-cell")) return;
+      last = target;
+      playSfx("hover");
+    };
+    const onOut = (event) => {
+      const target = event.target.closest?.(HOVERABLE);
+      if (target && target === last) last = null;
+    };
+    const onPress = (event) => {
+      if (event.target.closest?.(PRESSABLE)) playSfx("click");
+    };
+
+    document.addEventListener("pointerover", onOver, true);
+    document.addEventListener("pointerout", onOut, true);
+    document.addEventListener("pointerdown", onPress, true);
+    return () => {
+      document.removeEventListener("pointerover", onOver, true);
+      document.removeEventListener("pointerout", onOut, true);
+      document.removeEventListener("pointerdown", onPress, true);
+    };
+  }, []);
+
+  /* A record landing on the bench chirps once. */
+  const announcedRef = useRef(null);
+  useEffect(() => {
+    if (!pokemon?.id || announcedRef.current === pokemon.id) return;
+    announcedRef.current = pokemon.id;
+    playSfx("reveal");
+  }, [pokemon?.id]);
 
   const clearFilters = useCallback(() => {
     setQuery("");
@@ -601,9 +677,26 @@ export default function App() {
             </button>
             <p className="control-hint" id="dial-hint">
               Picks a random specimen from the archive.
-            </p>
-            <button type="button" className="key key--wide" onClick={clearFilters}>
+            </p>              <button type="button" className="key key--wide" onClick={clearFilters}>
               Clear filters
+            </button>
+            <button
+              type="button"
+              className="key key--wide mute-key"
+              aria-pressed={!muted}
+              onClick={toggleMuted}
+            >
+              <span className="mute-key__icon" aria-hidden="true">
+                <svg viewBox="0 0 16 16">
+                  <path d="M2 6h2.4L8 3v10L4.4 10H2z" />
+                  {muted ? (
+                    <path d="M10.6 6l3 4M13.6 6l-3 4" />
+                  ) : (
+                    <path d="M10.4 5.4a3.6 3.6 0 010 5.2M12.4 3.6a6.2 6.2 0 010 8.8" />
+                  )}
+                </svg>
+              </span>
+              {muted ? "Sound off" : "Sound on"}
             </button>
           </div>
         </section>
@@ -684,6 +777,9 @@ export default function App() {
             onClear={clearFilters}
             searchRef={searchRef}
             feed={feed}
+            hoverType={hoverType}
+            hotIds={hotIds}
+            onTypeHover={previewType}
           />
         </section>
 

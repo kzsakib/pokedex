@@ -86,9 +86,10 @@ export default function InteractiveTitle() {
             char.textContent = finalChars[index];
           });
 
-          /* The accent character becomes a Pokéball that tracks the cursor. */
+          /* The Pokéball stands in for the wordmark's O — not the É — and
+             tracks the cursor from that slot. */
           const accent = split.chars.find(
-            (char) => char.textContent.toLowerCase() === "é",
+            (char) => char.textContent.toLowerCase() === "o",
           );
           if (accent) {
             accent.classList.add("has-ball");

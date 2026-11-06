@@ -10,7 +10,7 @@ import {
   titleCase,
 } from "./api";
 import { percentileFor } from "./census";
-import { typeAccent } from "./typeColors";
+import { markOnDark, typeAccent } from "./typeColors";
 import {
   formatMultiplier,
   matchupStrip,
@@ -18,6 +18,7 @@ import {
 } from "./typeChart";
 import { gsap } from "./motion";
 import { useMotion } from "./motionSettings";
+import { playCry } from "./audio";
 import DecryptedText from "./components/DecryptedText";
 import TextType from "./components/TextType";
 import FaultyTerminal from "./components/FaultyTerminal";
@@ -54,9 +55,10 @@ export default function SpecimenScreen({
   const bentoRef = useRef(null);
   const [version, setVersion] = useState(null);
   const [shiny, setShiny] = useState(false);
+  const [crying, setCrying] = useState(false);
 
-  /* SpotlightCard-style highlight: the tile under the pointer carries a
-     soft accent pool that tracks the cursor. */
+  /* Cursor-tracking border glow: each tile records where the pointer is so
+     its edge can light up locally instead of the whole plate washing out. */
   const trackSpotlight = (event) => {
     const grid = bentoRef.current;
     if (!grid) return;
@@ -65,8 +67,8 @@ export default function SpecimenScreen({
     if (lit && lit !== tile) lit.classList.remove("is-lit");
     if (!tile) return;
     const rect = tile.getBoundingClientRect();
-    tile.style.setProperty("--spot-x", `${event.clientX - rect.left}px`);
-    tile.style.setProperty("--spot-y", `${event.clientY - rect.top}px`);
+    tile.style.setProperty("--mouse-x", `${event.clientX - rect.left}px`);
+    tile.style.setProperty("--mouse-y", `${event.clientY - rect.top}px`);
     tile.classList.add("is-lit");
   };
 
@@ -77,6 +79,7 @@ export default function SpecimenScreen({
   useEffect(() => {
     setShiny(false);
     setVersion(null);
+    setCrying(false);
   }, [pokemon?.id]);
 
   const entries = record?.entries ?? [];
@@ -209,6 +212,7 @@ export default function SpecimenScreen({
     pokemon.sprites?.front_shiny ??
     pokemon.sprites?.other?.["official-artwork"]?.front_shiny ??
     null;
+  const cryUrl = pokemon.cries?.latest ?? pokemon.cries?.legacy ?? null;
   const scopeLabel = statsScope === "all" ? "Pokémon" : "the registry";
 
   return (
@@ -313,22 +317,44 @@ export default function SpecimenScreen({
             </ul>
           </div>
 
-          <button
-            type="button"
-            className={`shiny-toggle${shiny ? " is-on" : ""} cursor-target`}
-            aria-pressed={shiny}
-            aria-label={
-              shinyUrl
-                ? `Show shiny ${label}`
-                : `No shiny sprite on record for ${label}`
-            }
-            data-cursor-label={shiny ? "Default" : "Shiny"}
-            disabled={!shinyUrl}
-            onClick={() => setShiny((current) => !current)}
-          >
-            <span className="shiny-toggle__dot" aria-hidden="true" />
-            Shiny
-          </button>
+          <div className="sprite-actions">
+            <button
+              type="button"
+              className={`shiny-toggle cry-toggle${crying ? " is-on" : ""} cursor-target`}
+              aria-label={cryUrl ? `Play ${label} cry` : `No cry on record for ${label}`}
+              data-cursor-label="Cry"
+              disabled={!cryUrl}
+              onClick={() => {
+                playCry(cryUrl);
+                setCrying(true);
+                window.setTimeout(() => setCrying(false), 900);
+              }}
+            >
+              <span className="cry-toggle__wave" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+              Cry
+            </button>
+
+            <button
+              type="button"
+              className={`shiny-toggle${shiny ? " is-on" : ""} cursor-target`}
+              aria-pressed={shiny}
+              aria-label={
+                shinyUrl
+                  ? `Show shiny ${label}`
+                  : `No shiny sprite on record for ${label}`
+              }
+              data-cursor-label={shiny ? "Default" : "Shiny"}
+              disabled={!shinyUrl}
+              onClick={() => setShiny((current) => !current)}
+            >
+              <span className="shiny-toggle__dot" aria-hidden="true" />
+              Shiny
+            </button>
+          </div>
         </section>
 
         {/* 2 — stats ------------------------------------------------- */}
@@ -442,7 +468,7 @@ export default function SpecimenScreen({
                 className="matchup-cell"
                 data-tone={multiplierTone(cell.multiplier)}
                 aria-label={`${cell.type} moves deal ${formatMultiplier(cell.multiplier)} damage`}
-                style={{ "--cell-type": typeAccent(cell.type) }}
+                style={{ "--cell-type": markOnDark(cell.type) }}
               >
                 <span className="matchup-cell__type" aria-hidden="true">
                   {cell.type}

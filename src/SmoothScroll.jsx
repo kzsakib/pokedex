@@ -4,6 +4,12 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import "lenis/dist/lenis.css";
 import { useMotion } from "./motionSettings";
 
+/* Lenis is the only thing allowed to move the page. Native smooth scrolling
+   on top of it produces two animations fighting for the same scroll offset,
+   which reads as stutter, so the CSS behaviour is pinned to auto (see
+   `html { scroll-behavior: auto }` in styles.css) and every programmatic
+   move goes through `lenis.scrollTo`. */
+
 /* Keeps GSAP's scroll work in step with Lenis, which drives the page scroll. */
 function ScrollTriggerBridge() {
   const lenis = useLenis();
@@ -19,6 +25,11 @@ function ScrollTriggerBridge() {
   return null;
 }
 
+/* A long exponential ease-out: the page keeps drifting after the wheel stops
+   and settles without a bounce. Time-based rather than lerp-based so the
+   glide is identical on 60Hz and 120Hz displays. */
+const easeOutExpo = (time) => (time === 1 ? 1 : 1 - 2 ** (-10 * time));
+
 export default function SmoothScroll({ children }) {
   const { motion } = useMotion();
 
@@ -28,16 +39,15 @@ export default function SmoothScroll({ children }) {
     <ReactLenis
       root
       options={{
-        /* A low lerp gives the wheel a long, weighted glide; the multiplier
-           is trimmed so a single notch travels less per frame. */
-        lerp: 0.045,
-        wheelMultiplier: 0.85,
+        autoRaf: true,
+        duration: 1.15,
+        easing: easeOutExpo,
         smoothWheel: true,
-        /* Touch pans are eased too, at a firmer lerp so they never trail. */
-        syncTouch: true,
-        syncTouchLerp: 0.075,
-        touchInertiaMultiplier: 28,
-        touchMultiplier: 1.4,
+        wheelMultiplier: 1,
+        /* Touch keeps the platform's own momentum: syncing it to Lenis makes
+           a phone flick feel like it is stuck in treacle. */
+        syncTouch: false,
+        touchMultiplier: 1.6,
       }}
     >
       <ScrollTriggerBridge />

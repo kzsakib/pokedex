@@ -5,6 +5,7 @@ import { fetchSpecies, pixelSpriteUrl, readEntries, titleCase } from "./api";
 import { gsap, prefersReducedMotion } from "./motion";
 import DecryptedText from "./components/DecryptedText";
 import TextType from "./components/TextType";
+import { inkOnLight, markOnLight, typeAccent } from "./typeColors";
 import { TYPES } from "./types";
 
 /* Species records are fetched on first hover and kept for the session so the
@@ -39,6 +40,9 @@ export default function Gallery({
   onClear,
   searchRef,
   feed,
+  hoverType = null,
+  hotIds = null,
+  onTypeHover,
 }) {
   const rootRef = useRef(null);
   const gridRef = useRef(null);
@@ -277,6 +281,7 @@ export default function Gallery({
           role="group"
           aria-label="Filter by type"
           ref={bankRef}
+          onPointerLeave={() => onTypeHover?.(null)}
         >
           <span className="chip-pill" aria-hidden="true" ref={pillRef} />
           <button
@@ -293,6 +298,14 @@ export default function Gallery({
               type="button"
               className="key key--type"
               aria-pressed={type === name}
+              style={{
+                "--chip": typeAccent(name),
+                "--chip-ink": inkOnLight(name),
+                "--chip-mark": markOnLight(name),
+              }}
+              onPointerEnter={() => onTypeHover?.(name)}
+              onFocus={() => onTypeHover?.(name)}
+              onBlur={() => onTypeHover?.(null)}
               onClick={() => onType(name)}
             >
               {name}
@@ -317,8 +330,9 @@ export default function Gallery({
         </div>
       ) : items.length ? (
         <div
-          className="gallery-grid"
+          className={`gallery-grid${hoverType ? " is-previewing" : ""}`}
           ref={gridRef}
+          style={{ "--hot": typeAccent(hoverType ?? "normal") }}
           onPointerOver={(event) => {
             const cell = event.target.closest?.(".gallery-cell");
             if (!cell || cell.classList.contains("is-skeleton")) return;
@@ -338,7 +352,7 @@ export default function Gallery({
               type="button"
               data-id={item.id}
               tabIndex={item.id === focusableId ? 0 : -1}
-              className={`gallery-cell cursor-target${item.id === selectedId ? " is-selected" : ""}`}
+              className={`gallery-cell cursor-target${item.id === selectedId ? " is-selected" : ""}${hoverType && hotIds?.has(item.id) ? " is-type-hot" : ""}`}
               aria-current={item.id === selectedId ? "true" : undefined}
               aria-label={`${item.number} ${titleCase(item.name)}`}
               data-cursor-label={`${item.number} ${titleCase(item.name)}`}

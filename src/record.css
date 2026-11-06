@@ -46,6 +46,8 @@
 }
 
 .bento-tile {
+  --mouse-x: 50%;
+  --mouse-y: 50%;
   position: relative;
   min-width: 0;
   padding: 13px 14px;
@@ -70,16 +72,37 @@
     0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
-/* Spotlight: the accent pools under the pointer instead of filling the
-   whole tile, so the plate reads as lit rather than repainted. */
-.bento-tile.is-lit {
-  background:
-    radial-gradient(
-      240px circle at var(--spot-x, 50%) var(--spot-y, 50%),
-      color-mix(in srgb, var(--accent) 22%, transparent) 0%,
-      transparent 68%
-    ),
-    linear-gradient(180deg, #1b2226 0%, #161c20 100%);
+/* Cursor-tracking border glow. A masked plate paints a 1px ring, and the
+   radial gradient inside it is anchored to the pointer, so only the edge
+   near the cursor lights up. No ambient wash across the tile. */
+.bento-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    190px circle at var(--mouse-x) var(--mouse-y),
+    color-mix(in srgb, var(--accent) 78%, #ffffff) 0%,
+    color-mix(in srgb, var(--accent) 42%, transparent) 42%,
+    transparent 72%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  transition: opacity 200ms ease;
+}
+
+.bento-tile.is-lit::before {
+  opacity: 1;
 }
 
 .bento-head {
@@ -105,7 +128,7 @@
   font-size: 8.5px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #74838a;
+  color: #93a0a7;
   white-space: nowrap;
 }
 
@@ -215,11 +238,17 @@
   color: #eff4f5;
 }
 
-.shiny-toggle {
+.sprite-actions {
   position: absolute;
   top: 12px;
   right: 12px;
   z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shiny-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -266,6 +295,50 @@
 .shiny-toggle:disabled {
   opacity: 0.38;
   cursor: not-allowed;
+}
+
+/* Cry button: three bars that answer while the sample plays. */
+.cry-toggle__wave {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 9px;
+}
+
+.cry-toggle__wave span {
+  width: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  height: 5px;
+}
+
+.cry-toggle__wave span:nth-child(2) {
+  height: 9px;
+}
+
+.cry-toggle__wave span:nth-child(3) {
+  height: 6.5px;
+}
+
+.cry-toggle.is-on .cry-toggle__wave span {
+  animation: cryBar 460ms ease-in-out infinite alternate;
+}
+
+.cry-toggle.is-on .cry-toggle__wave span:nth-child(2) {
+  animation-delay: 90ms;
+}
+
+.cry-toggle.is-on .cry-toggle__wave span:nth-child(3) {
+  animation-delay: 180ms;
+}
+
+@keyframes cryBar {
+  from {
+    transform: scaleY(0.55);
+  }
+  to {
+    transform: scaleY(1.35);
+  }
 }
 
 /* ---------- 2. stats tile ---------- */
@@ -335,7 +408,7 @@
   font-size: 7.5px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #6d7a81;
+  color: #9aa7ae;
 }
 
 .stat-item[data-tone="high"] {
@@ -373,7 +446,7 @@
   font-size: 8px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #6f7c83;
+  color: #95a3aa;
 }
 
 .bento-metric--led .bento-figure {
@@ -446,22 +519,24 @@
 
 .matchup-strip {
   display: grid;
-  /* Eighteen 30px slivers were unreadable: let the strip flow at a legible
-     minimum and wrap instead of crushing the labels. */
-  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
-  gap: 5px;
-  margin: 10px 0 10px;
+  /* Cells carry a full type name at readable size, so they wrap at a wider
+     minimum instead of being crushed into slivers. */
+  grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+  gap: 6px;
+  margin: 10px 0 11px;
   padding: 0;
   list-style: none;
 }
 
 .matchup-cell {
+  position: relative;
   display: grid;
   place-items: center;
-  gap: 2px;
-  padding: 7px 3px 6px;
-  border-radius: 5px;
-  border: 1px solid var(--cell-edge, rgba(255, 255, 255, 0.1));
+  gap: 3px;
+  padding: 10px 4px 8px;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid var(--cell-edge, rgba(255, 255, 255, 0.14));
   background: var(--cell-bg, #1d2529);
   transition:
     transform 160ms ease,
@@ -469,67 +544,73 @@
     background 160ms ease;
 }
 
+/* The type keeps its colour as a stripe, the label is near-white, so the
+   text always clears AA no matter how pale the type is. */
+.matchup-cell::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--cell-type, #7f8b92);
+}
+
 .matchup-cell:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.42);
 }
 
 .matchup-cell__type {
-  font-family: var(--font-mono);
-  font-size: 8px;
-  letter-spacing: 0.01em;
-  text-transform: uppercase;
-  color: var(--cell-type, #cbd5da);
-  opacity: 1;
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0;
+  text-transform: capitalize;
+  color: #f5f8f9;
   white-space: nowrap;
 }
 
 .matchup-cell__mult {
-  font-size: 12px;
+  font-family: var(--font-body);
+  font-size: 14px;
   line-height: 1;
-  font-weight: 700;
-  color: var(--cell-ink, #f2f7f9);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Tone is carried by a saturated plate and edge, not a near-black one:
-   the point of the strip is to scan it at a glance. */
+/* Tone is carried by the plate; the numerals stay white for contrast. */
 .matchup-cell[data-tone="immune"] {
   --cell-bg: #0b1013;
-  --cell-edge: rgba(255, 255, 255, 0.16);
-  --cell-ink: #8e9aa1;
-  --cell-type: #7c8a91;
+  --cell-edge: rgba(255, 255, 255, 0.2);
+  --cell-type: #6f7b82;
 }
 
 .matchup-cell[data-tone="resist-low"] {
   --cell-bg: #14432a;
-  --cell-edge: rgba(96, 220, 150, 0.45);
-  --cell-ink: #b8f5cf;
+  --cell-edge: rgba(96, 220, 150, 0.42);
 }
 
 .matchup-cell[data-tone="resist"] {
   --cell-bg: #17602f;
-  --cell-edge: rgba(90, 230, 150, 0.6);
-  --cell-ink: #d6ffe4;
+  --cell-edge: rgba(90, 230, 150, 0.55);
 }
 
 .matchup-cell[data-tone="neutral"] {
-  --cell-bg: #232d33;
-  --cell-edge: rgba(255, 255, 255, 0.08);
-  --cell-ink: #93a1a8;
-  --cell-type: #b3bfc5;
+  --cell-bg: #2b353b;
+  --cell-edge: rgba(255, 255, 255, 0.14);
 }
 
 .matchup-cell[data-tone="weak"] {
-  --cell-bg: #6b3218;
-  --cell-edge: rgba(255, 150, 90, 0.55);
-  --cell-ink: #ffd8bd;
+  --cell-bg: #7a3a1b;
+  --cell-edge: rgba(255, 150, 90, 0.5);
 }
 
 .matchup-cell[data-tone="weak-high"] {
-  --cell-bg: #8a2611;
-  --cell-edge: rgba(255, 120, 80, 0.8);
-  --cell-ink: #ffe2d6;
-  box-shadow: 0 0 0 1px rgba(255, 120, 80, 0.25), 0 6px 14px -10px #ff6a3d;
+  --cell-bg: #9c2a11;
+  --cell-edge: rgba(255, 140, 100, 0.75);
+  box-shadow: 0 0 0 1px rgba(255, 120, 80, 0.22), 0 6px 14px -10px #ff6a3d;
 }
 
 .matchup-legend {
@@ -540,9 +621,9 @@
   padding: 0;
   list-style: none;
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: 9px;
   letter-spacing: 0.06em;
-  color: #9aa7ad;
+  color: #b4c0c6;
 }
 
 .matchup-legend li {
@@ -572,15 +653,15 @@
 }
 
 .matchup-legend li[data-tone="neutral"] {
-  --cell-bg: #232d33;
+  --cell-bg: #2b353b;
 }
 
 .matchup-legend li[data-tone="weak"] {
-  --cell-bg: #6b3218;
+  --cell-bg: #7a3a1b;
 }
 
 .matchup-legend li[data-tone="weak-high"] {
-  --cell-bg: #8a2611;
+  --cell-bg: #9c2a11;
 }
 
 /* ---------- 6. flavor ---------- */
@@ -631,7 +712,7 @@
 .bento-flavor__foot {
   text-transform: none;
   letter-spacing: 0.04em;
-  color: #74838a;
+  color: #93a0a7;
 }
 
 /* ---------- responsive ---------- */

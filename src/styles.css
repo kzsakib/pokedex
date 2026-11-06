@@ -49,6 +49,14 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* Lenis owns the scroll position; a native smooth scroll here would run a
+     second animation against it and read as stutter. */
+  scroll-behavior: auto;
+}
+
+html.lenis,
+html.lenis body {
+  height: auto;
 }
 
 body {
@@ -388,7 +396,7 @@ img {
 
 .dial-symbol {
   font-size: 20px;
-  color: var(--accent);
+  color: var(--accent-ink, var(--accent-deep));
 }
 
 .dial-label {
@@ -456,6 +464,38 @@ img {
   width: 100%;
 }
 
+/* Sound switch in the control tray. */
+.mute-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.mute-key__icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.mute-key__icon svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.mute-key__icon svg path:first-child {
+  fill: currentColor;
+  stroke-width: 1.1;
+}
+
+.mute-key[aria-pressed="false"] {
+  color: #3c454b;
+}
+
 .key--type {
   position: relative;
   padding: 6px 9px 6px 18px;
@@ -481,6 +521,35 @@ img {
   box-shadow:
     0 0 0 1px var(--accent-soft),
     0 0 6px var(--accent-soft);
+}
+
+/* A type chip previews its own type: the label takes a contrast-checked ink
+   while the dot carries the raw colour. */
+.key--type {
+  transition:
+    color 180ms var(--dp-motion-settle),
+    border-color 180ms ease,
+    transform var(--dp-motion-key) var(--dp-motion-settle),
+    box-shadow var(--dp-motion-key) ease,
+    background var(--dp-motion-key) ease;
+}
+
+.key--type:hover,
+.key--type:focus-visible {
+  color: var(--chip-ink, var(--dp-color-label));
+  border-color: color-mix(in srgb, var(--chip-mark, #10161a) 55%, transparent);
+}
+
+.key--type:hover::before,
+.key--type:focus-visible::before {
+  background: var(--chip, var(--accent));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--chip-ink, #10161a) 60%, transparent),
+    0 0 7px var(--chip, var(--accent));
+}
+
+.key--type[aria-pressed="true"] {
+  color: var(--chip-ink, var(--dp-color-label));
 }
 
 .key--onfield {
@@ -1260,7 +1329,7 @@ img {
   flex: none;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--dp-color-label);
+  color: #2f383e;
 }
 
 .evo-module .lamp {
