@@ -114,19 +114,24 @@ export default function SpecimenScreen({
       });
 
       figures.forEach((node, index) => {
-        const target = Number(node.dataset.value ?? 0);
+        /* The species ID is a padded string, not a reading to count up. */
+        if (node.dataset.value === undefined) return;
+        const target = Number(node.dataset.value);
+        /* Height and weight read in decimals (0.4 m, 6.0 kg); the census
+           figures stay whole numbers. */
+        const decimals = Number(node.dataset.decimals ?? 0);
+        const write = (value) => {
+          node.textContent =
+            decimals > 0 ? value.toFixed(decimals) : String(Math.round(value));
+        };
         const proxy = { value: 0 };
         timeline.to(
           proxy,
           {
             value: target,
             duration: 0.7,
-            onUpdate: () => {
-              node.textContent = String(Math.round(proxy.value));
-            },
-            onComplete: () => {
-              node.textContent = String(target);
-            },
+            onUpdate: () => write(proxy.value),
+            onComplete: () => write(target),
           },
           0.2 + index * 0.06,
         );
@@ -349,7 +354,11 @@ export default function SpecimenScreen({
         {/* 3 — measurements ------------------------------------------ */}
         <div className="bento-tile bento-metric">
           <p className="bento-label">Height</p>
-          <p className="bento-figure" data-value={pokemon.height}>
+          <p
+            className="bento-figure"
+            data-value={pokemon.height / 10}
+            data-decimals="1"
+          >
             {(pokemon.height / 10).toFixed(1)}
           </p>
           <p className="bento-unit">metres</p>
@@ -357,7 +366,11 @@ export default function SpecimenScreen({
 
         <div className="bento-tile bento-metric">
           <p className="bento-label">Weight</p>
-          <p className="bento-figure" data-value={pokemon.weight}>
+          <p
+            className="bento-figure"
+            data-value={pokemon.weight / 10}
+            data-decimals="1"
+          >
             {(pokemon.weight / 10).toFixed(1)}
           </p>
           <p className="bento-unit">kilograms</p>

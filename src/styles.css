@@ -12,8 +12,6 @@
   --dp-color-on-field-muted: #d8dee1;
   --dp-color-accent: #f15b22;
 
-  --dp-typography-sans: var(--font-body);
-  --dp-typography-mono: var(--font-mono);
   --dp-typography-body: 17px;
   --dp-typography-reading: 16px;
   --dp-typography-metadata: 13px;
@@ -64,7 +62,7 @@ body {
     ),
     linear-gradient(180deg, #969ea2 0%, #8b9397 55%, #858d91 100%);
   color: var(--dp-color-ink);
-  font-family: var(--dp-typography-sans);
+  font-family: var(--font-body);
   font-size: var(--dp-typography-body);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -109,7 +107,7 @@ img {
   border-radius: var(--dp-radius-key);
   background: var(--dp-color-ink);
   color: #f6f8f8;
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: var(--dp-typography-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -223,7 +221,7 @@ img {
   align-items: baseline;
   gap: 9px;
   margin: 0 0 14px;
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: var(--dp-typography-label);
   font-weight: 400;
   letter-spacing: 0.16em;
@@ -392,7 +390,7 @@ img {
 }
 
 .dial-label {
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -402,7 +400,7 @@ img {
 .control-hint {
   margin: 0;
   max-width: 24ch;
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   line-height: 1.5;
   letter-spacing: 0.04em;
@@ -411,7 +409,7 @@ img {
 }
 
 .key {
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: var(--dp-typography-label);
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -527,7 +525,7 @@ img {
 }
 
 .fact dt {
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -631,7 +629,7 @@ img {
 
 .search-slot label {
   flex: none;
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -644,7 +642,7 @@ img {
   padding: 2px 0;
   border: 0;
   background: transparent;
-  font-family: var(--dp-typography-sans);
+  font-family: var(--font-body);
   font-size: 15px;
   color: var(--dp-color-ink);
 }
@@ -656,7 +654,7 @@ img {
 
 .search-slot kbd,
 .hint kbd {
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   padding: 1px 5px;
   border-radius: 3px;
@@ -667,7 +665,7 @@ img {
 
 .hint {
   margin: 0;
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   line-height: 1.6;
   letter-spacing: 0.04em;
@@ -736,7 +734,7 @@ img {
 }
 
 .index-number {
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.06em;
   color: var(--dp-color-label);
@@ -781,7 +779,7 @@ img {
 }
 
 .index-type {
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -859,7 +857,7 @@ img {
 
 .screen-no {
   margin: 0;
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: var(--dp-typography-metadata);
   letter-spacing: 0.14em;
   color: var(--dp-color-on-field);
@@ -867,7 +865,7 @@ img {
 
 .screen-genus {
   margin: 0;
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -933,7 +931,7 @@ img {
   padding: 2px 7px;
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 3px;
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -964,7 +962,7 @@ img {
 }
 
 .measures dt {
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -995,7 +993,7 @@ img {
 
 .stats-title {
   margin: 0;
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 400;
   letter-spacing: 0.16em;
@@ -1005,7 +1003,7 @@ img {
 
 .stats-total {
   margin: 0;
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--dp-color-on-field);
@@ -1034,7 +1032,7 @@ img {
 }
 
 .stat-label {
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.1em;
   color: var(--dp-color-on-field-muted);
@@ -1064,7 +1062,7 @@ img {
 }
 
 .stat-value {
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 12px;
   text-align: right;
   color: var(--dp-color-on-field);
@@ -1074,7 +1072,7 @@ img {
   margin: 13px 0 0;
   padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.11);
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1093,7 +1091,7 @@ img {
 
 .state-code {
   margin: 0;
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -1248,7 +1246,7 @@ img {
 }
 
 .evo-meta {
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1258,7 +1256,7 @@ img {
 .evo-link {
   align-self: center;
   flex: none;
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--dp-color-label);
 }
@@ -1529,7 +1527,7 @@ img {
 
 .entry-version {
   margin: 0;
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1572,7 +1570,7 @@ img {
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.07);
   color: var(--dp-color-on-field-muted);
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1652,7 +1650,7 @@ img {
 
 .radar-label {
   fill: var(--dp-color-on-field-muted);
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.06em;
   text-anchor: middle;
@@ -1670,7 +1668,7 @@ img {
 }
 
 .readout-label {
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1686,7 +1684,7 @@ img {
 }
 
 .readout-meta {
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.04em;
   color: var(--dp-color-on-field-muted);
@@ -1738,7 +1736,7 @@ img {
   padding: 1px 4px;
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 2px;
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 8px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1754,7 +1752,7 @@ img {
 }
 
 .stats-total-value {
-  font-family: var(--dp-typography-mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--dp-color-on-field);
 }

@@ -334,7 +334,6 @@ export default function Gallery({
             const item = items.find((entry) => entry.id === id);
             if (!item) return;
             hoveredRef.current = id;
-            wake(cell);
             show(cell, item);
           }}
           onPointerLeave={hide}
@@ -346,11 +345,10 @@ export default function Gallery({
               type="button"
               data-id={item.id}
               tabIndex={item.id === focusableId ? 0 : -1}
-              className={`gallery-cell${item.id === selectedId ? " is-selected" : ""}`}
+              className={`gallery-cell cursor-target${item.id === selectedId ? " is-selected" : ""}`}
               aria-current={item.id === selectedId ? "true" : undefined}
               aria-label={`${item.number} ${titleCase(item.name)}`}
               data-cursor-label={`${item.number} ${titleCase(item.name)}`}
-              class="cursor-target"
               onFocus={(event) => {
                 hoveredRef.current = item.id;
                 show(event.currentTarget, item);

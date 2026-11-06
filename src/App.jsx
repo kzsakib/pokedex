@@ -16,6 +16,12 @@ import {
   titleCase,
 } from "./api";
 import { ScrollTrigger, gsap } from "./motion";
+import {
+  STAT_KEYS,
+  buildCensus,
+  buildIndex,
+  readCachedCensus,
+} from "./census";
 import { useLenis } from "lenis/react";
 import TargetCursor from "./components/TargetCursor";
 import { useMotion } from "./motionSettings";
@@ -44,7 +50,10 @@ export default function App() {
   const ventsRef = useRef(null);
   const searchRef = useRef(null);
   const progressRef = useRef(null);
-  const { lenis } = useLenis();
+  const lenis = useLenis();
+  /* Set by the dial so only a random draw pulls the record into view; every
+     other selection (archive click, keyboard) already scrolls on its own. */
+  const scrollAfterDrawRef = useRef(false);
 
   const [index, setIndex] = useState([]);
   const [entries, setEntries] = useState({});
@@ -197,42 +206,46 @@ export default function App() {
     });
   }, [index, entries, query, type]);
 
-  /* Stats index & scope for percentiles across the live archive. */
-  const statsIndex = useMemo(() => {
-    if (!Object.keys(entries).length) return { scope: "the registry", data: [] };
-    const rows = Object.entries(entries)
-      .map(([id, p]) => {
-        const stats = p?.stats?.map((s) => ({ name: s.stat.name, base_stat: s.base_stat })) ?? [];
-        return { id, stats };
+  /* Stat percentiles. The full national census (~1300 species) is built once
+     in the background and cached; until it lands every bar is ranked against
+     the 151 loaded registry entries instead. */
+  const [censusRows, setCensusRows] = useState(() => readCachedCensus());
+
+  useEffect(() => {
+    if (censusRows?.length) return undefined;
+    let cancelled = false;
+    buildCensus()
+      .then((rows) => {
+        if (!cancelled && rows?.length) setCensusRows(rows);
       })
-      .filter((r) => r.stats.length > 0);
-    return { scope: "Pokémon", data: rows };
-  }, [entries]);
+      .catch(() => {
+        /* the registry fallback keeps the readings honest */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [censusRows]);
+
+  const statsIndex = useMemo(() => {
+    if (censusRows?.length) {
+      return { index: buildIndex(censusRows), scope: "all" };
+    }
+    const rows = Object.values(entries)
+      .map((entry) =>
+        STAT_KEYS.map(
+          (key) =>
+            entry?.stats?.find((slot) => slot.stat.name === key)?.base_stat ?? 0,
+        ),
+      )
+      .filter((row) => row.every((value) => value > 0));
+    return { index: buildIndex(rows), scope: "registry" };
+  }, [censusRows, entries]);
 
   const selectedEntry = index.find((item) => item.id === selectedId);
   const pokemon = entries[selectedId] ?? null;
   const record = records[selectedId] ?? null;
   const abilityList = abilitiesById[selectedId] ?? [];
   const line = lines[selectedId] ?? [];
-
-  /* How this specimen's base stats rank across the scanned registry. */
-  const percentiles = useMemo(() => {
-    if (!pokemon) return {};
-    const { data: scannedEntries = [] } = statsIndex ?? {};
-    if (!scannedEntries.length) return {};
-
-    return Object.fromEntries(
-      pokemon.stats.map((stat) => {
-        const key = stat.stat.name;
-        const values = scannedEntries
-          .map((entry) => entry.stats?.find((slot) => slot.stat.name === key)?.base_stat)
-          .filter((value) => typeof value === "number");
-        if (!values.length) return [key, null];
-        const below = values.filter((value) => value < stat.base_stat).length;
-        return [key, Math.round((below / values.length) * 100)];
-      }),
-    );
-  }, [statsIndex, pokemon]);
 
   const primaryType = pokemon?.types?.[0]?.type.name;
   const accentStyle = useMemo(() => accentVars(primaryType), [primaryType]);
@@ -292,6 +305,7 @@ export default function App() {
     const ticks = dial?.querySelector(".dial-ticks");
 
     if (!motion || !dial) {
+      scrollAfterDrawRef.current = true;
       select(target.id);
       if (readout) readout.textContent = target.number;
       return;
@@ -330,6 +344,7 @@ export default function App() {
         0,
       )
       .add(() => {
+        scrollAfterDrawRef.current = true;
         select(target.id);
         flashVents(1);
       }, 0.84);
@@ -342,20 +357,19 @@ export default function App() {
     if (selectedEntry) readout.textContent = selectedEntry.number;
   }, [selectedEntry]);
 
-  /* After randomize selects a new entry, scroll specimen-bay into view. */
+  /* After the dial draws a new entry, bring record 03 into view. */
   useEffect(() => {
+    if (!scrollAfterDrawRef.current) return undefined;
+    scrollAfterDrawRef.current = false;
     const scheduled = setTimeout(() => {
-      if (lenis) {
-        lenis.scrollTo("#specimen-bay", {
-          offset: -80,
-          duration: 1,
-          easing: (t) => Math.min(1, 0.1 + 0.9 * t),
-        });
+      const target = document.getElementById("specimen-bay");
+      if (!target) return;
+      if (lenis?.scrollTo) {
+        lenis.scrollTo(target, { offset: -18, duration: 1.1 });
       } else {
-        const target = document.getElementById("specimen-bay");
-        target?.scrollIntoView({ behavior: "auto", block: "start" });
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
       }
-    }, 0);
+    }, 40);
     return () => clearTimeout(scheduled);
   }, [selectedId, lenis]);
 
@@ -686,7 +700,8 @@ export default function App() {
               pokemon={pokemon}
               record={record}
               abilities={abilityList}
-              percentiles={percentiles}
+              statsIndex={statsIndex.index}
+              statsScope={statsIndex.scope}
               loading={!pokemon && faultId !== selectedId}
               fault={faultId === selectedId}
               onRetry={() => {
