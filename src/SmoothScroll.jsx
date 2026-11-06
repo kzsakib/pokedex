@@ -28,10 +28,16 @@ export default function SmoothScroll({ children }) {
     <ReactLenis
       root
       options={{
-        lerp: 0.08,
-        wheelMultiplier: 1.05,
+        /* A low lerp gives the wheel a long, weighted glide; the multiplier
+           is trimmed so a single notch travels less per frame. */
+        lerp: 0.045,
+        wheelMultiplier: 0.85,
         smoothWheel: true,
-        syncTouch: false,
+        /* Touch pans are eased too, at a firmer lerp so they never trail. */
+        syncTouch: true,
+        syncTouchLerp: 0.075,
+        touchInertiaMultiplier: 28,
+        touchMultiplier: 1.4,
       }}
     >
       <ScrollTriggerBridge />

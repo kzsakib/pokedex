@@ -70,6 +70,18 @@
     0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
+/* Spotlight: the accent pools under the pointer instead of filling the
+   whole tile, so the plate reads as lit rather than repainted. */
+.bento-tile.is-lit {
+  background:
+    radial-gradient(
+      240px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      color-mix(in srgb, var(--accent) 22%, transparent) 0%,
+      transparent 68%
+    ),
+    linear-gradient(180deg, #1b2226 0%, #161c20 100%);
+}
+
 .bento-head {
   display: flex;
   align-items: baseline;
@@ -434,9 +446,11 @@
 
 .matchup-strip {
   display: grid;
-  grid-template-columns: repeat(18, minmax(0, 1fr));
-  gap: 3px;
-  margin: 10px 0 9px;
+  /* Eighteen 30px slivers were unreadable: let the strip flow at a legible
+     minimum and wrap instead of crushing the labels. */
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 5px;
+  margin: 10px 0 10px;
   padding: 0;
   list-style: none;
 }
@@ -444,14 +458,15 @@
 .matchup-cell {
   display: grid;
   place-items: center;
-  gap: 1px;
-  padding: 5px 0 4px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 2px;
+  padding: 7px 3px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--cell-edge, rgba(255, 255, 255, 0.1));
   background: var(--cell-bg, #1d2529);
   transition:
     transform 160ms ease,
-    border-color 160ms ease;
+    border-color 160ms ease,
+    background 160ms ease;
 }
 
 .matchup-cell:hover {
@@ -461,53 +476,73 @@
 
 .matchup-cell__type {
   font-family: var(--font-mono);
-  font-size: 6.5px;
-  letter-spacing: 0.02em;
+  font-size: 8px;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
   color: var(--cell-type, #cbd5da);
-  opacity: 0.92;
+  opacity: 1;
+  white-space: nowrap;
 }
 
 .matchup-cell__mult {
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1;
-  color: #eef3f5;
+  font-weight: 700;
+  color: var(--cell-ink, #f2f7f9);
 }
 
+/* Tone is carried by a saturated plate and edge, not a near-black one:
+   the point of the strip is to scan it at a glance. */
 .matchup-cell[data-tone="immune"] {
-  --cell-bg: #101619;
+  --cell-bg: #0b1013;
+  --cell-edge: rgba(255, 255, 255, 0.16);
+  --cell-ink: #8e9aa1;
+  --cell-type: #7c8a91;
 }
 
 .matchup-cell[data-tone="resist-low"] {
-  --cell-bg: #12301e;
+  --cell-bg: #14432a;
+  --cell-edge: rgba(96, 220, 150, 0.45);
+  --cell-ink: #b8f5cf;
 }
 
 .matchup-cell[data-tone="resist"] {
-  --cell-bg: #1a3d28;
+  --cell-bg: #17602f;
+  --cell-edge: rgba(90, 230, 150, 0.6);
+  --cell-ink: #d6ffe4;
 }
 
 .matchup-cell[data-tone="neutral"] {
-  --cell-bg: #1e262b;
+  --cell-bg: #232d33;
+  --cell-edge: rgba(255, 255, 255, 0.08);
+  --cell-ink: #93a1a8;
+  --cell-type: #b3bfc5;
 }
 
 .matchup-cell[data-tone="weak"] {
-  --cell-bg: #45261a;
+  --cell-bg: #6b3218;
+  --cell-edge: rgba(255, 150, 90, 0.55);
+  --cell-ink: #ffd8bd;
 }
 
 .matchup-cell[data-tone="weak-high"] {
-  --cell-bg: #5d2113;
+  --cell-bg: #8a2611;
+  --cell-edge: rgba(255, 120, 80, 0.8);
+  --cell-ink: #ffe2d6;
+  box-shadow: 0 0 0 1px rgba(255, 120, 80, 0.25), 0 6px 14px -10px #ff6a3d;
 }
 
 .matchup-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
   font-family: var(--font-mono);
-  font-size: 7.5px;
+  font-size: 8.5px;
   letter-spacing: 0.06em;
-  color: #7d8a91;
+  color: #9aa7ad;
 }
 
 .matchup-legend li {
@@ -525,27 +560,27 @@
 }
 
 .matchup-legend li[data-tone="immune"] {
-  --cell-bg: #101619;
+  --cell-bg: #0b1013;
 }
 
 .matchup-legend li[data-tone="resist-low"] {
-  --cell-bg: #12301e;
+  --cell-bg: #14432a;
 }
 
 .matchup-legend li[data-tone="resist"] {
-  --cell-bg: #1a3d28;
+  --cell-bg: #17602f;
 }
 
 .matchup-legend li[data-tone="neutral"] {
-  --cell-bg: #1e262b;
+  --cell-bg: #232d33;
 }
 
 .matchup-legend li[data-tone="weak"] {
-  --cell-bg: #45261a;
+  --cell-bg: #6b3218;
 }
 
 .matchup-legend li[data-tone="weak-high"] {
-  --cell-bg: #5d2113;
+  --cell-bg: #8a2611;
 }
 
 /* ---------- 6. flavor ---------- */
@@ -583,11 +618,14 @@
 }
 
 .bento-entry {
-  max-width: 60ch;
+  /* The entry sits in the widest tile in the grid, so it runs the full tile
+     width instead of stopping at a 60ch ribbon with half the box empty. */
+  max-width: none;
   margin: 10px 0 7px;
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 15.5px;
+  line-height: 1.62;
   color: #e7eff2;
+  text-wrap: pretty;
 }
 
 .bento-flavor__foot {
@@ -642,9 +680,7 @@
     height: 148px;
   }
 
-  .matchup-strip {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
+
 
   .bento-entry {
     font-size: 14px;

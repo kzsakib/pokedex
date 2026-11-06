@@ -4,6 +4,7 @@ import { useLenis } from "lenis/react";
 import { fetchSpecies, pixelSpriteUrl, readEntries, titleCase } from "./api";
 import { gsap, prefersReducedMotion } from "./motion";
 import DecryptedText from "./components/DecryptedText";
+import TextType from "./components/TextType";
 import { TYPES } from "./types";
 
 /* Species records are fetched on first hover and kept for the session so the
@@ -25,11 +26,6 @@ function loadEntries(id) {
   return entryCache.get(id);
 }
 
-const words = (text) =>
-  text
-    .split(/(\s+)/)
-    .filter((chunk) => chunk.length)
-    .map((chunk, index) => ({ chunk, index, space: !chunk.trim() }));
 
 export default function Gallery({
   items,
@@ -49,7 +45,6 @@ export default function Gallery({
   const panelRef = useRef(null);
   const bankRef = useRef(null);
   const pillRef = useRef(null);
-  const textRef = useRef(null);
   const lenis = useLenis();
   const [tip, setTip] = useState(null);
   const requestRef = useRef(0);
@@ -73,9 +68,9 @@ export default function Gallery({
           panel,
           {
             autoAlpha: 0,
-            y: tip?.below ? -14 : 16,
-            scale: 0.86,
-            rotateX: tip?.below ? -12 : 12,
+            y: tip?.below ? -18 : 22,
+            scale: 0.82,
+            rotateX: tip?.below ? -16 : 16,
             clipPath: "inset(0% 0% 100% 0%)",
           },
           {
@@ -85,7 +80,7 @@ export default function Gallery({
             rotateX: 0,
             clipPath: "inset(0%)",
             transformPerspective: 700,
-            duration: 0.42,
+            duration: 0.52,
             ease: "expo.out",
           },
         )
@@ -107,31 +102,29 @@ export default function Gallery({
     { scope: rootRef, dependencies: [tip?.key] },
   );
 
-  /* The record itself arrives word by word out of focus. */
+  /* The wall re-assembles on every filter change: sprites fade up in a
+     short wave so a new result set reads as new, not as a jump cut. */
   useGSAP(
     () => {
-      const words = textRef.current?.querySelectorAll(".tip-word");
-      if (!words?.length) return undefined;
-      if (prefersReducedMotion()) {
-        gsap.set(words, { autoAlpha: 1, y: 0, filter: "none" });
-        return undefined;
-      }
+      const cells = gridRef.current?.querySelectorAll(".gallery-cell");
+      if (!cells?.length || prefersReducedMotion()) return undefined;
       const tween = gsap.fromTo(
-        words,
-        { autoAlpha: 0, y: 9, filter: "blur(6px)" },
+        cells,
+        { autoAlpha: 0, y: 12, scale: 0.9 },
         {
           autoAlpha: 1,
           y: 0,
-          filter: "blur(0px)",
-          duration: 0.34,
-          stagger: { each: 0.014, from: "start" },
+          scale: 1,
+          duration: 0.38,
           ease: "power2.out",
-          clearProps: "filter",
+          stagger: { each: 0.006, from: "start" },
+          overwrite: true,
+          clearProps: "transform,opacity,visibility",
         },
       );
       return () => tween.kill();
     },
-    { scope: rootRef, dependencies: [tip?.text] },
+    { scope: rootRef, dependencies: [items.length, query, type] },
   );
 
   /* Sliding highlight under the active type chip. */
@@ -397,21 +390,20 @@ export default function Gallery({
               </span>
             </p>
             <span className="gallery-tip__rule" aria-hidden="true" />
-            <p className="gallery-tip__text" ref={textRef}>
-              {tip.text ? (
-                words(tip.text).map(({ chunk, index, space }) =>
-                  space ? (
-                    " "
-                  ) : (
-                    <span className="tip-word" key={index}>
-                      {chunk}
-                    </span>
-                  ),
-                )
-              ) : (
+            {tip.text ? (
+              <TextType
+                key={`${tip.id}-${tip.text.length}`}
+                className="gallery-tip__text"
+                text={tip.text}
+                charDelay={0.011}
+                caret
+                force
+              />
+            ) : (
+              <p className="gallery-tip__text">
                 <span className="gallery-tip__wait">Reading record…</span>
-              )}
-            </p>
+              </p>
+            )}
           </div>
         </div>
       )}

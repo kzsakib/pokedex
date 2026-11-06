@@ -51,8 +51,28 @@ export default function SpecimenScreen({
 }) {
   const { motion } = useMotion();
   const screenRef = useRef(null);
+  const bentoRef = useRef(null);
   const [version, setVersion] = useState(null);
   const [shiny, setShiny] = useState(false);
+
+  /* SpotlightCard-style highlight: the tile under the pointer carries a
+     soft accent pool that tracks the cursor. */
+  const trackSpotlight = (event) => {
+    const grid = bentoRef.current;
+    if (!grid) return;
+    const tile = event.target.closest?.(".bento-tile") ?? null;
+    const lit = grid.querySelector(".bento-tile.is-lit");
+    if (lit && lit !== tile) lit.classList.remove("is-lit");
+    if (!tile) return;
+    const rect = tile.getBoundingClientRect();
+    tile.style.setProperty("--spot-x", `${event.clientX - rect.left}px`);
+    tile.style.setProperty("--spot-y", `${event.clientY - rect.top}px`);
+    tile.classList.add("is-lit");
+  };
+
+  const clearSpotlight = () => {
+    bentoRef.current?.querySelector(".bento-tile.is-lit")?.classList.remove("is-lit");
+  };
 
   useEffect(() => {
     setShiny(false);
@@ -223,7 +243,12 @@ export default function SpecimenScreen({
         <p className="screen-genus">{record?.genus || "Specimen"}</p>
       </header>
 
-      <div className="bento">
+      <div
+        className="bento"
+        ref={bentoRef}
+        onPointerMove={trackSpotlight}
+        onPointerLeave={clearSpotlight}
+      >
         {/* 1 — sprite ------------------------------------------------ */}
         <section
           className="bento-tile bento-sprite"
@@ -420,7 +445,7 @@ export default function SpecimenScreen({
                 style={{ "--cell-type": typeAccent(cell.type) }}
               >
                 <span className="matchup-cell__type" aria-hidden="true">
-                  {cell.short}
+                  {cell.type}
                 </span>
                 <span className="matchup-cell__mult" aria-hidden="true">
                   {formatMultiplier(cell.multiplier)}

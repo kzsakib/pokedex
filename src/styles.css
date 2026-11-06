@@ -261,10 +261,12 @@ img {
 
 .opening h1 {
   margin: 0;
-  font-size: clamp(54px, 8.2vw, 106px);
-  font-weight: 800;
-  line-height: 0.9;
-  letter-spacing: -0.045em;
+  /* Monospace advance is wider than the grotesque, so the wordmark runs a
+     shorter scale and looser tracking to stay inside the plate. */
+  font-size: clamp(42px, 6.1vw, 86px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
 }
 
 .lede {
@@ -1351,7 +1353,7 @@ img {
   }
 
   .opening h1 {
-    font-size: clamp(54px, 13vw, 76px);
+    font-size: clamp(38px, 11.5vw, 64px);
   }
 
   .controls {
@@ -1444,7 +1446,7 @@ img {
   }
 
   .opening h1 {
-    font-size: 54px;
+    font-size: 38px;
   }
 
   .index-types {

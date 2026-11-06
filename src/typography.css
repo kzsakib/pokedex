@@ -25,10 +25,19 @@ body {
   line-height: 1.55;
 }
 
-/* Display type: the wordmark and specimen names. Bricolage carries an
-   optical-size axis, so large settings expand the counters and tighten
-   the joins without hand-hinting. */
-.title,
+/* The wordmark is set in the mono rather than the grotesque: wide, even
+   strokes read like an engraved plate on the instrument, and the fixed
+   advance keeps the letter-by-letter decode from shifting the line. */
+.title {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.035em;
+  font-variation-settings: "wght" 700;
+}
+
+/* Specimen names stay in the grotesque: Bricolage carries an optical-size
+   axis, so large settings expand the counters and tighten the joins. */
 .screen-copy h3,
 .bento-sprite__name {
   font-family: var(--font-display);

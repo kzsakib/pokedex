@@ -18,6 +18,35 @@ const spring = (state, goal, stiffness, damping, dt) => {
 
 const resolveElement = value => (value && 'current' in value ? value.current : value) || null;
 
+/* Anything the pointer can activate should be framed, not just elements
+   carrying the marker class: links, buttons, form fields, ARIA widgets —
+   and any element the sheet marks with `cursor: pointer`. */
+const CLICKABLE =
+  'a[href], button, summary, label, select, textarea, input, [role="button"], [role="link"], [role="tab"], [role="switch"], [role="checkbox"], [role="radio"], [role="menuitem"], [contenteditable="true"]';
+
+const clickableCache = new WeakMap();
+
+const clickableFrom = node => {
+  if (!node || node.nodeType !== 1) return null;
+  if (clickableCache.has(node)) return clickableCache.get(node);
+  let current = node;
+  let found = null;
+  for (let depth = 0; current && depth < 8; depth += 1) {
+    if (current === document.body || current === document.documentElement) break;
+    if (current.matches?.(CLICKABLE)) {
+      found = current;
+      break;
+    }
+    if (getComputedStyle(current).cursor === 'pointer') {
+      found = current;
+      break;
+    }
+    current = current.parentElement;
+  }
+  clickableCache.set(node, found);
+  return found;
+};
+
 const TargetCursor = ({
   targetSelector = '.cursor-target',
   cursorColor = '#ffffff',
@@ -119,7 +148,7 @@ const TargetCursor = ({
     const findTarget = (x, y, element) => {
       const s = settingsRef.current;
       const node = element || document.elementFromPoint(x, y);
-      const found = node?.closest?.(s.targetSelector) || null;
+      const found = node?.closest?.(s.targetSelector) || clickableFrom(node) || null;
       const scope = scopeOf();
       if (found && scope && !scope.contains(found)) return null;
       return found;
