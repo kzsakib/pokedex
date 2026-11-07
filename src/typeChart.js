@@ -179,12 +179,6 @@ export function multiplierTone(multiplier) {
   return "weak-high";
 }
 
-export const formatMultiplier = (multiplier) => {
-  if (multiplier === 0) return "0×";
-  if (multiplier === 0.25) return "¼×";
-  if (multiplier === 0.5) return "½×";
-  if (multiplier === 1) return "1×";
-  if (multiplier === 2) return "2×";
-  if (multiplier === 4) return "4×";
-  return `${multiplier}×`;
-};
+/* Decimal multipliers throughout: a fraction glyph is pretty but it reads
+   slower than the number it stands for. */
+export const formatMultiplier = (multiplier) => `${multiplier}×`;

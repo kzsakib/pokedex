@@ -256,6 +256,17 @@ export default function App() {
   const accentType = hoverType ?? primaryType;
   const accentStyle = useMemo(() => accentVars(accentType), [accentType]);
 
+  /* Primary type of every scanned specimen, so the archive can light each
+     cell in its own colour instead of the loaded record's accent. */
+  const typeById = useMemo(() => {
+    const map = {};
+    Object.entries(entries).forEach(([id, data]) => {
+      const name = data?.types?.[0]?.type?.name;
+      if (name) map[id] = name;
+    });
+    return map;
+  }, [entries]);
+
   /* Which archive cells belong to the previewed type. Null means the wall
      is not previewing and every cell reads at full strength. */
   const hotIds = useMemo(() => {
@@ -299,12 +310,21 @@ export default function App() {
     const HOVERABLE = "button, a[href], select, summary, .key";
     const PRESSABLE = "button, a[href], select, input, .key";
     let last = null;
+    let lastSprite = 0;
 
     const onOver = (event) => {
       const target = event.target.closest?.(HOVERABLE);
       if (!target || target === last) return;
-      if (target.closest(".gallery-cell")) return;
       last = target;
+      /* A sprite crossing gets the short menu tick, and a floor between
+         ticks keeps a fast sweep from turning into a buzz. */
+      if (target.closest(".gallery-cell")) {
+        const now = performance.now();
+        if (now - lastSprite < 28) return;
+        lastSprite = now;
+        playSfx("sprite");
+        return;
+      }
       playSfx("hover");
     };
     const onOut = (event) => {
@@ -312,7 +332,9 @@ export default function App() {
       if (target && target === last) last = null;
     };
     const onPress = (event) => {
-      if (event.target.closest?.(PRESSABLE)) playSfx("click");
+      const target = event.target.closest?.(PRESSABLE);
+      if (!target) return;
+      playSfx(target.closest(".gallery-cell") ? "pick" : "click");
     };
 
     document.addEventListener("pointerover", onOver, true);
@@ -779,6 +801,7 @@ export default function App() {
             feed={feed}
             hoverType={hoverType}
             hotIds={hotIds}
+            typeById={typeById}
             onTypeHover={previewType}
           />
         </section>

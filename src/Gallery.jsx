@@ -5,7 +5,7 @@ import { fetchSpecies, pixelSpriteUrl, readEntries, titleCase } from "./api";
 import { gsap, prefersReducedMotion } from "./motion";
 import DecryptedText from "./components/DecryptedText";
 import TextType from "./components/TextType";
-import { inkOnLight, markOnLight, typeAccent } from "./typeColors";
+import { inkOnLight, markOnLight, softAccent, typeAccent } from "./typeColors";
 import { TYPES } from "./types";
 
 /* Species records are fetched on first hover and kept for the session so the
@@ -42,6 +42,7 @@ export default function Gallery({
   feed,
   hoverType = null,
   hotIds = null,
+  typeById = null,
   onTypeHover,
 }) {
   const rootRef = useRef(null);
@@ -260,7 +261,8 @@ export default function Gallery({
   return (
     <div className="gallery" ref={rootRef}>
       <div className="archive-filters">
-        <div className="search-slot">
+        <div className={`search-slot${query ? " has-value" : ""}`}>
+          <span className="search-slot__ticks" aria-hidden="true" />
           <label htmlFor="dex-search">Search</label>
           <input
             id="dex-search"
@@ -273,6 +275,16 @@ export default function Gallery({
             aria-describedby="dex-search-hint"
             onChange={(event) => onQuery(event.target.value)}
           />
+          {query ? (
+            <button
+              type="button"
+              className="search-slot__clear"
+              onClick={() => onQuery("")}
+              aria-label="Clear search"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          ) : null}
           <kbd aria-hidden="true">/</kbd>
         </div>
 
@@ -353,6 +365,11 @@ export default function Gallery({
               data-id={item.id}
               tabIndex={item.id === focusableId ? 0 : -1}
               className={`gallery-cell cursor-target${item.id === selectedId ? " is-selected" : ""}${hoverType && hotIds?.has(item.id) ? " is-type-hot" : ""}`}
+              style={
+                typeById?.[item.id]
+                  ? { "--cell-soft": softAccent(typeById[item.id]) }
+                  : undefined
+              }
               aria-current={item.id === selectedId ? "true" : undefined}
               aria-label={`${item.number} ${titleCase(item.name)}`}
               data-cursor-label={`${item.number} ${titleCase(item.name)}`}

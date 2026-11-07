@@ -741,8 +741,10 @@
     grid-column: span 1;
   }
 
+  /* Full names need room: six across at this width, never the nine slivers
+     the abbreviation version used. */
   .matchup-strip {
-    grid-template-columns: repeat(9, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
 
@@ -765,5 +767,11 @@
 
   .bento-entry {
     font-size: 14px;
+  }
+
+  /* The record stacks to one column here; four names per row still fit at
+     readable size, nine do not. */
+  .matchup-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }

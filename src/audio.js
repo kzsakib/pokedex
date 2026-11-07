@@ -31,15 +31,30 @@ function context() {
   if (!Ctor) return null;
   ctx = new Ctor();
   master = ctx.createGain();
-  master.gain.value = muted ? 0 : 0.5;
+  master.gain.value = muted ? 0 : 0.72;
   master.connect(ctx.destination);
   return ctx;
 }
 
+/* A voice asked for in the same gesture that creates the context would
+   otherwise be dropped while the context is still suspended, which is why
+   the very first click used to be silent. Hold the last one and play it the
+   moment the context starts running. */
+let queued = null;
+
 export function unlockAudio() {
   const audio = context();
   if (!audio) return;
-  if (audio.state === "suspended") audio.resume().catch(() => {});
+  if (audio.state === "suspended") {
+    audio
+      .resume()
+      .then(() => {
+        const pending = queued;
+        queued = null;
+        if (pending) pending();
+      })
+      .catch(() => {});
+  }
 }
 
 /* The context is only allowed to exist once the visitor has interacted. */
@@ -54,6 +69,20 @@ function ready() {
   const audio = context();
   if (!audio || audio.state !== "running") return null;
   return audio;
+}
+
+/* Runs a voice now if the context is live, keeps it for the next unlock if
+   the page has not been touched yet. */
+function schedule(voice) {
+  if (muted) return;
+  if (ready()) {
+    voice();
+    return;
+  }
+  if (ctx && ctx.state === "suspended") {
+    queued = voice;
+    unlockAudio();
+  }
 }
 
 /* One short voiced blip with a percussive envelope. */
@@ -76,24 +105,36 @@ function blip({ from, to, type = "square", length = 0.06, level = 0.05, delay = 
 
 const VOICES = {
   /* Soft detent as the pointer crosses a control. */
-  hover: () => blip({ from: 1180, to: 1420, type: "triangle", length: 0.035, level: 0.018 }),
+  hover: () => blip({ from: 1180, to: 1420, type: "triangle", length: 0.035, level: 0.03 }),
   /* Mechanical key press. */
   click: () => {
-    blip({ from: 620, to: 380, type: "square", length: 0.055, level: 0.045 });
-    blip({ from: 1560, to: 1200, type: "sine", length: 0.03, level: 0.02 });
+    blip({ from: 620, to: 380, type: "square", length: 0.055, level: 0.06 });
+    blip({ from: 1560, to: 1200, type: "sine", length: 0.03, level: 0.028 });
   },
-  /* Record loaded: a two-note confirm. */
+  /* Crossing a sprite in the wall: the short, dry cursor tick a handheld
+     menu makes, quiet enough that sweeping 151 cells stays a texture. */
+  sprite: () => {
+    blip({ from: 1320, to: 990, type: "square", length: 0.026, level: 0.022 });
+    blip({ from: 660, to: 660, type: "triangle", length: 0.02, level: 0.012 });
+  },
+  /* Sprite picked: the rising two-step confirm of a menu select. */
+  pick: () => {
+    blip({ from: 784, to: 784, type: "square", length: 0.045, level: 0.045 });
+    blip({ from: 1046, to: 1046, type: "square", length: 0.07, level: 0.04, delay: 0.05 });
+  },
+  /* Record loaded: a three-note fanfare. */
   reveal: () => {
-    blip({ from: 523, to: 660, type: "sine", length: 0.11, level: 0.038 });
-    blip({ from: 784, to: 988, type: "sine", length: 0.14, level: 0.03, delay: 0.085 });
+    blip({ from: 523, to: 523, type: "square", length: 0.06, level: 0.04 });
+    blip({ from: 659, to: 659, type: "square", length: 0.06, level: 0.04, delay: 0.065 });
+    blip({ from: 784, to: 1046, type: "square", length: 0.16, level: 0.042, delay: 0.13 });
   },
   /* Filter chip engaged. */
-  filter: () => blip({ from: 880, to: 660, type: "triangle", length: 0.07, level: 0.032 }),
+  filter: () => blip({ from: 880, to: 660, type: "triangle", length: 0.07, level: 0.038 }),
 };
 
 export function playSfx(name) {
   const voice = VOICES[name];
-  if (voice) voice();
+  if (voice) schedule(voice);
 }
 
 export function playCry(url) {
@@ -119,7 +160,7 @@ export function setMuted(next) {
   } catch {
     /* private mode: the toggle still works for this session */
   }
-  if (master) master.gain.value = next ? 0 : 0.5;
+  if (master) master.gain.value = next ? 0 : 0.72;
   if (next && cry) cry.pause();
   listeners.forEach((listener) => listener(muted));
 }

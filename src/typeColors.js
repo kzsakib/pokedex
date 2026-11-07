@@ -90,6 +90,12 @@ export function typeAccent(type) {
   return ACCENTS[type] ?? FALLBACK_ACCENT;
 }
 
+/* Pale halo behind a sprite, so a hovered cell glows in its own type rather
+   than the accent of whatever record happens to be loaded. */
+export function softAccent(type) {
+  return mix(typeAccent(type), "#ffffff", 0.4);
+}
+
 /* Label colour for type text on the light chassis. */
 export function inkOnLight(type, min = 4.5) {
   return settle(typeAccent(type), SURFACE_LIGHT, "#0a0f12", min);
@@ -113,7 +119,7 @@ export function accentVars(type) {
   const base = typeAccent(type);
   return {
     "--accent": base,
-    "--accent-soft": mix(base, "#ffffff", 0.4),
+    "--accent-soft": softAccent(type),
     "--accent-deep": mix(base, "#0b1115", 0.22),
     /* Accent used as text on the grey chassis. */
     "--accent-ink": settle(base, SURFACE_LIGHT, "#0a0f12", 4.5),

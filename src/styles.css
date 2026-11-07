@@ -686,25 +686,145 @@ img {
   margin-bottom: 2px;
 }
 
+/* The search field is cut into the plate: a recessed channel with corner
+   ticks that light up and an accent rail that fills in when it takes focus. */
 .search-slot {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 10px;
-  border-radius: 5px;
-  background: linear-gradient(180deg, #aeb6ba, #bcc3c6);
+  padding: 8px 11px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #a4adb1, #b6bdc0 58%, #c0c7ca);
   box-shadow:
-    inset 0 2px 4px rgba(16, 22, 26, 0.35),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.45);
+    inset 0 2px 5px rgba(16, 22, 26, 0.4),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+  transition:
+    box-shadow 260ms var(--dp-motion-settle),
+    background 260ms linear;
+}
+
+.search-slot::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent-ink, #2f383e) 10%,
+    var(--accent-ink, #2f383e) 90%,
+    transparent
+  );
+  transform: scaleX(0.16);
+  transform-origin: left center;
+  opacity: 0.3;
+  pointer-events: none;
+  transition:
+    transform 420ms cubic-bezier(0.22, 0.9, 0.2, 1),
+    opacity 240ms ease;
+}
+
+.search-slot.has-value::after {
+  transform: scaleX(1);
+  opacity: 0.6;
+}
+
+.search-slot:focus-within {
+  box-shadow:
+    inset 0 2px 5px rgba(16, 22, 26, 0.44),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.5),
+    0 0 0 2px var(--accent-deep, #2f383e),
+    0 10px 20px -14px rgba(8, 14, 18, 0.9);
+}
+
+/* The field takes focus as a single unit; the input's own ring would draw a
+   second, smaller box inside the recess. */
+.search-slot input:focus,
+.search-slot input:focus-visible {
+  outline: none;
+}
+
+.search-slot:focus-within::after {
+  transform: scaleX(1);
+  opacity: 0.95;
+}
+
+/* Four corner ticks, drawn as gradients so the field needs no extra nodes. */
+.search-slot__ticks {
+  position: absolute;
+  inset: 4px;
+  pointer-events: none;
+  color: rgba(38, 47, 52, 0.55);
+  background-repeat: no-repeat;
+  background-size:
+    8px 1.5px,
+    1.5px 8px,
+    8px 1.5px,
+    1.5px 8px,
+    8px 1.5px,
+    1.5px 8px,
+    8px 1.5px,
+    1.5px 8px;
+  background-position:
+    left top,
+    left top,
+    right top,
+    right top,
+    left bottom,
+    left bottom,
+    right bottom,
+    right bottom;
+  background-image:
+    linear-gradient(currentColor, currentColor),
+    linear-gradient(currentColor, currentColor),
+    linear-gradient(currentColor, currentColor),
+    linear-gradient(currentColor, currentColor),
+    linear-gradient(currentColor, currentColor),
+    linear-gradient(currentColor, currentColor),
+    linear-gradient(currentColor, currentColor),
+    linear-gradient(currentColor, currentColor);
+  transition: color 220ms ease;
+}
+
+/* Deep accent holds 3:1 against the darkest corner of the recessed field,
+   which the ink tone does not. */
+.search-slot:focus-within .search-slot__ticks {
+  color: var(--accent-deep, #2f383e);
 }
 
 .search-slot label {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #2c3439;
+}
+
+/* A tiny tell that the field is armed; the label itself stays dark so it
+   keeps its contrast against the plate. */
+.search-slot label::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(44, 52, 57, 0.4);
+  transition:
+    background-color 200ms ease,
+    box-shadow 200ms ease;
+}
+
+.search-slot:focus-within label::before {
+  background: var(--accent-deep, #2f383e);
+  box-shadow: inset 0 0 0 1px var(--accent-deep, #2f383e);
 }
 
 .search-slot input {
@@ -715,12 +835,58 @@ img {
   background: transparent;
   font-family: var(--font-body);
   font-size: 15px;
+  font-variant-numeric: tabular-nums;
   color: var(--dp-color-ink);
+  caret-color: var(--accent-ink, #2f383e);
+}
+
+/* One clear affordance only: the browser's own search cancel is a blue
+   glyph that belongs to no other part of the instrument. */
+.search-slot input::-webkit-search-cancel-button,
+.search-slot input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+.search-slot.has-value kbd {
+  display: none;
 }
 
 .search-slot input::placeholder {
-  color: #4d575d;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  color: #394247;
   opacity: 1;
+}
+
+.search-slot__clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 3px;
+  border: 1px solid rgba(16, 22, 26, 0.28);
+  background: rgba(255, 255, 255, 0.42);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  color: #2c3439;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.search-slot__clear:hover,
+.search-slot__clear:focus-visible {
+  background: var(--accent-ink, #2f383e);
+  border-color: var(--accent-ink, #2f383e);
+  color: #ffffff;
 }
 
 .search-slot kbd,
@@ -730,8 +896,12 @@ img {
   padding: 1px 5px;
   border-radius: 3px;
   border: 1px solid rgba(16, 22, 26, 0.25);
-  color: #394247;
+  color: #333c41;
   background: rgba(255, 255, 255, 0.35);
+}
+
+.search-slot:focus-within kbd {
+  border-color: color-mix(in srgb, var(--accent-deep, #2f383e) 60%, transparent);
 }
 
 .hint {

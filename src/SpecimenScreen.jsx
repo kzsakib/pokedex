@@ -483,8 +483,8 @@ export default function SpecimenScreen({
           <ul className="matchup-legend" aria-hidden="true">
             {[
               ["immune", "0×"],
-              ["resist-low", "¼×"],
-              ["resist", "½×"],
+              ["resist-low", "0.25×"],
+              ["resist", "0.5×"],
               ["neutral", "1×"],
               ["weak", "2×"],
               ["weak-high", "4×"],

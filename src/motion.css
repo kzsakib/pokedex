@@ -1027,8 +1027,11 @@
 .gallery-cell:hover img,
 .gallery-cell:focus-visible img {
   transform: translate3d(0, -4px, 0) scale(1.14);
+  /* --cell-soft is the specimen's own type, so the halo belongs to the
+     creature under the pointer rather than the loaded record. */
   filter: drop-shadow(0 7px 7px rgba(8, 14, 18, 0.4))
-    drop-shadow(0 0 9px var(--accent-soft)) saturate(1.1) contrast(1.05);
+    drop-shadow(0 0 10px var(--cell-soft, var(--accent-soft))) saturate(1.1)
+    contrast(1.05);
 }
 
 .gallery-cell.is-skeleton {
@@ -1037,7 +1040,7 @@
 }
 
 .gallery-cell.is-selected img {
-  filter: drop-shadow(0 0 8px var(--accent-soft))
+  filter: drop-shadow(0 0 8px var(--cell-soft, var(--accent-soft)))
     drop-shadow(0 2px 2px rgba(8, 14, 18, 0.3)) saturate(1.1);
 }
 
@@ -1214,18 +1217,20 @@
 .split-char {
   will-change: font-variation-settings;
 }
+/* The ball is drawn at cap height (Martian Mono capitals sit at ~0.8em), so
+   it stands level with the letters either side instead of floating small. */
 .split-char.has-ball {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 0.64em;
+  width: 0.82em;
   margin-right: 0.02em;
   overflow: visible;
 }
 .title-ball {
   display: block;
-  width: 0.6em;
-  height: 0.6em;
+  width: 0.8em;
+  height: 0.8em;
   will-change: transform;
   filter: drop-shadow(0 2px 3px rgba(8, 14, 18, 0.25));
 }
