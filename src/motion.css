@@ -1229,11 +1229,18 @@
 }
 .title-ball {
   display: block;
-  width: 0.8em;
-  height: 0.8em;
-  /* The negative tracking pulls the next letter in, so the ball is nudged
-     the same distance to sit centred between P and K. */
-  margin-left: 0.02em;
+  /* The SVG's stroke ring is inset ~2.5% each side, so the box is enlarged
+     until the inked circle measures exactly the 0.8em cap height. */
+  width: 0.845em;
+  height: 0.845em;
+  /* Measured from the rendered glyphs, not their boxes: P's right bearing
+     and the SVG's inset circle both pushed the ink closer to the P, so the
+     ball is nudged until the inked gaps match at 5px either side, and lifted
+     onto the cap centre rather than the line box's. */
+  margin-left: 0.045em;
+  /* The slot's line box centres the dot higher than the cap centre. */
+  position: relative;
+  top: 0.028em;
   will-change: transform;
   filter: drop-shadow(0 2px 3px rgba(8, 14, 18, 0.25));
 }
