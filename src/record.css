@@ -176,8 +176,8 @@
   grid-area: 1 / 1;
   /* 96px source art at a whole 3× — fractional scaling is what makes pixel
      sprites look muddy however sharp the filter is. */
-  width: clamp(192px, 20vw, 288px);
-  height: clamp(192px, 20vw, 288px);
+  width: 288px;
+  height: 288px;
   image-rendering: pixelated;
   opacity: 0;
   transition: opacity 280ms ease;
