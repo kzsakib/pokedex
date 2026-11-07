@@ -161,8 +161,16 @@ const GENERATION_OF_VERSION = GENERATIONS.reduce((map, generation) => {
   return map;
 }, {});
 
+/* PokéAPI keeps the soft hyphens the original cartridges used to break words
+   across lines ("swim\u00ad\nming"). They are invisible in a browser but
+   become a stray gap once the newline is turned into a space, so they go
+   first, together with any newline that followed them. */
 const tidy = (text = "") =>
-  text.replace(/[\n\f\r]+/g, " ").replace(/\s{2,}/g, " ").trim();
+  text
+    .replace(/\u00ad[\n\f\r]?/g, "")
+    .replace(/[\n\f\r]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 
 /* Every English Pokédex entry this species has, one per game version. */
 export function readEntries(species) {

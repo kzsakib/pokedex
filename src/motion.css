@@ -1231,6 +1231,9 @@
   display: block;
   width: 0.8em;
   height: 0.8em;
+  /* The negative tracking pulls the next letter in, so the ball is nudged
+     the same distance to sit centred between P and K. */
+  margin-left: 0.02em;
   will-change: transform;
   filter: drop-shadow(0 2px 3px rgba(8, 14, 18, 0.25));
 }
@@ -1294,12 +1297,15 @@
   line-height: 1;
 }
 .dial-label {
-  font-size: 9px;
-  letter-spacing: 0.1em;
+  /* A label rather than an LED reading, so it stays in the mono face where
+     the dotted glyphs at 9px were reading as texture, not words. */
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
 }
 .dial-readout {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.04em;
   line-height: 1;
   font-variant-numeric: tabular-nums;

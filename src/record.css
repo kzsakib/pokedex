@@ -140,7 +140,8 @@
   display: grid;
   overflow: hidden;
   padding: 0;
-  min-height: 292px;
+  /* Room for the 288px sprite plus the name plate that sits over its feet. */
+  min-height: 400px;
 }
 
 .bento-sprite__glow {
@@ -167,13 +168,16 @@
   z-index: 1;
   display: grid;
   place-items: center;
-  padding-bottom: 26px;
+  /* Lifts the sprite clear of the name plate over the bottom of the tile. */
+  padding-bottom: 84px;
 }
 
 .bento-sprite__img {
   grid-area: 1 / 1;
-  width: clamp(148px, 13vw, 188px);
-  height: clamp(148px, 13vw, 188px);
+  /* 96px source art at a whole 3× — fractional scaling is what makes pixel
+     sprites look muddy however sharp the filter is. */
+  width: clamp(192px, 20vw, 288px);
+  height: clamp(192px, 20vw, 288px);
   image-rendering: pixelated;
   opacity: 0;
   transition: opacity 280ms ease;
@@ -405,22 +409,66 @@
 .stat-rank {
   grid-area: rank;
   font-family: var(--font-mono);
-  font-size: 7.5px;
-  letter-spacing: 0.05em;
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: #9aa7ae;
+  /* 9.5:1 on the tile: small text needs headroom, not just the 4.5 floor. */
+  color: #b3c0c6;
 }
 
+/* Three tones, read the same way for every specimen: grey below the middle,
+   blue around it, green above it. The type accent no longer doubles as a
+   data colour, which is what made the bars ambiguous. */
 .stat-item[data-tone="high"] {
   --tone-color: #74d99f;
 }
 
 .stat-item[data-tone="mid"] {
-  --tone-color: var(--accent);
+  --tone-color: #5fa8dd;
 }
 
 .stat-item[data-tone="low"] {
-  --tone-color: #6a777e;
+  --tone-color: #8d9aa1;
+}
+
+.stat-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 14px;
+  margin: 11px 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #b3c0c6;
+}
+
+.stat-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat-legend li::before {
+  content: "";
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--tone-color);
+}
+
+.stat-legend li[data-tone="low"] {
+  --tone-color: #8d9aa1;
+}
+
+.stat-legend li[data-tone="mid"] {
+  --tone-color: #5fa8dd;
+}
+
+.stat-legend li[data-tone="high"] {
+  --tone-color: #74d99f;
 }
 
 /* ---------- 3. measurement tiles ---------- */
@@ -561,7 +609,7 @@
 
 .matchup-cell__type {
   font-family: var(--font-body);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: 0;
@@ -572,7 +620,7 @@
 
 .matchup-cell__mult {
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1;
   font-weight: 800;
   letter-spacing: -0.01em;
@@ -588,12 +636,12 @@
 }
 
 .matchup-cell[data-tone="resist-low"] {
-  --cell-bg: #14432a;
+  --cell-bg: #113a24;
   --cell-edge: rgba(96, 220, 150, 0.42);
 }
 
 .matchup-cell[data-tone="resist"] {
-  --cell-bg: #17602f;
+  --cell-bg: #14512a;
   --cell-edge: rgba(90, 230, 150, 0.55);
 }
 
@@ -603,12 +651,12 @@
 }
 
 .matchup-cell[data-tone="weak"] {
-  --cell-bg: #7a3a1b;
+  --cell-bg: #6b3117;
   --cell-edge: rgba(255, 150, 90, 0.5);
 }
 
 .matchup-cell[data-tone="weak-high"] {
-  --cell-bg: #9c2a11;
+  --cell-bg: #8a2110;
   --cell-edge: rgba(255, 140, 100, 0.75);
   box-shadow: 0 0 0 1px rgba(255, 120, 80, 0.22), 0 6px 14px -10px #ff6a3d;
 }
@@ -645,11 +693,11 @@
 }
 
 .matchup-legend li[data-tone="resist-low"] {
-  --cell-bg: #14432a;
+  --cell-bg: #113a24;
 }
 
 .matchup-legend li[data-tone="resist"] {
-  --cell-bg: #17602f;
+  --cell-bg: #14512a;
 }
 
 .matchup-legend li[data-tone="neutral"] {
@@ -657,11 +705,11 @@
 }
 
 .matchup-legend li[data-tone="weak"] {
-  --cell-bg: #7a3a1b;
+  --cell-bg: #6b3117;
 }
 
 .matchup-legend li[data-tone="weak-high"] {
-  --cell-bg: #9c2a11;
+  --cell-bg: #8a2110;
 }
 
 /* ---------- 6. flavor ---------- */
@@ -750,12 +798,13 @@
   }
 
   .bento-sprite {
-    min-height: 250px;
+    min-height: 300px;
   }
 
   .bento-sprite__img {
-    width: 148px;
-    height: 148px;
+    /* Still a whole multiple of the 96px source, just a smaller one. */
+    width: 192px;
+    height: 192px;
   }
 
 

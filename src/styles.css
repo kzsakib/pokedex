@@ -401,10 +401,10 @@ img {
 
 .dial-label {
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--dp-color-label);
+  color: #2c3439;
 }
 
 .control-hint {
@@ -613,6 +613,15 @@ img {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The feed word is prose, not an LED reading: the dotted face left it looking
+   washed out at this size. */
+.status .fact dd .shiny-text {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 .fault {

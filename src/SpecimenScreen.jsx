@@ -400,6 +400,12 @@ export default function SpecimenScreen({
               );
             })}
           </ul>
+          {/* The bars carry a colour nobody could decode from the bars alone. */}
+          <ul className="stat-legend">
+            <li data-tone="low">Below average</li>
+            <li data-tone="mid">Around average</li>
+            <li data-tone="high">Above average</li>
+          </ul>
         </section>
 
         {/* 3 — measurements ------------------------------------------ */}
