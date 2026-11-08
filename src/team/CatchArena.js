@@ -11,52 +11,71 @@ import { pixelSpriteUrl, pixelSpriteRawUrl } from "../api";
 const W = 720;
 const H = 420;
 
-/* Sprites are drawn at a whole 2× so the source pixels stay square; the
-   ball is drawn at 3px a cell to sit at the same visual weight. */
-const SPRITE_SCALE = 2;
-const BALL_R = 28;
-const BALL_HOME = { x: W / 2, y: H - 52 };
-const GROUND = H - 64;
+/* Sprites sit on a whole 1.5× so three of them fit the arena without
+   crowding; the ball is a 30-cell pixel ball scaled to match. */
+const SPRITE_SCALE = 1.5;
+const BALL_CELLS = 30;
+const BALL_R = 22;
+const FLOOR = H - 40;
+const BALL_HOME = { x: W / 2, y: FLOOR - BALL_R - 1 };
+const MON_R = 40;
+const CATCH_R = BALL_R + MON_R;
 
 /* Left, back, right — the three places a specimen can stand. */
 const SPOTS = [
-  { x: 166, y: 262 },
-  { x: 360, y: 168 },
-  { x: 554, y: 246 },
+  { x: 176, y: 248 },
+  { x: 360, y: 174 },
+  { x: 544, y: 242 },
 ];
 
 const ROUNDS = 6;
 const BALLS = 3;
-const MAX_SPEED = 1250;
-/* Matter integrates in 60Hz steps: px/step in, px/s out. */
-const MAX_STEP_SPEED = MAX_SPEED / 60;
-const GRAVITY_STEP = 0.277;
+const MAX_SPEED = 1320;
+/* Gravity per step², and how hard a spinning ball curves its own path
+   (Magnus): lateral acceleration is spin × speed × this. */
+const GRAVITY_Y = 1.3;
+const MAGNUS = 0.00022;
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const spriteKey = (id) => `mon-${id}`;
 
-/* A 20×20 Poké Ball drawn a pixel at a time and doubled: the same blocky
-   grammar as the sprites, not a smooth vector circle. */
+/* A 30-cell Poké Ball, one pixel a cell: black shell, red crown, white base,
+   the equator band and a button ringed in black. Drawn from the geometry
+   rather than by hand so the circle stays even at this size. */
 function ballCells() {
   const cells = [];
-  const cx = 9.5;
-  const cy = 9.5;
-  for (let y = 0; y < 20; y += 1) {
-    for (let x = 0; x < 20; x += 1) {
-      const dx = x - cx;
-      const dy = y - cy;
+  const c = (BALL_CELLS - 1) / 2;
+  const R = 14.4;
+
+  for (let y = 0; y < BALL_CELLS; y += 1) {
+    for (let x = 0; x < BALL_CELLS; x += 1) {
+      const dx = x - c;
+      const dy = y - c;
       const r = Math.hypot(dx, dy);
-      if (r > 9.4) continue;
+      if (r > R + 0.4) continue;
+
+      /* The real ball's button is about a quarter of its width and the band
+         a couple of pixels at this size — get those two ratios right and the
+         whole thing reads as a Poké Ball. */
       let color;
-      if (r > 8.1) color = "#0e1417";
-      else if (Math.abs(dy) <= 1.15) color = "#0e1417";
-      else if (r <= 3.6) color = r <= 2.5 ? "#f2f5f4" : "#0e1417";
-      else color = dy < 0 ? "#d8452f" : "#eef0ef";
-      /* two specular pixels, the way the original ball has them */
-      if ((x === 5 && y === 4) || (x === 6 && y === 3)) color = "#f2896f";
-      if ((x === 6 && y === 4) || (x === 7 && y === 3)) color = "#e85a42";
+      if (r > R - 1.7) {
+        color = "#0b1114"; /* shell */
+      } else if (r <= 3.9) {
+        color = r <= 2.5 ? "#f1f4f3" : "#0b1114"; /* button: face, ring */
+      } else if (Math.abs(dy) <= 1.05) {
+        color = "#0b1114"; /* equator band */
+      } else if (dy < 0) {
+        color = dx > 3.5 ? "#b5301f" : "#d8412c"; /* crown, shaded right */
+      } else {
+        color = dx > 5 ? "#d2d8d7" : "#eef1f0"; /* base, shaded right */
+      }
+
+      /* two highlight pixels on the shoulder, the way the sprite art does it */
+      if ((dx === -5 && dy === -7) || (dx === -4 && dy === -8)) color = "#ee7257";
+      if (dx === -5 && dy === -8) color = "#f4917a";
+
       cells.push([x, y, color]);
     }
   }
@@ -82,7 +101,7 @@ export class CatchArena {
     this.scene = null;
     this.game = null;
     this.aim = null;
-    this.spin = 0;
+    this.spinRate = 0;
     this.throwStart = 0;
   }
 
@@ -101,8 +120,9 @@ export class CatchArena {
     });
   }
 
-  alive() {
-    return !this.destroyed && !!this.scene;
+  alive(roundId) {
+    if (this.destroyed || !this.scene) return false;
+    return roundId === undefined || roundId === this.roundId;
   }
 
   /* Off-screen the arena has nothing to show, so its render loop parks. */
@@ -159,7 +179,7 @@ export class CatchArena {
       },
       physics: {
         default: "matter",
-        matter: { gravity: { y: 1 }, debug: false },
+        matter: { gravity: { y: GRAVITY_Y }, debug: false },
       },
       scene: ArenaScene,
     });
@@ -168,6 +188,9 @@ export class CatchArena {
   /* ---------- round flow ---------- */
 
   startRound({ silent = false } = {}) {
+    /* Bumped on every round so a capture animation left over from the last
+       round cannot finish inside this one. */
+    this.roundId = (this.roundId || 0) + 1;
     this.roundMons = this.pickRound();
     this.balls = BALLS;
     this.phase = "ready";
@@ -217,9 +240,12 @@ export class CatchArena {
 
     this.makeTextures(scene);
     this.drawStage(scene);
+    this.createBounds(scene);
     this.createBall(scene);
     this.bindInput(scene);
+    this.clock = 0;
     scene.matter.world.on("collisionstart", (event) => this.onCollision(event));
+    scene.matter.world.on("beforeupdate", () => this.beforeStep());
 
     if (this.roundMons.length) this.loadRound(this.roundMons);
     this.emit();
@@ -230,9 +256,9 @@ export class CatchArena {
       const g = scene.make.graphics({ add: false });
       ballCells().forEach(([x, y, color]) => {
         g.fillStyle(parseInt(color.slice(1), 16), 1);
-        g.fillRect(x * 3, y * 3, 3, 3);
+        g.fillRect(x, y, 1, 1);
       });
-      g.generateTexture("ball", 60, 60);
+      g.generateTexture("ball", BALL_CELLS, BALL_CELLS);
       g.destroy();
     }
     if (!scene.textures.exists("spark")) {
@@ -253,22 +279,44 @@ export class CatchArena {
     rings.lineStyle(1, 0x27343b, 0.4);
     rings.strokeEllipse(W / 2, 300, 158, 58);
 
-    scene.add.rectangle(W / 2, H - 9, W, 2, 0x2c3b43, 0.7).setDepth(-4);
+    /* the floor line the ball actually rests on */
+    scene.add.rectangle(W / 2, FLOOR, W, 2, 0x2c3b43, 0.8).setDepth(-4);
+  }
 
-    /* Rebuilt on every pointer move while the ball is held. */
-    this.guide = scene.add.graphics().setDepth(3);
+  /* Floor and three walls, so a hard throw rattles around the arena instead
+     of leaving it. The mon volumes are sensors: the ball never bounces off a
+     specimen, contact is a catch. */
+  createBounds(scene) {
+    const wall = (x, y, w, h, restitution = 0.52) =>
+      scene.matter.add.rectangle(x, y, w, h, {
+        isStatic: true,
+        restitution,
+        friction: 0.4,
+        label: "wall",
+      });
+
+    this.walls = [
+      wall(W / 2, FLOOR + 40, W * 3, 80, 0.34), /* floor, deadens the bounce */
+      wall(-30, H / 2 - 60, 60, H * 3, 0.52), /* left */
+      wall(W + 30, H / 2 - 60, 60, H * 3, 0.52), /* right */
+      wall(W / 2, -30, W * 3, 60, 0.52), /* top */
+    ];
   }
 
   createBall(scene) {
+    this.ballScale = (BALL_R * 2) / BALL_CELLS;
     this.ball = scene.matter.add.image(BALL_HOME.x, BALL_HOME.y, "ball", null, {
       shape: { type: "circle", radius: BALL_R },
-      restitution: 0.56,
-      friction: 0.05,
-      frictionAir: 0.007,
-      density: 0.0016,
+      restitution: 0.44,
+      friction: 0.16,
+      frictionAir: 0.009,
+      frictionStatic: 0.3,
+      density: 0.0019,
       label: "ball",
     });
-    this.ball.setDepth(6);
+    /* In front of the specimens: a ball in flight should never hide behind
+       the thing it is aimed at. */
+    this.ball.setDepth(900).setScale(this.ballScale);
     this.parkBall();
   }
 
@@ -279,8 +327,14 @@ export class CatchArena {
     scene.matter.body.setStatic(body, true);
     scene.matter.body.setPosition(body, { x: BALL_HOME.x, y: BALL_HOME.y });
     scene.matter.body.setAngle(body, 0);
+    scene.matter.body.setAngularVelocity(body, 0);
     this.ball.setPosition(BALL_HOME.x, BALL_HOME.y);
-    this.ball.setAngle(0).setAlpha(1).setScale(1).setVisible(true);
+    this.ball
+      .setAngle(0)
+      .setAlpha(1)
+      .setScale(this.ballScale || 1)
+      .setVisible(true);
+    this.spinRate = 0;
   }
 
   loadRound(mons) {
@@ -298,7 +352,7 @@ export class CatchArena {
       const spot = SPOTS[index] || SPOTS[0];
 
       const shadow = scene.add
-        .ellipse(spot.x + 2, spot.y + 52, 86, 18, 0x070d10, 0.55)
+        .ellipse(spot.x + 2, spot.y + 44, 62, 13, 0x070d10, 0.5)
         .setDepth(spot.y - 1);
 
       const sprite = scene.add
@@ -306,35 +360,20 @@ export class CatchArena {
         .setDepth(spot.y)
         .setVisible(false);
 
-      const marker = scene.matter.add.circle(spot.x, spot.y, 38, {
+      /* A sensor: the ball passes through and the catch is the contact. */
+      const marker = scene.matter.add.circle(spot.x, spot.y, MON_R, {
         isStatic: true,
-        restitution: 0.3,
+        isSensor: true,
         label: `mon-${mon.id}`,
       });
 
-      const entry = { ...mon, sprite, shadow, marker, spot };
+      const entry = { ...mon, sprite, shadow, marker, spot, bob: index * 2.1 };
       this.mons.push(entry);
 
       this.loadSprite(mon.id).then((key) => {
         if (!key || !this.alive() || !sprite.active) return;
         sprite.setTexture(key).setScale(SPRITE_SCALE).setVisible(true);
-        scene.tweens.add({
-          targets: sprite,
-          y: spot.y - 6,
-          duration: 1500 + index * 190,
-          yoyo: true,
-          repeat: -1,
-          ease: "Sine.inOut",
-        });
-        entry.shadowTween = scene.tweens.add({
-          targets: shadow,
-          alpha: 0.3,
-          scaleX: 0.86,
-          duration: 1500 + index * 190,
-          yoyo: true,
-          repeat: -1,
-          ease: "Sine.inOut",
-        });
+        entry.loaded = true;
       });
     });
 
@@ -411,7 +450,7 @@ export class CatchArena {
 
   onDown(point, touched) {
     if (this.phase !== "ready" || this.aim) return;
-    const nearBall = Math.hypot(point.x - BALL_HOME.x, point.y - BALL_HOME.y) < 170;
+    const nearBall = Math.hypot(point.x - BALL_HOME.x, point.y - BALL_HOME.y) < 150;
     if (!nearBall && point.y < H - 150) return;
 
     this.aim = { samples: [{ x: point.x, y: point.y, t: performance.now() }], touched };
@@ -424,15 +463,14 @@ export class CatchArena {
   onMove(point, event) {
     if (!this.aim || !this.alive()) return;
     /* A finger hides what it is aiming at, so the ball rides above it. */
-    const lift = this.aim.touched ? 46 : 0;
-    const x = clamp(point.x, 26, W - 26);
-    const y = clamp(point.y + lift, 44, H - 26);
+    const lift = this.aim.touched ? 42 : 0;
+    const x = clamp(point.x, BALL_R + 3, W - BALL_R - 3);
+    const y = clamp(point.y + lift, BALL_R + 4, FLOOR - BALL_R - 2);
     const now = performance.now();
     if (event?.pointerId !== undefined) this.lastPointerId = event.pointerId;
     this.placeBall(x, y);
     this.aim.samples.push({ x, y, t: now });
     this.aim.samples = this.aim.samples.filter((sample) => now - sample.t < 320);
-    this.drawGuide();
   }
 
   placeBall(x, y) {
@@ -449,8 +487,10 @@ export class CatchArena {
     const first = samples[0];
     const last = samples[samples.length - 1];
     const travel = Math.hypot(last.x - first.x, last.y - first.y);
+    /* Read the gesture before dropping it: the throw is measured from the
+       samples this press collected. */
+    const throwVec = this.measureThrow();
     this.aim = null;
-    this.guide?.clear();
 
     /* A press that never moved is not a throw: put the ball back rather than
        lobbing it for the player and spending one of their three. */
@@ -461,7 +501,7 @@ export class CatchArena {
       return;
     }
 
-    this.launch(this.measureThrow());
+    this.launch(throwVec);
   }
 
   /* Velocity from the last ~140ms of travel, curvature from the signed turn
@@ -522,80 +562,103 @@ export class CatchArena {
       turn += Math.asin(clamp((ax * by - ay * bx) / (la * lb), -1, 1));
       count += 1;
     }
+    /* Samples land ~16ms apart, so the mean turn per sample becomes a turn
+       per second: a flick that curls a quarter turn in a fifth of a second
+       is a hard spin, a nearly straight pull is almost none. */
     const curl = count ? turn / count : 0;
+    const turnRate = (curl / 16) * 1000;
 
-    return { vx, vy, spin: clamp(curl * 2.2, -0.4, 0.4) };
-  }
-
-  /* Dashed arc from the ball's nose, using the same numbers the launch will
-     use — the guide is a prediction, not decoration. */
-  drawGuide() {
-    const guide = this.guide;
-    if (!guide || !this.aim) return;
-    guide.clear();
-    const { vx, vy } = this.measureThrow();
-    if (Math.hypot(vx, vy) < 140) return;
-
-    let x = this.ball.x;
-    let y = this.ball.y;
-    let stepX = vx / 60;
-    let stepY = vy / 60;
-
-    for (let step = 0; step < 60; step += 1) {
-      stepY += GRAVITY_STEP;
-      x += stepX;
-      y += stepY;
-      if (y > GROUND + 6 || x < 8 || x > W - 8) break;
-      if (step % 2 === 0) {
-        guide.fillStyle(0xf5f8f9, Math.max(0.14, 0.62 - step * 0.008));
-        guide.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 3);
-      }
-    }
+    return {
+      vx,
+      vy,
+      spin: clamp(turnRate, -16, 16), /* radians per second */
+    };
   }
 
   launch({ vx, vy, spin }) {
     const scene = this.scene;
+    const body = this.ball.body;
     this.balls = Math.max(0, this.balls - 1);
     this.throwStart = performance.now();
     this.emit({ phase: "flying", balls: this.balls, message: "" });
 
-    scene.matter.body.setStatic(this.ball.body, false);
-    scene.matter.body.setVelocity(this.ball.body, {
-      x: vx / 60,
-      y: vy / 60,
-    });
-    scene.matter.body.setAngularVelocity(this.ball.body, spin);
-    this.spin = spin;
+    scene.matter.body.setStatic(body, false);
+    scene.matter.body.setVelocity(body, { x: vx / 60, y: vy / 60 });
+    /* Matter turns in radians per step; the throw spins in per second. */
+    scene.matter.body.setAngularVelocity(body, spin / 60);
+    this.spinRate = spin;
     playSfx("throw");
   }
 
   /* ---------- per-frame ---------- */
 
-  _update() {
+  _update(delta) {
     const ball = this.ball;
     if (!ball?.body) return;
     const body = ball.body;
 
-    /* Magnus: spin left by a curved swipe curls the flight. Small enough to
-       stay aimable, big enough to feel earned. */
-    if (this.phase === "flying" && Math.abs(this.spin) > 0.03) {
-      const speed = Math.hypot(body.velocity.x, body.velocity.y);
-      if (speed > 1) {
-        const curl = this.spin * 0.022;
-        body.velocity.x += (-body.velocity.y / speed) * curl;
-        body.velocity.y += (body.velocity.x / speed) * curl;
-      }
-    }
+    this.clock = (this.clock || 0) + (delta || 16);
+    this.hover();
 
     ball.x = body.position.x;
     ball.y = body.position.y;
     ball.rotation = body.angle;
 
-    if (this.phase === "flying") {
-      const speed = Math.hypot(body.velocity.x, body.velocity.y);
-      const elapsed = performance.now() - this.throwStart;
-      if ((speed < 0.4 && elapsed > 380) || elapsed > 5200) this.settle();
+    if (this.phase !== "flying") return;
+
+    /* A ball still at the release point is not a catch: give it a beat to
+       clear the hand first. */
+    if (performance.now() - this.throwStart < 90) return;
+
+    /* Contact is the catch. The volumes are sensors and the check runs every
+       frame, so a fast ball cannot slip through one. */
+    for (const mon of this.mons) {
+      if (!mon.marker) continue;
+      const distance = Math.hypot(
+        mon.marker.position.x - body.position.x,
+        mon.marker.position.y - body.position.y,
+      );
+      if (distance < CATCH_R) {
+        this.catchSequence(mon);
+        return;
+      }
     }
+
+    const speed = Math.hypot(body.velocity.x, body.velocity.y);
+    const elapsed = performance.now() - this.throwStart;
+    if ((speed < 0.6 && elapsed > 450) || elapsed > 6000) this.settle();
+  }
+
+  /* Idle float, a frame at a time: no tween sitting on a long duration, and
+     the shadow breathes with the sprite. */
+  hover() {
+    const t = (this.clock || 0) / 1000;
+    this.mons.forEach((mon) => {
+      if (!mon.loaded || !mon.sprite?.active) return;
+      const wave = Math.sin(t * 1.75 + mon.bob);
+      mon.sprite.y = mon.spot.y - 4 + wave * 4.5;
+      mon.shadow.setScale(1 - wave * 0.07, 1);
+    });
+  }
+
+  /* Runs inside the physics step before Matter integrates: the spin bends the
+     flight sideways and bleeds off, so a curled throw arcs and then straightens
+     like a real spinning ball. */
+  beforeStep() {
+    const body = this.ball?.body;
+    if (!body || this.phase !== "flying") return;
+    if (Math.abs(this.spinRate) < 0.2) return;
+
+    const { x: vx, y: vy } = body.velocity;
+    const speed = Math.hypot(vx, vy);
+    if (speed < 1.5) return;
+
+    const push = this.spinRate * speed * MAGNUS;
+    this.scene.matter.body.setVelocity(body, {
+      x: vx + (-vy / speed) * push,
+      y: vy + (vx / speed) * push,
+    });
+    this.spinRate *= 0.994;
   }
 
   onCollision(event) {
@@ -611,24 +674,10 @@ export class CatchArena {
     }
   }
 
-  /* The throw stopped short: whatever sits nearest still counts if close. */
+  /* The throw came to rest without touching anything: that is a miss. */
   settle() {
     if (this.phase !== "flying") return;
-    const body = this.ball.body;
-    let nearest = null;
-    let best = Infinity;
-    this.mons.forEach((mon) => {
-      const distance = Math.hypot(
-        mon.marker.position.x - body.position.x,
-        mon.marker.position.y - body.position.y,
-      );
-      if (distance < best) {
-        best = distance;
-        nearest = mon;
-      }
-    });
-    if (nearest && best < 104) this.catchSequence(nearest);
-    else this.missed();
+    this.missed();
   }
 
   /* ---------- capture sequence ---------- */
@@ -636,16 +685,19 @@ export class CatchArena {
   async catchSequence(target) {
     const scene = this.scene;
     if (!scene || this.phase === "catching" || this.phase === "caught") return;
+    const roundId = this.roundId;
     this.emit({ phase: "catching", message: `Ball on ${target.name}…` });
 
     const body = this.ball.body;
-    const at = { x: target.marker.position.x, y: target.marker.position.y };
+    /* The ball stops where it touched, not at the specimen's centre: a catch
+       should not look like a teleport. */
+    const at = { x: this.ball.x, y: this.ball.y };
     scene.matter.body.setStatic(body, true);
-    scene.matter.body.setPosition(body, at);
-    this.ball.setPosition(at.x, at.y);
+    scene.matter.body.setVelocity(body, { x: 0, y: 0 });
+    scene.matter.body.setAngularVelocity(body, 0);
 
     playSfx("impact");
-    const flash = scene.add.circle(at.x, at.y, 34, 0xffffff, 0.85).setDepth(7);
+    const flash = scene.add.circle(at.x, at.y, 26, 0xffffff, 0.85).setDepth(950);
     scene.tweens.add({
       targets: flash,
       scale: 3.4,
@@ -656,12 +708,9 @@ export class CatchArena {
     scene.cameras.main.shake(120, 0.004);
 
     await wait(130);
-    if (!this.alive()) return;
+    if (!this.alive(roundId)) return;
     playSfx("absorb");
-    /* The idle loops own these properties, so they have to stop first or the
-       bob keeps dragging the sprite (and its shadow) back into view. */
-    target.bob?.stop();
-    target.shadowTween?.stop();
+    target.loaded = false; /* stops the idle float fighting the tween */
     scene.tweens.add({
       targets: target.sprite,
       alpha: 0,
@@ -673,13 +722,13 @@ export class CatchArena {
     scene.tweens.add({ targets: target.shadow, alpha: 0, scaleX: 0.2, duration: 280 });
 
     await wait(430);
-    if (!this.alive()) return;
+    if (!this.alive(roundId)) return;
     playSfx("close");
-    const landing = clamp(at.x, 52, W - 52);
+    const landing = clamp(at.x, BALL_R + 14, W - BALL_R - 14);
     scene.tweens.add({
       targets: this.ball,
       x: landing,
-      y: GROUND,
+      y: FLOOR - BALL_R,
       duration: 420,
       ease: "bounce.out",
       onUpdate: () => {
@@ -687,13 +736,13 @@ export class CatchArena {
       },
     });
     await wait(500);
-    if (!this.alive()) return;
+    if (!this.alive(roundId)) return;
 
     for (let shake = 0; shake < 3; shake += 1) {
       playSfx(["shake", "shake2", "shake3"][shake]);
       await this.tweenBallAngle(scene, -16, 16, 110, true, 1);
       await wait(170);
-      if (!this.alive()) return;
+      if (!this.alive(roundId)) return;
     }
 
     this.emit({ phase: "caught", message: `Gotcha! ${target.name} joined the team.` });
@@ -710,7 +759,7 @@ export class CatchArena {
       scale: { start: 2, end: 0 },
       emitting: false,
     });
-    burst.setDepth(8);
+    burst.setDepth(950);
     burst.explode(28);
     scene.time.delayedCall(900, () => burst.destroy());
 
@@ -724,7 +773,7 @@ export class CatchArena {
     });
 
     await wait(950);
-    if (!this.alive()) return;
+    if (!this.alive(roundId)) return;
     this.ball.setVisible(false);
     this.emit({ team: this.team.slice() });
     this.finishRound();
