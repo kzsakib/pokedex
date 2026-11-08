@@ -31,6 +31,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Form controls do not inherit the page face: the UA sheet gives <button>,
+   <input> and friends their own family, and anything reached only through a
+   zero-specificity :where() reset (the dial, the gallery cells) loses to it
+   and renders in the browser default. */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
 /* The wordmark is set in the mono rather than the grotesque: wide, even
    strokes read like an engraved plate on the instrument, and the fixed
    advance keeps the letter-by-letter decode from shifting the line. */
