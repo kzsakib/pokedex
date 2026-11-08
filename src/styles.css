@@ -336,8 +336,7 @@ img {
   justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
-  /* clears the dial, which hangs below the bar */
-  margin-top: clamp(40px, 5vw, 58px);
+  margin-top: clamp(22px, 2.6vw, 32px);
 }
 
 .console-keys .key {
@@ -419,8 +418,10 @@ img {
 .console .dial {
   position: absolute;
   left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  top: 0;
+  /* it sits mostly above the bar and ends just inside it, so nothing below
+     the bar is ever covered */
+  transform: translate(-50%, -32%);
   width: clamp(112px, 13vw, 150px);
   height: clamp(112px, 13vw, 150px);
   border: 3px solid #10171b;
@@ -432,16 +433,16 @@ img {
   );
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.5),
-    0 16px 26px -14px rgba(6, 12, 16, 0.95),
+    0 14px 22px -18px rgba(6, 12, 16, 0.9),
     inset 0 -10px 18px -14px rgba(16, 22, 26, 0.45);
 }
 
 .console .dial:hover {
-  transform: translate(-50%, -54%);
+  transform: translate(-50%, -38%);
 }
 
 .console .dial:active {
-  transform: translate(-50%, -47%) scale(0.99);
+  transform: translate(-50%, -27%) scale(0.99);
 }
 
 .console .dial-ticks {
@@ -760,11 +761,11 @@ img {
 }
 
 .facts .fact:nth-child(2) {
-  padding-right: clamp(72px, 9vw, 116px);
+  padding-right: clamp(44px, 5.5vw, 82px);
 }
 
 .facts .fact:nth-child(4) {
-  padding-left: clamp(72px, 9vw, 116px);
+  padding-left: clamp(44px, 5.5vw, 82px);
 }
 
 .fact dt {

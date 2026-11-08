@@ -161,8 +161,11 @@ export const ROW_S = 0;
 export function facingRow(dx, dz) {
   if (!dx && !dz) return ROW_S;
   const turns = Math.round(Math.atan2(dz, dx) / (Math.PI / 4));
-  /* atan2: 0 = east, then south, west, north as the index climbs */
-  const table = [2, 1, 0, 7, 6, 5, 4, 3];
+  /* The sheets stack their rows clockwise from the front view: 0 south,
+     1 south-west, 2 west, 3 north-west, 4 north, 5 north-east, 6 east,
+     7 south-east. Checked against a rendered Pikachu walk sheet, where row 2
+     is the left-facing profile and row 6 the right-facing one. */
+  const table = [6, 7, 0, 1, 2, 3, 4, 5];
   return table[((turns % 8) + 8) % 8];
 }
 

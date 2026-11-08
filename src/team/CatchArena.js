@@ -26,7 +26,7 @@ const CONVERGE = 0.24;
 const Z_NEAR = 0.05;
 const Z_FAR = 1;
 
-const MON_SCALE = 2.9;
+const MON_SCALE = 2.55;
 /* 32 cells across, drawn at 36px: the ball is nearly one pixel per pixel,
    so the outline and the button stay sharp. */
 const BALL_CELLS = 32;
@@ -37,8 +37,10 @@ const BALL_HOME = { x: W / 2, z: Z_NEAR };
 /* Throw feel: the ball lands where the swipe ends, and the arc is a real
    projectile lob over that distance. */
 const GRAVITY = 1500;
-const FLIGHT_BASE = 0.24;
-const FLIGHT_PER_PX = 900;
+/* Air time: even a short flick is a visible lob, and a long throw hangs long
+   enough to see the ball cross the whole field. */
+const FLIGHT_BASE = 0.46;
+const FLIGHT_PER_PX = 560;
 const SPIN_CURVE = 0.035;
 
 const ROUNDS = 6;
@@ -680,9 +682,9 @@ export class CatchArena {
       z = clamp(1.26 - z, Z_MIN + 0.03, 0.94);
     }
     entry.target = { x, z };
-    const running = Math.random() < 0.38;
+    const running = Math.random() < 0.42;
     entry.state = running ? "run" : "walk";
-    entry.speed = running ? 96 : 56;
+    entry.speed = running ? 138 : 82;
     this.setAnim(entry, running && entry.parts?.run ? "run" : "walk");
   }
 
@@ -857,7 +859,7 @@ export class CatchArena {
     const dz = (goal.z - state.z) * Z_SPAN;
     const distance = Math.hypot(goal.x - state.x, dz);
     /* a longer throw takes a little longer and arcs higher */
-    const flight = clamp(FLIGHT_BASE + distance / FLIGHT_PER_PX, 0.24, 0.72);
+    const flight = clamp(FLIGHT_BASE + distance / FLIGHT_PER_PX, 0.46, 1.05);
 
     state.vx = (goal.x - state.x) / flight;
     state.vz = dz / Z_SPAN / flight;
@@ -929,11 +931,17 @@ export class CatchArena {
       body.vz = -Math.abs(body.vz) * 0.5;
     }
 
-    /* ground: a damp bounce, then it rolls */
+    /* Ground contact: it hits, hops, then rolls — and each contact kicks up
+       a little dust, which is what sells the height it just fell from. */
     if (body.h <= BALL_R) {
       body.h = BALL_R;
-      if (body.vh < -40) {
-        body.vh = -body.vh * 0.32;
+      const impact = Math.abs(body.vh);
+      if (impact > 190) {
+        body.vh = impact * 0.4;
+        this.puff(impact);
+      } else if (impact > 45) {
+        body.vh = impact * 0.16;
+        this.puff(impact * 0.55);
       } else {
         body.vh = 0;
         const drag = Math.exp(-2.1 * dt);
@@ -962,8 +970,11 @@ export class CatchArena {
   /* Contact is a catch: the ball has to come down inside the creature's
      footprint, at or below its shoulders. */
   checkCatch() {
-    if (performance.now() - this.throwStart < 90) return;
+    if (performance.now() - this.throwStart < 120) return;
     const state = this.ballState;
+    /* A ball still climbing sails over everyone. It only catches on the way
+       down, or once it is rolling across the ground. */
+    if (state.vh > 0) return;
 
     for (const mon of this.mons) {
       if (!mon.loaded || mon.caught) continue;
@@ -974,6 +985,31 @@ export class CatchArena {
         this.catchSequence(mon);
         return;
       }
+    }
+  }
+
+  /* A ring of grit at the point of impact, sized by how hard it landed. */
+  puff(strength = 120) {
+    const scene = this.scene;
+    if (!scene) return;
+    const state = this.ballState;
+    const point = this.project(state.x, state.z, 0);
+    const reach = clamp(strength / 5, 10, 30);
+    for (let i = 0; i < 5; i += 1) {
+      const angle = (Math.PI * 2 * i) / 5 + Math.random() * 0.6;
+      const dot = scene.add
+        .circle(point.x, point.y, 2.4, 0xb9c6cc, 0.55)
+        .setDepth(300 - state.z * 250 - 3);
+      scene.tweens.add({
+        targets: dot,
+        x: point.x + Math.cos(angle) * reach,
+        y: point.y + Math.sin(angle) * reach * 0.4 - 4,
+        scale: 0.3,
+        alpha: 0,
+        duration: 320 + Math.random() * 180,
+        ease: "Quad.out",
+        onComplete: () => dot.destroy(),
+      });
     }
   }
 
