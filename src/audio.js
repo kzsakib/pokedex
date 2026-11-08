@@ -103,6 +103,30 @@ function blip({ from, to, type = "square", length = 0.06, level = 0.05, delay = 
   osc.stop(start + length + 0.02);
 }
 
+/* Short filtered noise burst: the body of a ball hitting something, which a
+   plain oscillator cannot give. */
+function thud({ length = 0.08, level = 0.05, from = 1800, to = 320 }) {
+  const audio = ready();
+  if (!audio) return;
+  const frames = Math.max(1, Math.floor(audio.sampleRate * length));
+  const buffer = audio.createBuffer(1, frames, audio.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < frames; i += 1) {
+    const falloff = (1 - i / frames) ** 2;
+    data[i] = (Math.random() * 2 - 1) * falloff;
+  }
+  const source = audio.createBufferSource();
+  source.buffer = buffer;
+  const filter = audio.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(from, audio.currentTime);
+  filter.frequency.exponentialRampToValueAtTime(Math.max(80, to), audio.currentTime + length);
+  const gain = audio.createGain();
+  gain.gain.value = level;
+  source.connect(filter).connect(gain).connect(master);
+  source.start();
+}
+
 const VOICES = {
   /* Soft detent as the pointer crosses a control. */
   hover: () => blip({ from: 1180, to: 1420, type: "triangle", length: 0.035, level: 0.03 }),
@@ -130,6 +154,47 @@ const VOICES = {
   },
   /* Filter chip engaged. */
   filter: () => blip({ from: 880, to: 660, type: "triangle", length: 0.07, level: 0.038 }),
+
+  /* --- catch arena ------------------------------------------------- */
+  /* Ball picked up off the rack. */
+  grab: () => blip({ from: 520, to: 760, type: "triangle", length: 0.05, level: 0.04 }),
+  /* Released with a swipe: a whoosh over the wrist snap. */
+  throw: () => {
+    thud({ length: 0.14, level: 0.05, from: 2800, to: 700 });
+    blip({ from: 300, to: 660, type: "sine", length: 0.09, level: 0.03 });
+  },
+  /* Ball meets a specimen. */
+  impact: () => {
+    thud({ length: 0.1, level: 0.1, from: 1900, to: 180 });
+    blip({ from: 250, to: 110, type: "square", length: 0.07, level: 0.05 });
+  },
+  /* Drawn into the ball. */
+  absorb: () => {
+    blip({ from: 940, to: 170, type: "sawtooth", length: 0.3, level: 0.032 });
+    blip({ from: 470, to: 120, type: "triangle", length: 0.26, level: 0.03, delay: 0.03 });
+  },
+  /* Ball snaps shut. */
+  close: () => {
+    thud({ length: 0.06, level: 0.07, from: 2400, to: 400 });
+    blip({ from: 720, to: 320, type: "square", length: 0.07, level: 0.045 });
+  },
+  /* Three shakes, each a step higher. */
+  shake: () => blip({ from: 400, to: 300, type: "triangle", length: 0.075, level: 0.045 }),
+  shake2: () => blip({ from: 460, to: 330, type: "triangle", length: 0.075, level: 0.045 }),
+  shake3: () => blip({ from: 520, to: 370, type: "triangle", length: 0.075, level: 0.045 }),
+  /* Gotcha: the four-note flourish. */
+  caught: () => {
+    blip({ from: 523, to: 523, type: "square", length: 0.09, level: 0.045 });
+    blip({ from: 659, to: 659, type: "square", length: 0.09, level: 0.045, delay: 0.1 });
+    blip({ from: 784, to: 784, type: "square", length: 0.09, level: 0.045, delay: 0.2 });
+    blip({ from: 1046, to: 1046, type: "square", length: 0.26, level: 0.05, delay: 0.3 });
+    blip({ from: 1568, to: 1568, type: "sine", length: 0.26, level: 0.025, delay: 0.3 });
+  },
+  /* Nothing reached. */
+  miss: () => {
+    blip({ from: 330, to: 240, type: "triangle", length: 0.1, level: 0.04 });
+    blip({ from: 240, to: 170, type: "triangle", length: 0.14, level: 0.035, delay: 0.1 });
+  },
 };
 
 export function playSfx(name) {

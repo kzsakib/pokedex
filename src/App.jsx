@@ -37,6 +37,7 @@ import CountUp from "./components/CountUp";
 import ShinyText from "./components/ShinyText";
 import EvolutionTray from "./EvolutionTray";
 import SpecimenScreen from "./SpecimenScreen";
+import TeamBuilder from "./team/TeamBuilder";
 
 const LEDE =
   "A field instrument for the original 151. Search the field archive, load a specimen record, switch between Pokédex entries by game, and trace the evolution line. Every reading below streams live from PokéAPI.";
@@ -836,11 +837,22 @@ export default function App() {
           />
         </section>
 
+        <section className="bay team-bay" id="team-bay" aria-labelledby="team-title">
+          <h2 className="bay-tag bay-tag--rule" id="team-title">
+            <span className="bay-index" aria-hidden="true">
+              04
+            </span>
+            <span className="bay-label">Build a team</span>
+            <span className="bay-rule" aria-hidden="true" />
+          </h2>
+          <TeamBuilder roster={index} />
+        </section>
+
         <footer className="bay closing">
           <div>
             <p className="bay-tag">
               <span className="bay-index" aria-hidden="true">
-                04
+                05
               </span>
               Field unit
             </p>
