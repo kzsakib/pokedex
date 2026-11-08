@@ -666,8 +666,11 @@ export class CatchArena {
     entry.z = clamp(entry.z + nz / Z_SPAN, Z_MIN, 0.95);
     if (Math.abs(nx) > 0.05) entry.dir = nx < 0 ? -1 : 1;
     entry.lean = clamp(nx * 1.4, -4.5, 4.5);
-    /* whichever way it is walking is the way it faces */
-    entry.face = facingRow(nx, nz);
+    /* Whichever way it is walking is the way it faces. Depth runs the other
+       way on screen — z grows away from the viewer while screen y shrinks —
+       so the heading is measured with -nz, or a creature walking away is
+       drawn facing the camera. */
+    entry.face = facingRow(nx, -nz);
 
     this.placeMon(entry);
   }

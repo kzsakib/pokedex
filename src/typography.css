@@ -23,6 +23,12 @@ body {
   font-family: var(--font-body);
   font-weight: 400;
   line-height: 1.55;
+  /* All three families are variable with a real weight axis, so nothing needs
+     to be faked. Left to itself Windows synthesises bold where macOS does
+     not, and the two render the same page at different weights. */
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* The wordmark is set in the mono rather than the grotesque: wide, even
@@ -104,4 +110,17 @@ body {
 .fact dd,
 .archive-count__value {
   font-weight: 700;
+}
+
+/* Counters change every round: tabular figures keep the line from shifting as
+   they climb, in whichever family ends up carrying the digits. */
+.team-round,
+.team-round__value,
+.team-round__total,
+.team-hud,
+.team-hud__balls b,
+.archive-count,
+.stats-total-value {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
