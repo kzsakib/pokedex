@@ -161,11 +161,12 @@ export const ROW_S = 0;
 export function facingRow(dx, dz) {
   if (!dx && !dz) return ROW_S;
   const turns = Math.round(Math.atan2(dz, dx) / (Math.PI / 4));
-  /* The sheets stack their rows clockwise from the front view: 0 south,
-     1 south-west, 2 west, 3 north-west, 4 north, 5 north-east, 6 east,
-     7 south-east. Checked against a rendered Pikachu walk sheet, where row 2
-     is the left-facing profile and row 6 the right-facing one. */
-  const table = [6, 7, 0, 1, 2, 3, 4, 5];
+  /* Rows run 0 south, 1 south-east, 2 east, 3 north-east, 4 north,
+     5 north-west, 6 west, 7 south-west. Measured, not guessed: on Pikachu's
+     walk sheet the red cheek sits right of the silhouette's centre of mass on
+     rows 1–3 and left on rows 5–7, so 2 is the right-facing profile and 6 the
+     left-facing one, with 0 front and 4 back. */
+  const table = [2, 1, 0, 7, 6, 5, 4, 3];
   return table[((turns % 8) + 8) % 8];
 }
 

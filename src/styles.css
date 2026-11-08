@@ -268,8 +268,7 @@ img {
 /* Every bay opens the same way: the tag centred on the plate, with the rule
    running out to both edges. */
 .bay-tag--rule,
-.opening .bay-tag,
-.closing .bay-tag:not(.bay-tag--plain) {
+.opening .bay-tag {
   justify-content: center;
 }
 
@@ -342,6 +341,48 @@ img {
 .console-keys .key {
   width: auto;
   min-width: 148px;
+}
+
+/* ---------- platform ---------- */
+
+/* Windows lets a drag select the plate's text, and iOS inflates type on
+   rotation: neither should happen to an instrument. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+button,
+a,
+.key,
+.dial,
+.chip-pill {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* One tap, not a double-tap zoom, on every control. */
+button,
+.key,
+.dial,
+.chip-pill {
+  touch-action: manipulation;
+}
+
+@media (max-width: 760px) {
+  /* Thumbs need a real target, not a 31px chip. */
+  .key {
+    min-height: 44px;
+  }
+
+  .console-keys .key {
+    min-width: 132px;
+  }
+
+  .footer-list a,
+  .closing-copy a {
+    display: inline-block;
+    padding: 5px 0;
+  }
 }
 
 /* The vent grille answers the feed and the dial; the reference layout has
