@@ -266,6 +266,7 @@
   text-transform: uppercase;
   color: #cfd9dd;
   cursor: pointer;
+  -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   transition:
     background 180ms ease,
@@ -813,4 +814,14 @@
     font-size: 14px;
   }
 
+  /* 9px reads as a caption on a desktop and as a focusing problem on a
+     phone — and anything under 16px makes iOS zoom the page on focus. */
+  .version-select {
+    font-size: 10px;
+  }
+
+  .version-select select {
+    font-size: 16px;
+    padding: 6px 10px;
+  }
 }

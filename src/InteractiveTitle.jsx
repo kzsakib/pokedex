@@ -26,7 +26,9 @@ export default function InteractiveTitle() {
     });
   });
 
-  const onPointerMove = contextSafe((event) => {
+  const pending = useRef({ x: 0, y: 0, frame: 0 });
+
+  const applyPointer = contextSafe((clientX, clientY) => {
     if (!motion) return;
     const { split, ball } = state.current;
 
@@ -34,8 +36,8 @@ export default function InteractiveTitle() {
       const rect = ball.getBoundingClientRect();
       const angle =
         (Math.atan2(
-          event.clientY - (rect.top + rect.height / 2),
-          event.clientX - (rect.left + rect.width / 2),
+          clientY - (rect.top + rect.height / 2),
+          clientX - (rect.left + rect.width / 2),
         ) *
           180) /
           Math.PI +
@@ -52,8 +54,8 @@ export default function InteractiveTitle() {
       if (char.classList.contains("has-ball")) return;
       const rect = char.getBoundingClientRect();
       const distance = Math.hypot(
-        event.clientX - (rect.left + rect.width / 2),
-        event.clientY - (rect.top + rect.height / 2),
+        clientX - (rect.left + rect.width / 2),
+        clientY - (rect.top + rect.height / 2),
       );
       const reach = Math.max(0, 1 - distance / 240);
       char.style.fontVariationSettings = `"wght" ${Math.round(
@@ -61,6 +63,20 @@ export default function InteractiveTitle() {
       )}`;
     });
   });
+
+  /* A 120Hz trackpad delivers roughly twice the events of a mouse wheel, and
+     each one used to read six rects and restyle them. Folding the reads into
+     one update per frame keeps the weight shift smooth without that churn. */
+  const onPointerMove = (event) => {
+    const point = pending.current;
+    point.x = event.clientX;
+    point.y = event.clientY;
+    if (point.frame) return;
+    point.frame = requestAnimationFrame(() => {
+      point.frame = 0;
+      applyPointer(point.x, point.y);
+    });
+  };
 
   useGSAP(
     () => {
@@ -138,6 +154,8 @@ export default function InteractiveTitle() {
       return () => {
         window.removeEventListener("pointermove", onPointerMove);
         window.removeEventListener("pointerleave", resetWeights);
+        cancelAnimationFrame(pending.current.frame);
+        pending.current.frame = 0;
         state.current.split = null;
         state.current.ball = null;
         split.revert();

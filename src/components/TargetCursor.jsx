@@ -7,8 +7,13 @@ import './TargetCursor.css';
 const CORNER_ANGLES = [0, 90, 180, 270];
 const QUARTER = Math.PI / 2;
 
+/* Explicit Euler only stays stable while step * sqrt(stiffness) is well under
+   1. A fixed substep count blows up into visible overshoot on any frame that
+   arrives late — which is exactly what a 2× retina Mac does when it drops a
+   frame — so the step count scales with the spring's own frequency instead. */
 const spring = (state, goal, stiffness, damping, dt) => {
-  const steps = 2;
+  const omega = Math.sqrt(Math.max(stiffness, 1e-4));
+  const steps = Math.min(16, Math.max(1, Math.ceil((dt * omega) / 0.45)));
   const h = dt / steps;
   for (let i = 0; i < steps; i++) {
     state.v += (stiffness * (goal - state.x) - damping * state.v) * h;
@@ -51,8 +56,10 @@ const TargetCursor = ({
   targetSelector = '.cursor-target',
   cursorColor = '#ffffff',
   cursorColorOnTarget,
-  spinDuration = 2,
-  hoverDuration = 0.2,
+  /* Off by default: an idle reticle that rotates on its own reads as a
+     loading spinner, not as a cursor. */
+  spinDuration = 0,
+  hoverDuration = 0.24,
   parallaxOn = true,
   hideDefaultCursor = true,
   size = 36,
@@ -128,6 +135,7 @@ const TargetCursor = ({
     let lastLabel = '';
     let lastColor = '';
     let lastScope = null;
+    let scrollSettle = 0;
 
     const scopeOf = () => resolveElement(settingsRef.current.container);
 
@@ -147,7 +155,9 @@ const TargetCursor = ({
 
     const findTarget = (x, y, element) => {
       const s = settingsRef.current;
-      const node = element || document.elementFromPoint(x, y);
+      /* Some browsers dispatch pointer events with window or a text node as the
+         target; anything that is not an element is re-resolved by position. */
+      const node = element && element.nodeType === 1 ? element : document.elementFromPoint(x, y);
       const found = node?.closest?.(s.targetSelector) || clickableFrom(node) || null;
       const scope = scopeOf();
       if (found && scope && !scope.contains(found)) return null;
@@ -169,7 +179,10 @@ const TargetCursor = ({
     const frame = now => {
       raf = 0;
       const s = settingsRef.current;
-      const dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
+      /* A tab that was parked or a frame dropped under load can hand over a
+         very long dt; clamping keeps one bad frame from teleporting the
+         reticle. */
+      const dt = last ? Math.min(1 / 30, (now - last) / 1000) : 1 / 60;
       last = now;
 
       if (target && !target.isConnected) lockOn(null);
@@ -191,7 +204,9 @@ const TargetCursor = ({
       if (locked) {
         const cx = rect.left + rect.width / 2;
         const cy = rect.top + rect.height / 2;
-        const lean = s.parallaxOn ? 0.08 : 0;
+        /* Enough lean to feel alive, little enough that moving inside a tile
+           does not swing the reticle around. */
+        const lean = s.parallaxOn ? 0.05 : 0;
         goalX = cx + (pointer.x - cx) * lean;
         goalY = cy + (pointer.y - cy) * lean;
         const odd = Math.abs(quarter) % 2 === 1;
@@ -338,7 +353,21 @@ const TargetCursor = ({
       wake();
     };
 
-    const onLeave = () => {
+    const onLeave = event => {
+      /* Safari fires pointerleave on <html> when the pointer merely grazes a
+         scrollbar or the window's rounded corner. Only a leave that reports a
+         position outside the viewport is real. */
+      if (
+        event &&
+        Number.isFinite(event.clientX) &&
+        Number.isFinite(event.clientY) &&
+        event.clientX > 0 &&
+        event.clientX < window.innerWidth &&
+        event.clientY > 0 &&
+        event.clientY < window.innerHeight
+      ) {
+        return;
+      }
       pointer.inside = false;
       pointer.pressed = false;
       lockOn(null);
@@ -346,9 +375,28 @@ const TargetCursor = ({
       wake();
     };
 
+    const underPointer = element => {
+      if (!element || !element.isConnected) return false;
+      const box = element.getBoundingClientRect();
+      return (
+        pointer.x >= box.left && pointer.x <= box.right && pointer.y >= box.top && pointer.y <= box.bottom
+      );
+    };
+
+    /* Trackpads glide for a second after the fingers lift, so the page keeps
+       moving under a still pointer. Re-picking a target on every scroll frame
+       made the reticle jump tile to tile; instead the current target is kept
+       while it is still under the pointer, dropped when it slides away, and
+       only re-picked once the page settles. */
     const onScroll = () => {
       if (!pointer.inside) return;
-      lockOn(findTarget(pointer.x, pointer.y));
+      if (target && !underPointer(target)) lockOn(null);
+      clearTimeout(scrollSettle);
+      scrollSettle = setTimeout(() => {
+        if (!pointer.inside) return;
+        lockOn(findTarget(pointer.x, pointer.y));
+        wake();
+      }, 140);
       wake();
     };
 
@@ -358,9 +406,13 @@ const TargetCursor = ({
     window.addEventListener('scroll', onScroll, { passive: true, capture: true });
     document.documentElement.addEventListener('pointerleave', onLeave);
     window.addEventListener('blur', onLeave);
+    /* Frames stop while a tab is in the background; without this the reticle
+       can come back frozen at its old spot with the native cursor hidden. */
+    document.addEventListener('visibilitychange', wake);
 
     return () => {
       cancelAnimationFrame(raf);
+      clearTimeout(scrollSettle);
       wakeRef.current = null;
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerdown', onPointerDown);
@@ -368,6 +420,7 @@ const TargetCursor = ({
       window.removeEventListener('scroll', onScroll, { capture: true });
       document.documentElement.removeEventListener('pointerleave', onLeave);
       window.removeEventListener('blur', onLeave);
+      document.removeEventListener('visibilitychange', wake);
       lastScope?.removeAttribute('data-target-cursor-scope');
       style.remove();
     };

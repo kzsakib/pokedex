@@ -47,6 +47,11 @@
   box-sizing: border-box;
 }
 
+/* No 300ms tap wait and no double-tap zoom on controls. */
+:where(a, button, input, select, textarea, summary, [role="button"]) {
+  touch-action: manipulation;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
   /* Lenis owns the scroll position; a native smooth scroll here would run a
@@ -62,6 +67,9 @@ html.lenis body {
 body {
   margin: 0;
   min-height: 100vh;
+  /* iOS counts the collapsing URL bar in 100vh, which leaves the page
+     scrollable by exactly that much on a phone. */
+  min-height: 100dvh;
   background:
     radial-gradient(
       1100px 520px at 50% -12%,
@@ -1581,8 +1589,16 @@ img {
 
 @media (max-width: 760px) {
   .chassis {
-    padding: 14px 14px 14px 20px;
+    /* Clears the notch and the home indicator instead of sitting under them. */
+    padding:
+      max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right))
+      max(14px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
     border-radius: 16px;
+  }
+
+  /* iOS zooms the whole page when a focused field's text is under 16px. */
+  .search-slot input {
+    font-size: 16px;
   }
 
   .seam {
@@ -2042,5 +2058,25 @@ img {
   .evo-track {
     flex-direction: column;
     width: 100%;
+  }
+}
+
+/* Touch: no hover, no fine pointer, and a finger that covers what it taps.
+   The filter keys were sized for a mouse at 28px tall; on glass they get a
+   real 40px surface and a touch more letter. */
+@media (hover: none) and (pointer: coarse) {
+  .key {
+    min-height: 40px;
+  }
+
+  .key--type {
+    min-height: 40px;
+    padding: 9px 11px 9px 20px;
+    font-size: 11px;
+  }
+
+  .search-slot__clear {
+    min-width: 36px;
+    min-height: 36px;
   }
 }
