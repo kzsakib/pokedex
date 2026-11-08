@@ -133,8 +133,8 @@ export default function TeamBuilder({ roster = [] }) {
         <div className="team-head__copy">
           <h3 className="team-title">Catch 6 Pokémon</h3>
           <p className="team-sub">
-            Swipe a ball at one of the three. Speed sets the throw, a curl sets
-            its spin.
+            They wander, so lead your throw. The ball lands where the swipe
+            ends, and a curl bends it on the way.
           </p>
         </div>
         <p className="team-round">
@@ -158,7 +158,7 @@ export default function TeamBuilder({ roster = [] }) {
           className="team-canvas"
           ref={hostRef}
           role="application"
-          aria-label="Catching arena. Press on the Poké Ball, swipe toward a Pokémon and release to throw."
+          aria-label="Catching arena. Press on the Poké Ball, swipe to where a moving Pokémon is and release to throw."
         />
 
         <p className={`team-toast${announce ? " is-on" : ""}`} aria-live="polite">

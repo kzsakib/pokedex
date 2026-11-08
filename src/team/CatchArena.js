@@ -1,4 +1,5 @@
-/* The catching arena: one Phaser 3 scene, powered by Matter.js.
+/* The catching arena: one Phaser 3 scene, three wandering specimens and a
+   Poké Ball thrown across a shallow pocket of depth.
 
    Deliberately framework-free. React mounts it, hands over the roster and
    listens for state snapshots; nothing that moves, bounces or shakes ever
@@ -7,47 +8,62 @@
 
 import { playSfx } from "../audio";
 import { pixelSpriteUrl, pixelSpriteRawUrl } from "../api";
+import { fetchPmd, installPmdTextures } from "./sprites";
 
 const W = 720;
 const H = 420;
 
-/* Sprites sit on a whole 1.5× so three of them fit the arena without
-   crowding; the ball is a 30-cell pixel ball scaled to match. */
-const SPRITE_SCALE = 1.5;
-const BALL_CELLS = 30;
-const BALL_R = 22;
-const FLOOR = H - 40;
-const BALL_HOME = { x: W / 2, y: FLOOR - BALL_R - 1 };
-const MON_R = 40;
-const CATCH_R = BALL_R + MON_R;
+/* The field is a ground plane seen from a low seat: z = 0 is the front edge
+   under the player, z = 1 the far edge. Anything standing further back is
+   drawn smaller and higher up, and the same goes for a ball in flight. */
+const NEAR_Y = H - 26;
+const FAR_Y = 128;
+const Z_SPAN = NEAR_Y - FAR_Y;
+const SHRINK = 0.46;
+const Z_NEAR = 0.05;
+const Z_FAR = 1;
 
-/* Left, back, right — the three places a specimen can stand. */
-const SPOTS = [
-  { x: 176, y: 248 },
-  { x: 360, y: 174 },
-  { x: 544, y: 242 },
-];
+const MON_SCALE = 3.4;
+const BALL_CELLS = 16;
+const BALL_R = 18;
+const CATCH_R = 44;
+const BALL_HOME = { x: W / 2, z: Z_NEAR };
+
+/* Throw feel: the ball lands where the swipe ends, and the arc is a real
+   projectile lob over that distance. */
+const GRAVITY = 1500;
+const FLIGHT_BASE = 0.24;
+const FLIGHT_PER_PX = 900;
+const SPIN_CURVE = 0.035;
 
 const ROUNDS = 6;
 const BALLS = 3;
-const MAX_SPEED = 1320;
-/* Gravity per step², and how hard a spinning ball curves its own path
-   (Magnus): lateral acceleration is spin × speed × this. */
-const GRAVITY_Y = 1.3;
-const MAGNUS = 0.00022;
+
+/* Where the three stand when the round opens: front-left, back, front-right. */
+const ZONES = [
+  { x: 170, z: 0.5 },
+  { x: 360, z: 0.16 },
+  { x: 548, z: 0.56 },
+];
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
 
-const spriteKey = (id) => `mon-${id}`;
+/* One second of PMD animation is 60 ticks; a creature crossing a room should
+   not shuffle through its walk cycle that fast. */
+const ANIM_TICK = 1 / 60;
+const WALK_RATE = 2.3;
+const RUN_RATE = 1.4;
+const IDLE_RATE = 2.6;
 
-/* A 30-cell Poké Ball, one pixel a cell: black shell, red crown, white base,
-   the equator band and a button ringed in black. Drawn from the geometry
-   rather than by hand so the circle stays even at this size. */
+/* A 16-cell Poké Ball, one pixel a cell. The band and the button are what
+   make the shape readable at this size, so they are drawn first and the
+   shading goes around them. */
 function ballCells() {
   const cells = [];
   const c = (BALL_CELLS - 1) / 2;
-  const R = 14.4;
+  const R = 7.35;
 
   for (let y = 0; y < BALL_CELLS; y += 1) {
     for (let x = 0; x < BALL_CELLS; x += 1) {
@@ -56,25 +72,22 @@ function ballCells() {
       const r = Math.hypot(dx, dy);
       if (r > R + 0.4) continue;
 
-      /* The real ball's button is about a quarter of its width and the band
-         a couple of pixels at this size — get those two ratios right and the
-         whole thing reads as a Poké Ball. */
-      let color;
-      if (r > R - 1.7) {
-        color = "#0b1114"; /* shell */
-      } else if (r <= 3.9) {
-        color = r <= 2.5 ? "#f1f4f3" : "#0b1114"; /* button: face, ring */
-      } else if (Math.abs(dy) <= 1.05) {
-        color = "#0b1114"; /* equator band */
-      } else if (dy < 0) {
-        color = dx > 3.5 ? "#b5301f" : "#d8412c"; /* crown, shaded right */
-      } else {
-        color = dx > 5 ? "#d2d8d7" : "#eef1f0"; /* base, shaded right */
-      }
+      /* The button sits on the band, so it has to be drawn before it. */
+      const button = Math.abs(dx) <= 1.1 && Math.abs(dy) <= 1.1;
 
-      /* two highlight pixels on the shoulder, the way the sprite art does it */
-      if ((dx === -5 && dy === -7) || (dx === -4 && dy === -8)) color = "#ee7257";
-      if (dx === -5 && dy === -8) color = "#f4917a";
+      let color;
+      if (button) color = "#d8d8d8";
+      else if (Math.abs(dy) <= 0.62) color = "#151515"; /* equator band */
+      else if (r > R - 1.15) color = "#151515"; /* shell */
+      else if (dy < 0) color = "#e5322b"; /* crown */
+      else color = "#e9e9e9"; /* base */
+
+      if (!button) {
+        /* one glint on the shoulder, and a darker rim under the base — but
+           never over the outline, or the ball loses its edge */
+        if (dy < -1.6 && Math.hypot(dx + 2.4, dy + 3.3) < 1.5) color = "#ffffff";
+        if (dy > 5 && r < R - 1.15) color = "#b9b9b9";
+      }
 
       cells.push([x, y, color]);
     }
@@ -94,6 +107,7 @@ export class CatchArena {
     this.team = [];
     this.phase = "loading";
     this.roundMons = [];
+    this.nextMons = [];
     this.mons = [];
     this.message = "";
     this.destroyed = false;
@@ -101,8 +115,23 @@ export class CatchArena {
     this.scene = null;
     this.game = null;
     this.aim = null;
-    this.spinRate = 0;
-    this.throwStart = 0;
+    this.clock = 0;
+
+    /* The ball lives in field space: x across, z into the scene, h above
+       the ground. The sprite is only its shadow on the screen. */
+    this.ballState = {
+      x: BALL_HOME.x,
+      z: BALL_HOME.z,
+      h: BALL_R,
+      vx: 0,
+      vz: 0,
+      vh: 0,
+      angle: 0,
+      spin: 0,
+      live: false,
+      frozen: false,
+      still: 0,
+    };
   }
 
   emit(patch = {}) {
@@ -133,6 +162,18 @@ export class CatchArena {
     const idle = ["ready", "roundOver", "complete"].includes(this.phase);
     if (!awake && idle) loop.sleep();
     else if (awake && !loop.running) loop.wake(true);
+  }
+
+  /* ---------- field geometry ---------- */
+
+  /* Screen position and scale of a point on (or above) the field. */
+  project(x, z, h = 0) {
+    const s = 1 - SHRINK * z;
+    return { x, y: NEAR_Y - Z_SPAN * z - h * s, s };
+  }
+
+  groundAt(z) {
+    return NEAR_Y - Z_SPAN * z;
   }
 
   /* ---------- boot ---------- */
@@ -177,10 +218,6 @@ export class CatchArena {
         width: W,
         height: H,
       },
-      physics: {
-        default: "matter",
-        matter: { gravity: { y: GRAVITY_Y }, debug: false },
-      },
       scene: ArenaScene,
     });
   }
@@ -191,12 +228,21 @@ export class CatchArena {
     /* Bumped on every round so a capture animation left over from the last
        round cannot finish inside this one. */
     this.roundId = (this.roundId || 0) + 1;
-    this.roundMons = this.pickRound();
+
+    const queued = (this.nextMons || []).filter(
+      (mon) => !this.team.some((caught) => caught.id === mon.id),
+    );
+    this.roundMons = queued.length === 3 ? queued : this.pickRound();
+    /* Decide the next three now, so their sheets can download while this
+       round is being played instead of during it. */
+    this.nextMons = this.pickRound(this.roundMons.map((mon) => mon.id));
+
     this.balls = BALLS;
     this.phase = "ready";
     this.message = "";
     if (!silent) this.emit();
     this.loadRound(this.roundMons);
+    this.warm(this.nextMons);
   }
 
   nextRound() {
@@ -208,19 +254,33 @@ export class CatchArena {
   resetGame() {
     this.round = 1;
     this.team = [];
+    this.nextMons = [];
     this.startRound();
   }
 
-  pickRound() {
-    const pool = this.roster.length ? this.roster : [];
-    const caught = new Set(this.team.map((mon) => mon.id));
-    const fresh = pool.filter((mon) => !caught.has(mon.id));
-    const bag = (fresh.length >= 3 ? fresh : pool).slice();
+  pickRound(exclude = []) {
+    const pool = (this.roster.length ? this.roster : []).filter(
+      (mon) =>
+        !this.team.some((caught) => caught.id === mon.id) &&
+        !exclude.includes(mon.id),
+    );
+    const bag = pool.slice();
     const picked = [];
     while (picked.length < 3 && bag.length) {
       picked.push(bag.splice(Math.floor(Math.random() * bag.length), 1)[0]);
     }
     return picked;
+  }
+
+  /* Download the next round's three while the browser is otherwise idle. */
+  warm(mons) {
+    if (!mons.length) return;
+    const run = () => mons.forEach((mon) => fetchPmd(mon.id).catch(() => {}));
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      window.requestIdleCallback(run, { timeout: 4000 });
+    } else {
+      setTimeout(run, 1200);
+    }
   }
 
   finishRound() {
@@ -239,13 +299,9 @@ export class CatchArena {
     scene.cameras.main.setBackgroundColor("#131b1f");
 
     this.makeTextures(scene);
-    this.drawStage(scene);
-    this.createBounds(scene);
+    this.drawField(scene);
     this.createBall(scene);
     this.bindInput(scene);
-    this.clock = 0;
-    scene.matter.world.on("collisionstart", (event) => this.onCollision(event));
-    scene.matter.world.on("beforeupdate", () => this.beforeStep());
 
     if (this.roundMons.length) this.loadRound(this.roundMons);
     this.emit();
@@ -270,120 +326,156 @@ export class CatchArena {
     }
   }
 
-  drawStage(scene) {
-    const rings = scene.add.graphics().setDepth(-5);
-    rings.lineStyle(1, 0x35474f, 0.55);
-    rings.strokeEllipse(W / 2, 288, 540, 196);
-    rings.lineStyle(1, 0x2d3d45, 0.45);
-    rings.strokeEllipse(W / 2, 294, 336, 122);
-    rings.lineStyle(1, 0x27343b, 0.4);
-    rings.strokeEllipse(W / 2, 300, 158, 58);
+  /* A depth grid instead of flat rings: rails running away from the player
+     and rungs that bunch up toward the back. */
+  drawField(scene) {
+    const g = scene.add.graphics().setDepth(-5);
 
-    /* the floor line the ball actually rests on */
-    scene.add.rectangle(W / 2, FLOOR, W, 2, 0x2c3b43, 0.8).setDepth(-4);
-  }
+    [0.08, 0.34, 0.66, 0.92].forEach((t) => {
+      const nearX = W * t;
+      const farX = W / 2 + (nearX - W / 2) * 0.46;
+      g.lineStyle(1, 0x2f424b, 0.45);
+      g.lineBetween(nearX, this.groundAt(0), farX, this.groundAt(1));
+    });
 
-  /* Floor and three walls, so a hard throw rattles around the arena instead
-     of leaving it. The mon volumes are sensors: the ball never bounces off a
-     specimen, contact is a catch. */
-  createBounds(scene) {
-    const wall = (x, y, w, h, restitution = 0.52) =>
-      scene.matter.add.rectangle(x, y, w, h, {
-        isStatic: true,
-        restitution,
-        friction: 0.4,
-        label: "wall",
-      });
+    [0, 0.16, 0.36, 0.6, 0.82, 1].forEach((z, index) => {
+      const y = this.groundAt(z);
+      const inset = 46 * z;
+      g.lineStyle(1, 0x2b3c44, index === 0 ? 0.85 : 0.32);
+      g.lineBetween(inset, y, W - inset, y);
+    });
 
-    this.walls = [
-      wall(W / 2, FLOOR + 40, W * 3, 80, 0.34), /* floor, deadens the bounce */
-      wall(-30, H / 2 - 60, 60, H * 3, 0.52), /* left */
-      wall(W + 30, H / 2 - 60, 60, H * 3, 0.52), /* right */
-      wall(W / 2, -30, W * 3, 60, 0.52), /* top */
-    ];
+    /* the near edge, where the ball is thrown from */
+    scene.add.rectangle(W / 2, this.groundAt(0), W, 2, 0x2c3b43, 0.9).setDepth(-4);
   }
 
   createBall(scene) {
     this.ballScale = (BALL_R * 2) / BALL_CELLS;
-    this.ball = scene.matter.add.image(BALL_HOME.x, BALL_HOME.y, "ball", null, {
-      shape: { type: "circle", radius: BALL_R },
-      restitution: 0.44,
-      friction: 0.16,
-      frictionAir: 0.009,
-      frictionStatic: 0.3,
-      density: 0.0019,
-      label: "ball",
-    });
-    /* In front of the specimens: a ball in flight should never hide behind
-       the thing it is aimed at. */
-    this.ball.setDepth(900).setScale(this.ballScale);
+    this.ball = scene.add.image(BALL_HOME.x, NEAR_Y - BALL_R, "ball");
+    this.ball.setDepth(600).setScale(this.ballScale);
     this.parkBall();
   }
 
   parkBall() {
-    const scene = this.scene;
-    if (!scene || !this.ball) return;
-    const body = this.ball.body;
-    scene.matter.body.setStatic(body, true);
-    scene.matter.body.setPosition(body, { x: BALL_HOME.x, y: BALL_HOME.y });
-    scene.matter.body.setAngle(body, 0);
-    scene.matter.body.setAngularVelocity(body, 0);
-    this.ball.setPosition(BALL_HOME.x, BALL_HOME.y);
+    const state = this.ballState;
+    state.x = BALL_HOME.x;
+    state.z = BALL_HOME.z;
+    state.h = BALL_R;
+    state.vx = 0;
+    state.vz = 0;
+    state.vh = 0;
+    state.angle = 0;
+    state.spin = 0;
+    state.live = false;
+    state.frozen = false;
+    state.still = 0;
+
+    if (!this.ball) return;
+    const point = this.project(state.x, state.z, state.h);
     this.ball
+      .setPosition(point.x, point.y)
+      .setScale(this.ballScale * point.s)
       .setAngle(0)
       .setAlpha(1)
-      .setScale(this.ballScale || 1)
-      .setVisible(true);
-    this.spinRate = 0;
+      .setVisible(true)
+      .setDepth(600 - state.z * 400);
   }
+
+  /* ---------- the three specimens ---------- */
 
   loadRound(mons) {
     const scene = this.scene;
-    if (!scene || !scene.matter) return;
+    if (!scene) return;
 
     this.mons.forEach((entry) => {
       entry.sprite?.destroy();
       entry.shadow?.destroy();
-      if (entry.marker?.body) scene.matter.world.remove(entry.marker);
     });
     this.mons = [];
 
     mons.forEach((mon, index) => {
-      const spot = SPOTS[index] || SPOTS[0];
+      const zone = ZONES[index] || ZONES[0];
 
       const shadow = scene.add
-        .ellipse(spot.x + 2, spot.y + 44, 62, 13, 0x070d10, 0.5)
-        .setDepth(spot.y - 1);
+        .ellipse(zone.x, this.groundAt(zone.z), 46, 11, 0x070d10, 0.5)
+        .setDepth(1);
 
       const sprite = scene.add
-        .image(spot.x, spot.y, "__DEFAULT")
-        .setDepth(spot.y)
+        .image(zone.x, this.groundAt(zone.z), "__DEFAULT")
+        .setOrigin(0.5, 1)
+        .setDepth(2)
         .setVisible(false);
 
-      /* A sensor: the ball passes through and the catch is the contact. */
-      const marker = scene.matter.add.circle(spot.x, spot.y, MON_R, {
-        isStatic: true,
-        isSensor: true,
-        label: `mon-${mon.id}`,
-      });
-
-      const entry = { ...mon, sprite, shadow, marker, spot, bob: index * 2.1 };
-      this.mons.push(entry);
-
-      this.loadSprite(mon.id).then((key) => {
-        if (!key || !this.alive() || !sprite.active) return;
-        sprite.setTexture(key).setScale(SPRITE_SCALE).setVisible(true);
-        entry.loaded = true;
+      this.mons.push({
+        ...mon,
+        x: zone.x,
+        z: zone.z,
+        zone,
+        dir: 1,
+        state: "idle",
+        timer: 0.3 + index * 0.45,
+        speed: 0,
+        target: { x: zone.x, z: zone.z },
+        parts: null,
+        animName: "idle",
+        animT: 0,
+        frame: 0,
+        sprite,
+        shadow,
+        loaded: false,
+        caught: false,
       });
     });
 
     this.parkBall();
+    this.fillMons();
   }
 
-  async loadSprite(id) {
+  async fillMons() {
+    const roundId = this.roundId;
+    const entries = this.mons.slice();
+
+    await Promise.all(
+      entries.map(async (entry) => {
+        if (!entry?.sprite) return;
+        let parts = null;
+        try {
+          const data = await fetchPmd(entry.id);
+          if (!this.alive(roundId)) return;
+          parts = installPmdTextures(this.scene, entry.id, data);
+        } catch {
+          parts = null;
+        }
+        if (!this.alive(roundId) || !entry.sprite?.active) return;
+
+        if (parts) {
+          entry.parts = parts;
+          entry.pmd = true;
+          this.setAnim(entry, parts.walk ? "walk" : parts.idle ? "idle" : "run");
+          entry.sprite.setVisible(true);
+          entry.loaded = true;
+          this.placeMon(entry);
+          return;
+        }
+
+        /* No sheet: fall back to the still dex sprite so the round runs. */
+        const key = await this.loadStill(entry.id);
+        if (!key || !this.alive(roundId) || !entry.sprite?.active) return;
+        entry.parts = { still: { key, durations: null, frames: 1 } };
+        entry.pmd = false;
+        this.setAnim(entry, "still");
+        entry.sprite.setVisible(true).setTexture(key);
+        entry.loaded = true;
+        this.placeMon(entry);
+      }),
+    );
+  }
+
+  async loadStill(id) {
     const scene = this.scene;
-    const key = spriteKey(id);
-    if (!scene || scene.textures.exists(key)) return key;
+    const key = `still-${id}`;
+    if (!scene) return null;
+    if (scene.textures.exists(key)) return key;
     for (const url of [pixelSpriteUrl(id), pixelSpriteRawUrl(id)]) {
       try {
         const image = await new Promise((resolve, reject) => {
@@ -397,18 +489,126 @@ export class CatchArena {
         scene.textures.addImage(key, image);
         return key;
       } catch {
-        /* fall through to the next source */
+        /* next source */
       }
     }
     return null;
   }
 
+  setAnim(entry, name) {
+    const part = entry.parts?.[name];
+    if (!part || entry.animName === name) return;
+    entry.animName = name;
+    entry.animT = 0;
+    entry.frame = 0;
+    if (entry.sprite?.texture?.key !== part.key) {
+      entry.sprite.setTexture(part.key, 0);
+    } else {
+      entry.sprite.setFrame(0);
+    }
+  }
+
+  /* Screen position, scale and shadow for wherever the creature stands. */
+  placeMon(entry) {
+    const point = this.project(entry.x, entry.z, 0);
+    const scale = MON_SCALE * point.s;
+    /* the frame's empty bottom margin is scaled too, so the feet — not the
+       cell — are what touches the ground */
+    const foot = (entry.parts?.[entry.animName]?.foot || 0) * scale;
+    entry.sprite
+      .setPosition(point.x, point.y + foot + 1)
+      .setScale(scale)
+      .setDepth(300 - entry.z * 250)
+      .setFlipX(entry.dir < 0);
+    entry.shadow
+      .setPosition(point.x, point.y)
+      .setScale(0.7 * point.s, 0.7 * point.s)
+      .setAlpha(0.45)
+      .setDepth(300 - entry.z * 250 - 1);
+    entry.height = entry.sprite.displayHeight - foot;
+  }
+
+  tickAnim(entry, delta) {
+    const part = entry.parts?.[entry.animName];
+    if (!part?.durations || !entry.sprite?.active) return;
+    /* Most Gen 1 creatures have no separate run strip, so a run is the walk
+       cycle played quicker — the legs still keep up with the ground. */
+    const rate =
+      entry.animName === "run"
+        ? RUN_RATE
+        : entry.animName === "walk"
+          ? entry.state === "run"
+            ? WALK_RATE * 0.62
+            : WALK_RATE
+          : IDLE_RATE;
+
+    entry.animT += (delta / 1000) * rate;
+    let guard = 0;
+    while (entry.animT >= part.durations[entry.frame] * ANIM_TICK && guard < 8) {
+      entry.animT -= part.durations[entry.frame] * ANIM_TICK;
+      entry.frame = (entry.frame + 1) % part.frames;
+      entry.sprite.setFrame(entry.frame);
+      guard += 1;
+    }
+  }
+
+  /* Wander: pick a spot inside the creature's zone, cross to it, then stand
+     for a moment — and sometimes turn around or break into a run. */
+  roam(entry, delta) {
+    if (!entry.loaded || entry.caught) return;
+    const dt = Math.min(delta, 50) / 1000;
+
+    if (entry.state === "idle") {
+      entry.timer -= dt;
+      if (entry.timer <= 0) {
+        entry.target = {
+          x: clamp(entry.zone.x + (Math.random() - 0.5) * 190, 64, W - 64),
+          z: clamp(entry.zone.z + (Math.random() - 0.5) * 0.42, 0.06, 0.92),
+        };
+        entry.state = Math.random() < 0.3 ? "run" : "walk";
+        entry.speed = entry.state === "run" ? 74 : 38;
+        this.setAnim(
+          entry,
+          entry.state === "run" && entry.parts?.run ? "run" : "walk",
+        );
+      }
+      return;
+    }
+
+    const dx = entry.target.x - entry.x;
+    const dz = (entry.target.z - entry.z) * Z_SPAN;
+    const distance = Math.hypot(dx, dz);
+
+    if (distance < 5) {
+      entry.state = "idle";
+      entry.timer = 0.5 + Math.random() * 1.6;
+      this.setAnim(entry, "idle");
+      return;
+    }
+
+    /* a change of mind mid-stride, every so often */
+    if (
+      entry.state === "run" &&
+      entry.parts?.walk &&
+      Math.random() < dt * 0.5
+    ) {
+      entry.state = "walk";
+      entry.speed = 38;
+      this.setAnim(entry, "walk");
+    }
+
+    const step = Math.min(distance, entry.speed * dt);
+    const nx = (dx / distance) * step;
+    const nz = (dz / distance) * step;
+    entry.x = clamp(entry.x + nx, 58, W - 58);
+    entry.z = clamp(entry.z + nz / Z_SPAN, 0.05, 0.94);
+    if (Math.abs(nx) > 0.05) entry.dir = nx < 0 ? -1 : 1;
+
+    this.placeMon(entry);
+  }
+
   /* ---------- gesture: swipe forward to throw ---------- */
 
-  /* Phaser's own input reads mouse events; driving the gesture from pointer
-     events on the canvas instead gives touch and pen the same path as a
-     mouse, keeps pointer capture working when a swipe leaves the canvas, and
-     costs one rect read per event. */
   bindInput(scene) {
     if (import.meta.env?.DEV) window.__catchArena = this;
     const canvas = scene.game.canvas;
@@ -425,7 +625,6 @@ export class CatchArena {
     this.handleDown = (event) => {
       if (event.pointerType === "mouse" && event.button !== 0) return;
       if (event.isPrimary === false) return;
-      /* Capture keeps the swipe alive if it wanders off the canvas. */
       try {
         canvas.setPointerCapture(event.pointerId);
       } catch {
@@ -450,35 +649,72 @@ export class CatchArena {
 
   onDown(point, touched) {
     if (this.phase !== "ready" || this.aim) return;
-    const nearBall = Math.hypot(point.x - BALL_HOME.x, point.y - BALL_HOME.y) < 150;
-    if (!nearBall && point.y < H - 150) return;
+    const home = this.project(BALL_HOME.x, BALL_HOME.z, BALL_R);
+    const nearBall = Math.hypot(point.x - home.x, point.y - home.y) < 130;
+    if (!nearBall && point.y < NEAR_Y - 170) return;
 
-    this.aim = { samples: [{ x: point.x, y: point.y, t: performance.now() }], touched };
-    this.scene.matter.body.setStatic(this.ball.body, true);
-    this.placeBall(point.x, point.y);
+    this.aim = {
+      samples: [{ x: point.x, y: point.y, t: performance.now() }],
+      touched,
+      last: point,
+      spin: 0,
+    };
+    this.ballState.live = false;
+    this.dragTo(point.x, point.y, 0);
     playSfx("grab");
     this.emit({ phase: "aim", message: "" });
+
+    /* the ball gives a little hop when it is picked up */
+    this.scene.tweens.add({
+      targets: this.ball,
+      angle: { from: -8, to: 8 },
+      duration: 90,
+      yoyo: true,
+      repeat: 1,
+      ease: "Sine.inOut",
+      onComplete: () => this.ball?.setAngle(this.ballState.angle * 57.3),
+    });
+  }
+
+  /* Drag is a screen gesture at the near edge of the field; the height of the
+     ball follows the finger, so releasing anywhere throws from there. */
+  dragTo(x, y, horizontalSpeed = 0) {
+    const state = this.ballState;
+    const z = Z_NEAR;
+    const s = 1 - SHRINK * z;
+    const ground = this.groundAt(z);
+    state.x = clamp(x, BALL_R, W - BALL_R);
+    state.z = z;
+    state.h = clamp((ground - y) / s, BALL_R, ground - 34);
+    /* the ball rolls in the hand as it is dragged */
+    state.angle += horizontalSpeed * 0.0016;
+
+    /* and the ground under the finger is the spot it will be thrown to */
+    if (this.aim) {
+      this.aim.target = {
+        x: state.x,
+        z: clamp((this.groundAt(z) - y) / Z_SPAN, 0.03, 0.94),
+      };
+    }
+    this.drawBall();
   }
 
   onMove(point, event) {
     if (!this.aim || !this.alive()) return;
-    /* A finger hides what it is aiming at, so the ball rides above it. */
-    const lift = this.aim.touched ? 42 : 0;
-    const x = clamp(point.x, BALL_R + 3, W - BALL_R - 3);
-    const y = clamp(point.y + lift, BALL_R + 4, FLOOR - BALL_R - 2);
+    const lift = this.aim.touched ? 34 : 0;
     const now = performance.now();
-    if (event?.pointerId !== undefined) this.lastPointerId = event.pointerId;
-    this.placeBall(x, y);
-    this.aim.samples.push({ x, y, t: now });
-    this.aim.samples = this.aim.samples.filter((sample) => now - sample.t < 320);
-  }
+    const dt = Math.max(8, now - this.aim.samples[this.aim.samples.length - 1].t);
+    const vx = ((point.x - this.aim.last.x) / dt) * 1000;
 
-  placeBall(x, y) {
-    const scene = this.scene;
-    if (!scene) return;
-    scene.matter.body.setPosition(this.ball.body, { x, y });
-    this.ball.x = x;
-    this.ball.y = y;
+    this.aim.last = point;
+    this.aim.spin += (vx / 900) * 0.12;
+    this.aim.spin = clamp(this.aim.spin * 0.94, -0.6, 0.6);
+
+    if (event?.pointerId !== undefined) this.lastPointerId = event.pointerId;
+    this.dragTo(point.x, point.y + lift, vx);
+
+    this.aim.samples.push({ x: point.x, y: point.y, t: now });
+    this.aim.samples = this.aim.samples.filter((sample) => now - sample.t < 320);
   }
 
   onUp() {
@@ -490,6 +726,7 @@ export class CatchArena {
     /* Read the gesture before dropping it: the throw is measured from the
        samples this press collected. */
     const throwVec = this.measureThrow();
+    const target = this.aim.target;
     this.aim = null;
 
     /* A press that never moved is not a throw: put the ball back rather than
@@ -501,7 +738,7 @@ export class CatchArena {
       return;
     }
 
-    this.launch(throwVec);
+    this.launch({ ...throwVec, target });
   }
 
   /* Velocity from the last ~140ms of travel, curvature from the signed turn
@@ -511,40 +748,6 @@ export class CatchArena {
     const now = performance.now();
     const recent = samples.filter((sample) => now - sample.t < 140);
     const tail = recent.length >= 3 ? recent : samples.slice(-3);
-
-    let vx = 0;
-    let vy = 0;
-    let speed = 0;
-    if (tail.length >= 2) {
-      const first = tail[0];
-      const last = tail[tail.length - 1];
-      const dt = Math.max(16, last.t - first.t);
-      vx = ((last.x - first.x) / dt) * 1000;
-      vy = ((last.y - first.y) / dt) * 1000;
-      speed = Math.hypot(vx, vy);
-    }
-
-    /* A press with no travel still has to go somewhere: lob it away from the
-       release point rather than dropping it on the player's feet. */
-    if (speed < 320) {
-      const from = samples[0] || BALL_HOME;
-      const to = samples[samples.length - 1] || from;
-      let dx = to.x - from.x;
-      let dy = to.y - from.y;
-      if (Math.hypot(dx, dy) < 14) {
-        dx = 0;
-        dy = -1;
-      }
-      const len = Math.hypot(dx, dy) || 1;
-      vx = (dx / len) * 620;
-      vy = (dy / len) * 620;
-      speed = 620;
-    }
-
-    if (speed > MAX_SPEED) {
-      vx = (vx / speed) * MAX_SPEED;
-      vy = (vy / speed) * MAX_SPEED;
-    }
 
     let turn = 0;
     let count = 0;
@@ -562,116 +765,145 @@ export class CatchArena {
       turn += Math.asin(clamp((ax * by - ay * bx) / (la * lb), -1, 1));
       count += 1;
     }
-    /* Samples land ~16ms apart, so the mean turn per sample becomes a turn
-       per second: a flick that curls a quarter turn in a fifth of a second
-       is a hard spin, a nearly straight pull is almost none. */
     const curl = count ? turn / count : 0;
-    const turnRate = (curl / 16) * 1000;
 
-    return {
-      vx,
-      vy,
-      spin: clamp(turnRate, -16, 16), /* radians per second */
-    };
+    return { spin: clamp((curl / 16) * 12, -12, 12) };
   }
 
-  launch({ vx, vy, spin }) {
-    const scene = this.scene;
-    const body = this.ball.body;
-    this.balls = Math.max(0, this.balls - 1);
-    this.throwStart = performance.now();
-    this.emit({ phase: "flying", balls: this.balls, message: "" });
+  launch({ spin, target }) {
+    const state = this.ballState;
+    const goal = target || { x: BALL_HOME.x, z: 0.4 };
+    const dz = (goal.z - state.z) * Z_SPAN;
+    const distance = Math.hypot(goal.x - state.x, dz);
+    /* a longer throw takes a little longer and arcs higher */
+    const flight = clamp(FLIGHT_BASE + distance / FLIGHT_PER_PX, 0.24, 0.72);
 
-    scene.matter.body.setStatic(body, false);
-    scene.matter.body.setVelocity(body, { x: vx / 60, y: vy / 60 });
-    /* Matter turns in radians per step; the throw spins in per second. */
-    scene.matter.body.setAngularVelocity(body, spin / 60);
-    this.spinRate = spin;
+    state.vx = (goal.x - state.x) / flight;
+    state.vz = dz / Z_SPAN / flight;
+    state.vh = (GRAVITY * flight) / 2;
+    state.spin = spin;
+    state.live = true;
+    state.still = 0;
+    this.throwStart = performance.now();
+
+    this.balls = Math.max(0, this.balls - 1);
+    this.emit({ phase: "flying", balls: this.balls, message: "" });
     playSfx("throw");
   }
 
   /* ---------- per-frame ---------- */
 
   _update(delta) {
-    const ball = this.ball;
-    if (!ball?.body) return;
-    const body = ball.body;
+    if (!this.ball) return;
+    this.clock += delta || 16;
 
-    this.clock = (this.clock || 0) + (delta || 16);
-    this.hover();
+    this.mons.forEach((entry) => {
+      this.roam(entry, delta);
+      this.tickAnim(entry, delta);
+      if (entry.loaded && !entry.caught) this.placeMon(entry);
+    });
 
-    ball.x = body.position.x;
-    ball.y = body.position.y;
-    ball.rotation = body.angle;
+    if (this.ballState.live) this.stepBall(Math.min(delta, 50) / 1000);
 
-    if (this.phase !== "flying") return;
+    /* A ball held in the hand shivers and sways with the clock. */
+    const wobble = this.aim
+      ? Math.sin(this.clock / 120) * 4.5 + this.aim.spin * 40
+      : 0;
+    this.drawBall(wobble);
+  }
 
-    /* A ball still at the release point is not a catch: give it a beat to
-       clear the hand first. */
+  stepBall(dt) {
+    const state = this.ballState;
+    const body = state;
+
+    body.vh -= GRAVITY * dt;
+
+    /* a spinning ball curves across the field instead of flying straight */
+    if (Math.abs(body.spin) > 0.2) {
+      const speed = Math.hypot(body.vx, body.vz);
+      if (speed > 20) {
+        const push = body.spin * speed * SPIN_CURVE * dt;
+        body.vx += (-body.vz / speed) * push;
+        body.vz += (body.vx / speed) * push;
+      }
+    }
+
+    body.x += body.vx * dt;
+    body.z += body.vz * dt;
+    body.h += body.vh * dt;
+
+    /* the field is walled: the ball rattles off the edges, not off the screen */
+    if (body.x < BALL_R) {
+      body.x = BALL_R;
+      body.vx = Math.abs(body.vx) * 0.55;
+    } else if (body.x > W - BALL_R) {
+      body.x = W - BALL_R;
+      body.vx = -Math.abs(body.vx) * 0.55;
+    }
+    if (body.z < 0.02) {
+      body.z = 0.02;
+      body.vz = Math.abs(body.vz) * 0.5;
+    } else if (body.z > Z_FAR) {
+      body.z = Z_FAR;
+      body.vz = -Math.abs(body.vz) * 0.5;
+    }
+
+    /* ground: a damp bounce, then it rolls */
+    if (body.h <= BALL_R) {
+      body.h = BALL_R;
+      if (body.vh < -40) {
+        body.vh = -body.vh * 0.32;
+      } else {
+        body.vh = 0;
+        const drag = Math.exp(-2.1 * dt);
+        body.vx *= drag;
+        body.vz *= drag;
+      }
+    }
+
+    body.vx *= 1 - 0.22 * dt;
+    body.vz *= 1 - 0.22 * dt;
+
+    /* the printed shell rolls with the ground it covers */
+    body.angle += (body.vx / (BALL_R * 1.6)) * dt;
+
+    this.checkCatch();
+
+    const speed = Math.hypot(body.vx, body.vz) + Math.abs(body.vh);
+    const settled = body.h <= BALL_R + 0.6 && speed < 26;
+    body.still = settled ? body.still + dt : 0;
+
+    if (body.still > 0.35) this.settle();
+    else if (performance.now() - this.throwStart > 6500) this.settle();
+  }
+
+  /* Contact is a catch: the ball has to come down inside the creature's
+     footprint, at or below its shoulders. */
+  checkCatch() {
     if (performance.now() - this.throwStart < 90) return;
+    const state = this.ballState;
 
-    /* Contact is the catch. The volumes are sensors and the check runs every
-       frame, so a fast ball cannot slip through one. */
     for (const mon of this.mons) {
-      if (!mon.marker) continue;
-      const distance = Math.hypot(
-        mon.marker.position.x - body.position.x,
-        mon.marker.position.y - body.position.y,
-      );
-      if (distance < CATCH_R) {
+      if (!mon.loaded || mon.caught) continue;
+      const dx = state.x - mon.x;
+      const dz = (state.z - mon.z) * Z_SPAN;
+      const top = (mon.height || 90) * 0.95;
+      if (Math.hypot(dx, dz) < CATCH_R && state.h < top) {
         this.catchSequence(mon);
         return;
       }
     }
-
-    const speed = Math.hypot(body.velocity.x, body.velocity.y);
-    const elapsed = performance.now() - this.throwStart;
-    if ((speed < 0.6 && elapsed > 450) || elapsed > 6000) this.settle();
   }
 
-  /* Idle float, a frame at a time: no tween sitting on a long duration, and
-     the shadow breathes with the sprite. */
-  hover() {
-    const t = (this.clock || 0) / 1000;
-    this.mons.forEach((mon) => {
-      if (!mon.loaded || !mon.sprite?.active) return;
-      const wave = Math.sin(t * 1.75 + mon.bob);
-      mon.sprite.y = mon.spot.y - 4 + wave * 4.5;
-      mon.shadow.setScale(1 - wave * 0.07, 1);
-    });
-  }
-
-  /* Runs inside the physics step before Matter integrates: the spin bends the
-     flight sideways and bleeds off, so a curled throw arcs and then straightens
-     like a real spinning ball. */
-  beforeStep() {
-    const body = this.ball?.body;
-    if (!body || this.phase !== "flying") return;
-    if (Math.abs(this.spinRate) < 0.2) return;
-
-    const { x: vx, y: vy } = body.velocity;
-    const speed = Math.hypot(vx, vy);
-    if (speed < 1.5) return;
-
-    const push = this.spinRate * speed * MAGNUS;
-    this.scene.matter.body.setVelocity(body, {
-      x: vx + (-vy / speed) * push,
-      y: vy + (vx / speed) * push,
-    });
-    this.spinRate *= 0.994;
-  }
-
-  onCollision(event) {
-    if (this.phase !== "flying") return;
-    for (const pair of event.pairs) {
-      const label = [pair.bodyA.label, pair.bodyB.label].find((value) =>
-        value?.startsWith("mon-"),
-      );
-      if (!label) continue;
-      const target = this.mons.find((mon) => mon.id === Number(label.slice(4)));
-      if (target) this.catchSequence(target);
-      return;
-    }
+  drawBall(extraAngle = 0) {
+    if (!this.ball || this.ballState.frozen) return;
+    const state = this.ballState;
+    const point = this.project(state.x, state.z, state.h);
+    this.ball
+      .setPosition(point.x, point.y)
+      .setScale(this.ballScale * point.s)
+      .setAngle(state.angle * 57.3 + extraAngle)
+      .setDepth(600 - state.z * 400);
   }
 
   /* The throw came to rest without touching anything: that is a miss. */
@@ -688,16 +920,16 @@ export class CatchArena {
     const roundId = this.roundId;
     this.emit({ phase: "catching", message: `Ball on ${target.name}…` });
 
-    const body = this.ball.body;
-    /* The ball stops where it touched, not at the specimen's centre: a catch
-       should not look like a teleport. */
-    const at = { x: this.ball.x, y: this.ball.y };
-    scene.matter.body.setStatic(body, true);
-    scene.matter.body.setVelocity(body, { x: 0, y: 0 });
-    scene.matter.body.setAngularVelocity(body, 0);
+    const state = this.ballState;
+    state.live = false;
+    state.frozen = true; /* the tweens below own the sprite from here */
+    target.caught = true;
 
+    const at = this.project(state.x, state.z, state.h);
     playSfx("impact");
-    const flash = scene.add.circle(at.x, at.y, 26, 0xffffff, 0.85).setDepth(950);
+    const flash = scene.add
+      .circle(at.x, at.y, 24, 0xffffff, 0.85)
+      .setDepth(950);
     scene.tweens.add({
       targets: flash,
       scale: 3.4,
@@ -710,32 +942,46 @@ export class CatchArena {
     await wait(130);
     if (!this.alive(roundId)) return;
     playSfx("absorb");
-    target.loaded = false; /* stops the idle float fighting the tween */
+
+    /* the creature folds into the ball, wherever it happens to be standing */
     scene.tweens.add({
       targets: target.sprite,
       alpha: 0,
-      scale: 0.08,
+      scale: target.sprite.scale * 0.08,
       angle: 420,
       duration: 420,
       ease: "back.in",
     });
-    scene.tweens.add({ targets: target.shadow, alpha: 0, scaleX: 0.2, duration: 280 });
+    scene.tweens.add({
+      targets: target.shadow,
+      alpha: 0,
+      scaleX: 0.2,
+      duration: 280,
+    });
+
+    /* and the ball settles onto the ground at that spot */
+    const landing = this.project(
+      clamp(target.x, BALL_R + 10, W - BALL_R - 10),
+      clamp(target.z, 0.08, 0.94),
+      BALL_R,
+    );
+    state.x = landing.x;
+    state.z = clamp(target.z, 0.08, 0.94);
+    state.h = BALL_R;
+    scene.tweens.add({
+      targets: this.ball,
+      x: landing.x,
+      y: landing.y,
+      scale: this.ballScale * landing.s,
+      duration: 380,
+      ease: "Quad.out",
+    });
 
     await wait(430);
     if (!this.alive(roundId)) return;
     playSfx("close");
-    const landing = clamp(at.x, BALL_R + 14, W - BALL_R - 14);
-    scene.tweens.add({
-      targets: this.ball,
-      x: landing,
-      y: FLOOR - BALL_R,
-      duration: 420,
-      ease: "bounce.out",
-      onUpdate: () => {
-        scene.matter.body.setPosition(body, { x: this.ball.x, y: this.ball.y });
-      },
-    });
-    await wait(500);
+
+    await wait(420);
     if (!this.alive(roundId)) return;
 
     for (let shake = 0; shake < 3; shake += 1) {
@@ -765,7 +1011,7 @@ export class CatchArena {
 
     scene.tweens.add({
       targets: this.ball,
-      scale: { from: 1, to: 1.2 },
+      scale: this.ball.scale * 1.2,
       duration: 170,
       yoyo: true,
       repeat: 1,
@@ -779,11 +1025,9 @@ export class CatchArena {
     this.finishRound();
   }
 
-  /* The body owns rotation, so the shake has to be applied to both the body
-     and the sprite; tweening the sprite alone gets overwritten next step. */
   tweenBallAngle(scene, from, to, duration, yoyo, repeat) {
-    const body = this.ball.body;
     const state = { angle: from };
+    const base = this.ball.scale;
     return new Promise((resolve) => {
       scene.tweens.add({
         targets: state,
@@ -793,12 +1037,11 @@ export class CatchArena {
         repeat,
         ease: "Sine.inOut",
         onUpdate: () => {
-          scene.matter.body.setAngle(body, state.angle);
           this.ball.setAngle(state.angle);
+          this.ball.setScale(base * (1 + Math.abs(state.angle) / 240));
         },
         onComplete: () => {
-          scene.matter.body.setAngle(body, 0);
-          this.ball.setAngle(0);
+          this.ball.setAngle(0).setScale(base);
           resolve();
         },
       });
@@ -807,6 +1050,7 @@ export class CatchArena {
 
   async missed() {
     if (!this.alive() || this.phase !== "flying") return;
+    this.ballState.live = false;
     this.emit({
       phase: "missed",
       message: this.balls > 0 ? "Missed. Throw again." : "Missed — out of balls.",
@@ -828,7 +1072,7 @@ export class CatchArena {
       this.parkBall();
       scene.tweens.add({
         targets: this.ball,
-        scale: { from: 0.4, to: 1 },
+        scale: { from: this.ballScale * 0.4, to: this.ballScale },
         duration: 240,
         ease: "back.out",
       });
