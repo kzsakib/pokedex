@@ -150,33 +150,65 @@ export function fetchPmd(id) {
   return job;
 }
 
-/* Registers the strips as Phaser textures and returns playable animations:
-   { walk, run, idle } with { key, durations } or null. */
+/* PMD sheets stack all eight facings, one row per animation direction, in
+   the order south, south-east, east, north-east, north, north-west, west,
+   south-west — counter-clockwise from the front view. Row 0 is the creature
+   facing the camera. */
+export const ROW_S = 0;
+
+/* The row for a heading, where +x is to the right and +z is toward the
+   viewer: 0 = facing the camera, 2 = facing right, 4 = facing away, 6 = left. */
+export function facingRow(dx, dz) {
+  if (!dx && !dz) return ROW_S;
+  const turns = Math.round(Math.atan2(dz, dx) / (Math.PI / 4));
+  /* atan2: 0 = east, then south, west, north as the index climbs */
+  const table = [2, 1, 0, 7, 6, 5, 4, 3];
+  return table[((turns % 8) + 8) % 8];
+}
+
+/* Registers the sheets as Phaser textures and returns playable animations:
+   { walk, run, idle } with { key, durations, frames, rows, perRow } or null.
+   Every row holds the same frame count, so a frame is row * perRow + step. */
 export function installPmdTextures(scene, id, data) {
   const parts = {};
   data.names.forEach((name) => {
     const anim = data.anims[name];
+    const image = data.images[name];
+    if (!anim || !image) return;
     const key = `pmd-${id}-${name}`;
+
+    /* The XML states the authored cell, but a few sheets are packed tighter
+       than that, so the sheet's own height decides how many rows it has. */
+    const guess = image.height / anim.height;
+    const rows =
+      Number.isFinite(guess) && guess >= 1 && Math.abs(guess - Math.round(guess)) < 0.06
+        ? Math.round(guess)
+        : 8;
+    const frameW = anim.width;
+    const frameH = Math.round(image.height / rows);
+    const perRow = Math.max(1, Math.round(image.width / frameW));
+
     if (!scene.textures.exists(key)) {
       try {
-        scene.textures.addSpriteSheet(key, data.images[name], {
-          frameWidth: anim.width,
-          frameHeight: anim.height,
+        scene.textures.addSpriteSheet(key, image, {
+          frameWidth: frameW,
+          frameHeight: frameH,
         });
       } catch {
         /* a half-built texture is better than none */
       }
     }
     if (!scene.textures.exists(key)) return;
-    const frames = scene.textures.get(key).frameTotal - 1;
-    const durations = anim.durations.slice(0, Math.max(1, frames));
+
+    const durations = anim.durations.slice(0, perRow);
     if (!durations.length) return;
 
-    const slot = name.toLowerCase();
-    parts[slot] = {
+    parts[name.toLowerCase()] = {
       key,
       durations,
       frames: durations.length,
+      rows,
+      perRow,
       foot: data.feet?.[name] || 0,
     };
   });
