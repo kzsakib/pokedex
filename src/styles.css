@@ -422,8 +422,8 @@ img {
   /* it sits mostly above the bar and ends just inside it, so nothing below
      the bar is ever covered */
   transform: translate(-50%, -32%);
-  width: clamp(112px, 13vw, 150px);
-  height: clamp(112px, 13vw, 150px);
+  width: clamp(104px, 11vw, 134px);
+  height: clamp(104px, 11vw, 134px);
   border: 3px solid #10171b;
   background: radial-gradient(
     circle at 34% 26%,
@@ -761,11 +761,11 @@ img {
 }
 
 .facts .fact:nth-child(2) {
-  padding-right: clamp(44px, 5.5vw, 82px);
+  padding-right: clamp(56px, 7vw, 96px);
 }
 
 .facts .fact:nth-child(4) {
-  padding-left: clamp(44px, 5.5vw, 82px);
+  padding-left: clamp(72px, 9vw, 112px);
 }
 
 .fact dt {
