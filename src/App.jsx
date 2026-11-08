@@ -671,15 +671,50 @@ export default function App() {
             <SplitWords className="lede" delay={0.25} text={LEDE} />
           </div>
 
-          <div className="controls">
-            <div className="vents" aria-hidden="true" ref={ventsRef}>
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
+          <div className="console">
+            <dl className="facts" aria-label="Instrument status">
+              <div className="fact">
+                <dt>Entries</dt>
+                <dd>
+                  <CountUp to={index.length || ENTRY_LIMIT} duration={1} />
+                </dd>
+              </div>
+              <div className="fact">
+                <dt>Matches</dt>
+                <dd>
+                  {feed === "live" ? (
+                    <CountUp to={filtered.length} duration={0.45} />
+                  ) : (
+                    "—"
+                  )}
+                </dd>
+              </div>
+              <div className="fact fact--gap" aria-hidden="true" />
+              <div className="fact">
+                <dt>On bench</dt>
+                <dd>
+                  {selectedEntry
+                    ? `${selectedEntry.number} ${selectedEntry.label}`
+                    : pokemon
+                      ? `${formatNumber(pokemon.id)} ${titleCase(pokemon.name)}`
+                      : "—"}
+                </dd>
+              </div>
+              <div className="fact">
+                <dt>Feed</dt>
+                <dd>
+                  <span
+                    className={`lamp${feed === "live" ? " lamp--on" : ""}`}
+                    aria-hidden="true"
+                  />
+                  {feed === "live" ? (
+                    <ShinyText text={feedLabel} />
+                  ) : (
+                    <span className="feed-label">{feedLabel}</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
             <button
               ref={dialRef}
               type="button"
@@ -700,15 +735,21 @@ export default function App() {
             </button>
             <p className="control-hint" id="dial-hint">
               Picks a random specimen from the archive.
-            </p>              <button type="button" className="key key--wide" onClick={clearFilters}>
-              Clear filters
-            </button>
-            <button
-              type="button"
-              className="key key--wide mute-key"
-              aria-pressed={!muted}
-              onClick={toggleMuted}
-            >
+            </p>
+            <div className="console-keys">
+              <button
+                type="button"
+                className="key key--wide"
+                onClick={clearFilters}
+              >
+                Clear filters
+              </button>
+              <button
+                type="button"
+                className="key key--wide mute-key"
+                aria-pressed={!muted}
+                onClick={toggleMuted}
+              >
               <span className="mute-key__icon" aria-hidden="true">
                 <svg viewBox="0 0 16 16">
                   <path d="M2 6h2.4L8 3v10L4.4 10H2z" />
@@ -720,56 +761,18 @@ export default function App() {
                 </svg>
               </span>
               {muted ? "Sound off" : "Sound on"}
-            </button>
+              </button>
+            </div>
+            <div className="vents vents--parked" aria-hidden="true" ref={ventsRef}>
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
           </div>
-        </section>
 
-        <section className="bay status" aria-labelledby="status-title">
-          <h2 id="status-title" className="visually-hidden">
-            Instrument status
-          </h2>
-          <dl className="facts">
-            <div className="fact">
-              <dt>Entries</dt>
-              <dd>
-                <CountUp to={index.length || ENTRY_LIMIT} duration={1} />
-              </dd>
-            </div>
-            <div className="fact">
-              <dt>Matches</dt>
-              <dd>
-                {feed === "live" ? (
-                  <CountUp to={filtered.length} duration={0.45} />
-                ) : (
-                  "—"
-                )}
-              </dd>
-            </div>
-            <div className="fact">
-              <dt>On bench</dt>
-              <dd>
-                {selectedEntry
-                  ? `${selectedEntry.number} ${selectedEntry.label}`
-                  : pokemon
-                    ? `${formatNumber(pokemon.id)} ${titleCase(pokemon.name)}`
-                    : "—"}
-              </dd>
-            </div>
-            <div className="fact">
-              <dt>Feed</dt>
-              <dd>
-                <span
-                  className={`lamp${feed === "live" ? " lamp--on" : ""}`}
-                  aria-hidden="true"
-                />
-                {feed === "live" ? (
-                  <ShinyText text={feedLabel} />
-                ) : (
-                  <span className="feed-label">{feedLabel}</span>
-                )}
-              </dd>
-            </div>
-          </dl>
           {feed === "error" && (
             <p className="fault" role="alert">
               Index feed offline — PokéAPI did not answer.

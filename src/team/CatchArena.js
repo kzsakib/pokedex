@@ -20,10 +20,13 @@ const NEAR_Y = H - 26;
 const FAR_Y = 128;
 const Z_SPAN = NEAR_Y - FAR_Y;
 const SHRINK = 0.46;
+/* How hard the field narrows toward the back: the sides pull in toward the
+   centre line, so travel into the scene runs diagonally. */
+const CONVERGE = 0.24;
 const Z_NEAR = 0.05;
 const Z_FAR = 1;
 
-const MON_SCALE = 3.4;
+const MON_SCALE = 2.9;
 const BALL_CELLS = 16;
 const BALL_R = 18;
 const CATCH_R = 44;
@@ -57,41 +60,45 @@ const WALK_RATE = 2.3;
 const RUN_RATE = 1.4;
 const IDLE_RATE = 2.6;
 
-/* A 16-cell Poké Ball, one pixel a cell. The band and the button are what
-   make the shape readable at this size, so they are drawn first and the
-   shading goes around them. */
+/* The ball from the reference, cell by cell: red crown with a white shine,
+   a two-pixel band broken by the button, and a grey base that reads as the
+   shaded underside rather than a plain white half. Hand-drawn because a
+   circle this small cannot be generated and still look hand-placed. */
+const BALL_MAP = [
+  "................",
+  ".....######.....",
+  "...###RRRR###...",
+  "..##RRwRRRRR##..",
+  ".##RRwwRRRRRR##.",
+  ".#RRwRRRRRRRRR#.",
+  ".#RRRRRRRRRRRR#.",
+  "##RRRRRRRRRRRR##",
+  "#######ww#######",
+  "#######ww#######",
+  "#WWWWWWWWWWWWWW#",
+  ".#WWWWWWWWWWWW#.",
+  ".#WWWgggWWWWWW#.",
+  "..##gggggWWW##..",
+  "....########....",
+  "................",
+];
+
+const BALL_INK = {
+  R: "#e5322b",
+  w: "#ffffff",
+  W: "#e8e8e8",
+  g: "#8f8f8f",
+  "#": "#141414",
+};
+
 function ballCells() {
   const cells = [];
-  const c = (BALL_CELLS - 1) / 2;
-  const R = 7.35;
-
-  for (let y = 0; y < BALL_CELLS; y += 1) {
-    for (let x = 0; x < BALL_CELLS; x += 1) {
-      const dx = x - c;
-      const dy = y - c;
-      const r = Math.hypot(dx, dy);
-      if (r > R + 0.4) continue;
-
-      /* The button sits on the band, so it has to be drawn before it. */
-      const button = Math.abs(dx) <= 1.1 && Math.abs(dy) <= 1.1;
-
-      let color;
-      if (button) color = "#d8d8d8";
-      else if (Math.abs(dy) <= 0.62) color = "#151515"; /* equator band */
-      else if (r > R - 1.15) color = "#151515"; /* shell */
-      else if (dy < 0) color = "#e5322b"; /* crown */
-      else color = "#e9e9e9"; /* base */
-
-      if (!button) {
-        /* one glint on the shoulder, and a darker rim under the base — but
-           never over the outline, or the ball loses its edge */
-        if (dy < -1.6 && Math.hypot(dx + 2.4, dy + 3.3) < 1.5) color = "#ffffff";
-        if (dy > 5 && r < R - 1.15) color = "#b9b9b9";
-      }
-
-      cells.push([x, y, color]);
-    }
-  }
+  BALL_MAP.forEach((row, y) => {
+    [...row].forEach((glyph, x) => {
+      const color = BALL_INK[glyph];
+      if (color) cells.push([x, y, color]);
+    });
+  });
   return cells;
 }
 
@@ -169,7 +176,10 @@ export class CatchArena {
   /* Screen position and scale of a point on (or above) the field. */
   project(x, z, h = 0) {
     const s = 1 - SHRINK * z;
-    return { x, y: NEAR_Y - Z_SPAN * z - h * s, s };
+    /* perspective pull: the same x lands nearer the centre line the deeper
+       it is, so a throw into the field tracks diagonally, not straight up */
+    const nx = W / 2 + (x - W / 2) * (1 - CONVERGE * z);
+    return { x: nx, y: NEAR_Y - Z_SPAN * z - h * s, s };
   }
 
   groundAt(z) {
@@ -353,6 +363,10 @@ export class CatchArena {
     this.ballScale = (BALL_R * 2) / BALL_CELLS;
     this.ball = scene.add.image(BALL_HOME.x, NEAR_Y - BALL_R, "ball");
     this.ball.setDepth(600).setScale(this.ballScale);
+    /* its shadow on the ground is what tells the eye how high the ball is */
+    this.ballShadow = scene.add
+      .ellipse(BALL_HOME.x, this.groundAt(BALL_HOME.z), 34, 10, 0x05090b, 0.42)
+      .setDepth(1);
     this.parkBall();
   }
 
@@ -379,6 +393,8 @@ export class CatchArena {
       .setAlpha(1)
       .setVisible(true)
       .setDepth(600 - state.z * 400);
+    this.ballShadow?.setVisible(true);
+    this.drawBall();
   }
 
   /* ---------- the three specimens ---------- */
@@ -519,7 +535,9 @@ export class CatchArena {
       .setPosition(point.x, point.y + foot + 1)
       .setScale(scale)
       .setDepth(300 - entry.z * 250)
-      .setFlipX(entry.dir < 0);
+      .setFlipX(entry.dir < 0)
+      /* a lean into the walk, so a crossing creature is not a sliding decal */
+      .setRotation((entry.lean || 0) * 0.012);
     entry.shadow
       .setPosition(point.x, point.y)
       .setScale(0.7 * point.s, 0.7 * point.s)
@@ -559,19 +577,9 @@ export class CatchArena {
     const dt = Math.min(delta, 50) / 1000;
 
     if (entry.state === "idle") {
+      entry.lean = 0;
       entry.timer -= dt;
-      if (entry.timer <= 0) {
-        entry.target = {
-          x: clamp(entry.zone.x + (Math.random() - 0.5) * 190, 64, W - 64),
-          z: clamp(entry.zone.z + (Math.random() - 0.5) * 0.42, 0.06, 0.92),
-        };
-        entry.state = Math.random() < 0.3 ? "run" : "walk";
-        entry.speed = entry.state === "run" ? 74 : 38;
-        this.setAnim(
-          entry,
-          entry.state === "run" && entry.parts?.run ? "run" : "walk",
-        );
-      }
+      if (entry.timer <= 0) this.crossField(entry);
       return;
     }
 
@@ -579,32 +587,44 @@ export class CatchArena {
     const dz = (entry.target.z - entry.z) * Z_SPAN;
     const distance = Math.hypot(dx, dz);
 
-    if (distance < 5) {
+    if (distance < 6) {
       entry.state = "idle";
-      entry.timer = 0.5 + Math.random() * 1.6;
+      entry.timer = 0.15 + Math.random() * 0.5;
       this.setAnim(entry, "idle");
       return;
     }
 
-    /* a change of mind mid-stride, every so often */
-    if (
-      entry.state === "run" &&
-      entry.parts?.walk &&
-      Math.random() < dt * 0.5
-    ) {
-      entry.state = "walk";
-      entry.speed = 38;
-      this.setAnim(entry, "walk");
+    /* a change of mind mid-stride: new heading, no pause */
+    if (Math.random() < dt * 0.35) {
+      this.crossField(entry);
+      return;
     }
 
     const step = Math.min(distance, entry.speed * dt);
     const nx = (dx / distance) * step;
     const nz = (dz / distance) * step;
-    entry.x = clamp(entry.x + nx, 58, W - 58);
-    entry.z = clamp(entry.z + nz / Z_SPAN, 0.05, 0.94);
+    entry.x = clamp(entry.x + nx, 44, W - 44);
+    entry.z = clamp(entry.z + nz / Z_SPAN, 0.05, 0.95);
     if (Math.abs(nx) > 0.05) entry.dir = nx < 0 ? -1 : 1;
+    entry.lean = clamp(nx * 1.4, -4.5, 4.5);
 
     this.placeMon(entry);
+  }
+
+  /* Anywhere on the field is fair game: the whole plane, all four ways. */
+  crossField(entry) {
+    let x = 56 + Math.random() * (W - 112);
+    let z = 0.06 + Math.random() * 0.86;
+    /* don't pick a spot it is already standing on */
+    if (Math.hypot(x - entry.x, (z - entry.z) * Z_SPAN) < 90) {
+      x = W - x;
+      z = 1 - z;
+    }
+    entry.target = { x, z };
+    const running = Math.random() < 0.38;
+    entry.state = running ? "run" : "walk";
+    entry.speed = running ? 96 : 56;
+    this.setAnim(entry, running && entry.parts?.run ? "run" : "walk");
   }
 
   /* ---------- gesture: swipe forward to throw ---------- */
@@ -658,6 +678,10 @@ export class CatchArena {
       touched,
       last: point,
       spin: 0,
+      /* where the ball leaves the hand. The drag carries it under the finger
+         for feedback, but the throw runs from here, so the flight keeps the
+         sideways and depth travel the gesture implies. */
+      origin: { x: this.ballState.x, z: this.ballState.z },
     };
     this.ballState.live = false;
     this.dragTo(point.x, point.y, 0);
@@ -727,6 +751,7 @@ export class CatchArena {
        samples this press collected. */
     const throwVec = this.measureThrow();
     const target = this.aim.target;
+    const origin = this.aim.origin;
     this.aim = null;
 
     /* A press that never moved is not a throw: put the ball back rather than
@@ -738,7 +763,7 @@ export class CatchArena {
       return;
     }
 
-    this.launch({ ...throwVec, target });
+    this.launch({ ...throwVec, target, origin });
   }
 
   /* Velocity from the last ~140ms of travel, curvature from the signed turn
@@ -770,9 +795,18 @@ export class CatchArena {
     return { spin: clamp((curl / 16) * 12, -12, 12) };
   }
 
-  launch({ spin, target }) {
+  launch({ spin, target, origin }) {
     const state = this.ballState;
     const goal = target || { x: BALL_HOME.x, z: 0.4 };
+    const from = origin || { x: state.x, z: state.z };
+
+    /* back to the hand, upright, at the height of a ball held at the near
+       edge — then the whole arc happens in front of the player */
+    state.x = clamp(from.x, BALL_R, W - BALL_R);
+    state.z = clamp(from.z, 0.02, Z_FAR);
+    state.h = BALL_R;
+    state.angle = 0;
+
     const dz = (goal.z - state.z) * Z_SPAN;
     const distance = Math.hypot(goal.x - state.x, dz);
     /* a longer throw takes a little longer and arcs higher */
@@ -904,6 +938,20 @@ export class CatchArena {
       .setScale(this.ballScale * point.s)
       .setAngle(state.angle * 57.3 + extraAngle)
       .setDepth(600 - state.z * 400);
+
+    if (this.ballShadow) {
+      const ground = this.project(state.x, state.z, 0);
+      const lift = Math.max(0, state.h - BALL_R);
+      const spread = 1 + Math.min(1.4, lift / 110);
+      this.ballShadow
+        .setPosition(ground.x, ground.y)
+        .setScale(
+          (BALL_R * 1.7 * point.s * spread) / 34,
+          (BALL_R * 0.6 * point.s) / 10,
+        )
+        .setAlpha(0.4 / spread)
+        .setDepth(300 - state.z * 250 - 2);
+    }
   }
 
   /* The throw came to rest without touching anything: that is a miss. */
@@ -943,14 +991,41 @@ export class CatchArena {
     if (!this.alive(roundId)) return;
     playSfx("absorb");
 
-    /* the creature folds into the ball, wherever it happens to be standing */
+    /* A white flash on the silhouette, twice, then the creature is drawn
+       into the ball — no spinning, the sprite never turns over. */
+    const glow = scene.add
+      .circle(at.x, at.y, Math.max(26, (target.height || 90) * 0.34), 0xffffff, 0.9)
+      .setDepth(960);
+    scene.tweens.add({
+      targets: glow,
+      scale: 2.4,
+      alpha: 0,
+      duration: 460,
+      ease: "Quad.out",
+      onComplete: () => glow.destroy(),
+    });
+
+    target.sprite.setTintFill(0xffffff);
     scene.tweens.add({
       targets: target.sprite,
-      alpha: 0,
-      scale: target.sprite.scale * 0.08,
-      angle: 420,
-      duration: 420,
-      ease: "back.in",
+      alpha: { from: 1, to: 0.4 },
+      duration: 110,
+      yoyo: true,
+      repeat: 1,
+      ease: "Quad.inOut",
+      onComplete: () => {
+        target.sprite?.clearTint();
+        scene.tweens.add({
+          targets: target.sprite,
+          alpha: 0,
+          scaleX: target.sprite.scaleX * 0.12,
+          scaleY: target.sprite.scaleY * 0.12,
+          y: at.y,
+          duration: 300,
+          ease: "Quad.in",
+          onComplete: () => target.sprite?.clearTint(),
+        });
+      },
     });
     scene.tweens.add({
       targets: target.shadow,
@@ -1021,6 +1096,7 @@ export class CatchArena {
     await wait(950);
     if (!this.alive(roundId)) return;
     this.ball.setVisible(false);
+    this.ballShadow?.setVisible(false);
     this.emit({ team: this.team.slice() });
     this.finishRound();
   }
@@ -1083,6 +1159,7 @@ export class CatchArena {
       });
     } else {
       this.ball.setVisible(false);
+      this.ballShadow?.setVisible(false);
       this.finishRound();
     }
   }
