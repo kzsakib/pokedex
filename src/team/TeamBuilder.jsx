@@ -1,6 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, LayoutGroup, MotionConfig } from "motion/react";
 import { CatchArena } from "./CatchArena";
-import { pixelSpriteUrl } from "../api";
+import { fetchPokemon, formatNumber } from "../api";
+import { playSfx } from "../audio";
+import TeamStrip from "./TeamStrip";
+import TeamGrid from "./TeamGrid";
+import TeamReport from "./TeamReport";
+import CatchFlight from "./CatchFlight";
+import BallGlyph from "./BallGlyph";
+import { computeTeamReport } from "./teamReport";
 import "./team.css";
 
 const HINTS = {
@@ -29,32 +37,110 @@ const EMPTY = {
   mons: [],
 };
 
-function BallIcon({ size = 18, dim = false }) {
-  return (
-    <svg
-      className={`team-ball${dim ? " is-dim" : ""}`}
-      width={size}
-      height={size}
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <circle cx="10" cy="10" r="8.6" fill="#eef0ef" stroke="#0e1417" strokeWidth="1.6" />
-      <path d="M1.6 10h16.8" stroke="#0e1417" strokeWidth="1.6" />
-      <path d="M1.6 10a8.4 8.4 0 0 1 16.8 0Z" fill="#d8452f" stroke="#0e1417" strokeWidth="1.6" />
-      <circle cx="10" cy="10" r="3" fill="#eef0ef" stroke="#0e1417" strokeWidth="1.6" />
-      <circle cx="10" cy="10" r="1.1" fill="#0e1417" />
-    </svg>
+/* Types and base stat total come from the same /pokemon payload the dex
+   already fetches, and api.js caches it, so a member costs one request at
+   most. Kept at module scope so a remount does not refetch the team. */
+const FACTS = new Map();
+
+function useTeamFacts(team) {
+  const [version, setVersion] = useState(0);
+  const ids = team.map((mon) => mon.id).join(",");
+
+  useEffect(() => {
+    let live = true;
+    team.forEach((mon) => {
+      if (FACTS.has(mon.id)) return;
+      fetchPokemon(mon.id)
+        .then((data) => {
+          FACTS.set(mon.id, {
+            types: [...(data.types ?? [])]
+              .sort((a, b) => a.slot - b.slot)
+              .map((entry) => entry.type.name),
+            bst: (data.stats ?? []).reduce(
+              (sum, stat) => sum + (stat.base_stat ?? 0),
+              0,
+            ),
+            number: formatNumber(mon.id),
+          });
+        })
+        .catch(() => {
+          FACTS.set(mon.id, { types: [], bst: 0, number: formatNumber(mon.id) });
+        })
+        .finally(() => {
+          if (live) setVersion((value) => value + 1);
+        });
+    });
+    return () => {
+      live = false;
+    };
+  }, [ids]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return useMemo(
+    () =>
+      team.map((mon) => ({
+        ...mon,
+        ...(FACTS.get(mon.id) ?? { number: formatNumber(mon.id) }),
+      })),
+    [team, ids, version],
   );
 }
 
 export default function TeamBuilder({ roster = [] }) {
   const hostRef = useRef(null);
+  const stageRef = useRef(null);
+  const panelRef = useRef(null);
+  const slotRefs = useRef([]);
   const arenaRef = useRef(null);
   const rosterRef = useRef(roster);
   rosterRef.current = roster;
 
   const [state, setState] = useState(EMPTY);
+  const [flights, setFlights] = useState([]);
+  const [landed, setLanded] = useState(null);
+  const [revealed, setRevealed] = useState(false);
+  const [revealKey, setRevealKey] = useState(0);
+  /* The reveal floats over the panel at the stage's box rather than inside
+     it, so the clipped arena canvas can never spill behind the cards. */
+  const [stageBox, setStageBox] = useState(null);
+
+  const team = state.team || [];
+  const enriched = useTeamFacts(team);
+  const slots = useMemo(() => {
+    const filled = enriched.slice(0, 6);
+    while (filled.length < 6) filled.push(null);
+    return filled;
+  }, [enriched]);
+
+  const complete = state.phase === "complete";
+  const closed = state.phase === "roundOver" || complete;
+  const report = useMemo(() => computeTeamReport(enriched), [enriched]);
+
+  /* The catch handler is read through a ref so the arena, which is created
+     once, always calls the current version of it. */
+  const catchRef = useRef(null);
+  catchRef.current = (event) => {
+    if (event?.type !== "catch") return;
+    const target = slotRefs.current[event.slot];
+    const stage = stageRef.current?.getBoundingClientRect();
+    const panel = panelRef.current?.getBoundingClientRect();
+    if (!target || !stage || !panel) return;
+    const box = target.getBoundingClientRect();
+    setFlights((list) => [
+      ...list,
+      {
+        key: `${event.mon.id}-${list.length}-${Date.now()}`,
+        mon: event.mon,
+        from: {
+          x: stage.left - panel.left + stage.width / 2,
+          y: stage.top - panel.top + stage.height * 0.55,
+        },
+        to: {
+          x: box.left - panel.left + box.width / 2,
+          y: box.top - panel.top + box.height / 2,
+        },
+      },
+    ]);
+  };
 
   useEffect(() => {
     const host = hostRef.current;
@@ -71,14 +157,17 @@ export default function TeamBuilder({ roster = [] }) {
         poll = window.setTimeout(start, 500);
         return false;
       }
-      arena = new CatchArena(host, { roster: rosterRef.current, onState: setState });
+      arena = new CatchArena(host, {
+        roster: rosterRef.current,
+        onState: setState,
+        onEvent: (event) => catchRef.current?.(event),
+      });
       arenaRef.current = arena;
       arena.mount();
       return true;
     };
 
-    /* The engine is heavy, so it only boots when the bay comes into view —
-       and never on a save-data connection that asked for reduced motion. */
+    /* The engine is heavy, so it only boots when the bay comes into view. */
     if ("IntersectionObserver" in window) {
       observer = new IntersectionObserver(
         (entries) => {
@@ -113,155 +202,240 @@ export default function TeamBuilder({ roster = [] }) {
     };
   }, []);
 
-  const team = state.team || [];
-  const slots = useMemo(() => {
-    const filled = team.slice(0, 6);
-    while (filled.length < 6) filled.push(null);
-    return filled;
-  }, [team]);
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    const panel = panelRef.current;
+    if (!stage || !panel) return undefined;
 
-  const closed = state.phase === "roundOver" || state.phase === "complete";
-  const complete = state.phase === "complete";
-  /* The toast only carries what the engine chose to say — instructions live
-     in the header and the HUD, so the two never repeat each other. */
-  const announce = Boolean(state.message);
+    const measure = () => {
+      const box = stage.getBoundingClientRect();
+      const frame = panel.getBoundingClientRect();
+      setStageBox({
+        top: box.top - frame.top,
+        left: box.left - frame.left,
+        width: box.width,
+        height: box.height,
+      });
+    };
 
-  const nextLabel = complete ? "Play again" : "Next round";
+    measure();
+    let observer;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(measure);
+      observer.observe(stage);
+      observer.observe(panel);
+    }
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+
+  /* The run closes, the arena empties, then the six slots take over the
+     stage on their own. */
+  useEffect(() => {
+    if (!complete) {
+      setRevealed(false);
+      return undefined;
+    }
+    if (!team.length) return undefined;
+    const timer = window.setTimeout(() => setRevealed(true), 850);
+    return () => window.clearTimeout(timer);
+  }, [complete, team.length]);
+
+  const openReveal = () => {
+    setRevealed(true);
+    setRevealKey((value) => value + 1);
+  };
+
+  const replay = () => {
+    setRevealed(false);
+    window.setTimeout(() => {
+      setRevealed(true);
+      setRevealKey((value) => value + 1);
+    }, 80);
+  };
+
+  const onSlot = () => {
+    if (!complete) return;
+    if (revealed) replay();
+    else openReveal();
+  };
+
+  const finishFlight = (flight) => {
+    setFlights((list) => list.filter((item) => item.key !== flight.key));
+    const slot = slots.findIndex((mon) => mon?.id === flight.mon.id);
+    if (slot >= 0) {
+      setLanded(slot);
+      window.setTimeout(() => setLanded(null), 760);
+    }
+    playSfx("land");
+  };
+
+  const primary = () => {
+    if (complete) {
+      arenaRef.current?.resetGame();
+      setRevealed(false);
+      setFlights([]);
+      return;
+    }
+    if (closed) arenaRef.current?.nextRound();
+  };
+
+  const announce = Boolean(state.message) && !revealed;
 
   return (
-    <div className="team-panel">
-      <header className="team-head">
-        <span className="team-mark" aria-hidden="true">
-          {state.ball?.icon ? (
-            <img
-              className="team-ball team-ball--mark"
-              src={state.ball.icon}
-              alt=""
-              width="34"
-              height="34"
-              decoding="async"
-            />
-          ) : (
-            <BallIcon size={34} />
-          )}
-        </span>
-        <div className="team-head__copy">
-          <h3 className="team-title">Catch 6 Pokémon</h3>
-          <p className="team-sub">
-            They wander, so lead your throw. The ball lands where the swipe
-            ends, and a curl bends it on the way. Every ball on the rack is
-            rolled on its own, and the best ones are the rarest.
-          </p>
-        </div>
-        <p className="team-round">
-          <span className="team-round__label">Round</span>
-          <span className="team-round__value">{state.round}</span>
-          <span className="team-round__total">/ {state.rounds}</span>
-        </p>
-      </header>
-
-      <div className="team-stage">
-        <div className="team-hud">
-          {/* The rack itself, one sprite per ball still in hand: a mixed
-              round reads at a glance. */}
-          <span
-            className="team-hud__balls"
-            title={
-              state.rack?.length
-                ? state.rack.map((ball) => ball.name).join(", ")
-                : undefined
-            }
-            aria-label={`${state.balls} ${state.balls === 1 ? "ball" : "balls"} left`}
-          >
-            {state.rack?.length ? (
-              state.rack.map((ball, index) => (
+    <MotionConfig reducedMotion="never">
+      <LayoutGroup id="team-reveal">
+        <div className="team-panel" ref={panelRef}>
+          <header className="team-head">
+            <span className="team-mark" aria-hidden="true">
+              {state.ball?.icon ? (
                 <img
-                  key={`${ball.id}-${index}`}
-                  className="team-ball team-ball--sprite"
-                  src={ball.icon}
+                  className="team-ball team-ball--mark"
+                  src={state.ball.icon}
                   alt=""
-                  width="16"
-                  height="16"
+                  width="34"
+                  height="34"
                   decoding="async"
                 />
-              ))
-            ) : (
-              <BallIcon size={16} />
-            )}
-          </span>
-          <span className="team-hud__hint">
-            {/* While a throw is being lined up the hint gives way to the odds
-                of the creature under the landing spot, so a species' capture
-                rate is legible before the ball is committed. */}
-            {state.odds
-              ? `Catch ${state.odds}%`
-              : (HINTS[state.phase] ?? "Swipe to throw")}
-          </span>
-        </div>
+              ) : (
+                <BallGlyph size={34} />
+              )}
+            </span>
+            <div className="team-head__copy">
+              <h3 className="team-title">Catch 6 Pokémon</h3>
+              <p className="team-sub">
+                They wander, so lead your throw. The ball lands where the swipe
+                ends, and a curl bends it on the way. Each throw pulls its own
+                ball from the bag — only the one in hand is shown.
+              </p>
+            </div>
+            <p className="team-round">
+              <span className="team-round__label">Round</span>
+              <span className="team-round__value">{state.round}</span>
+              <span className="team-round__total">/ {state.rounds}</span>
+            </p>
+          </header>
 
-        <div
-          className="team-canvas"
-          ref={hostRef}
-          role="application"
-          aria-label="Catching arena. Press on the Poké Ball, swipe to where a moving Pokémon is and release to throw."
-        />
-
-        <p className={`team-toast${announce ? " is-on" : ""}`} aria-live="polite">
-          {announce ? state.message : ""}
-        </p>
-      </div>
-
-      <footer className="team-foot">
-        <div className="team-slots">
-          <p className="team-slots__label">Your team</p>
-          <ul className="team-slot-row">
-            {slots.map((mon, index) => (
-              <li
-                key={mon ? mon.id : `empty-${index}`}
-                className={`team-slot${mon ? " is-filled" : ""}`}
-                data-empty={mon ? undefined : "true"}
-              >
-                {mon ? (
-                  <>
+          <div className="team-stage" ref={stageRef}>
+            {!complete && (
+              <div className="team-hud">
+                <span
+                  className="team-hud__balls"
+                  title={state.ball?.name}
+                  aria-label={`${state.ball?.name ?? "Poké Ball"} in hand, ${
+                    state.balls
+                  } ${state.balls === 1 ? "ball" : "balls"} left`}
+                >
+                  {state.ball?.icon ? (
                     <img
-                      src={pixelSpriteUrl(mon.id)}
+                      className="team-ball"
+                      src={state.ball.icon}
                       alt=""
-                      width="44"
-                      height="44"
-                      loading="lazy"
+                      width="16"
+                      height="16"
                       decoding="async"
                     />
-                    <span className="team-slot__name">{mon.name}</span>
-                  </>
-                ) : (
-                  <>
-                    <BallIcon size={22} dim />
-                    <span className="team-slot__name" aria-hidden="true">
-                      —
-                    </span>
-                  </>
-                )}
-                <span className="visually-hidden">
-                  {mon ? `${mon.name} caught` : `slot ${index + 1} empty`}
+                  ) : (
+                    <BallGlyph size={16} />
+                  )}
+                  <b>×{state.balls}</b>
                 </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+                <span className="team-hud__hint">
+                  {state.odds
+                    ? `Catch ${state.odds}%`
+                    : (HINTS[state.phase] ?? "Swipe to throw")}
+                </span>
+              </div>
+            )}
 
-        <button
-          type="button"
-          className="team-cta"
-          onClick={() => {
-            if (complete) arenaRef.current?.resetGame();
-            else if (closed) arenaRef.current?.nextRound();
-          }}
-          disabled={!closed}
-        >
-          {nextLabel}
-          <span aria-hidden="true">›</span>
-        </button>
-      </footer>
-    </div>
+            <div
+              className="team-canvas"
+              ref={hostRef}
+              role="application"
+              aria-label="Catching arena. Press on the Poké Ball, swipe to where a moving Pokémon is and release to throw."
+            />
+
+            <p
+              className={`team-toast${announce ? " is-on" : ""}`}
+              aria-live="polite"
+            >
+              {announce ? state.message : ""}
+            </p>
+
+          </div>
+
+          <footer className="team-foot">
+            <TeamStrip
+              slots={slots}
+              revealed={revealed}
+              landedSlot={landed}
+              canReveal={complete}
+              slotRefs={slotRefs}
+              onSlot={onSlot}
+            />
+
+            <div className="team-actions">
+              {complete && (
+                <button
+                  type="button"
+                  className="team-ghost"
+                  onClick={revealed ? () => setRevealed(false) : openReveal}
+                >
+                  {revealed ? "Hide team" : "Show team"}
+                </button>
+              )}
+              <button
+                type="button"
+                className="team-cta"
+                onClick={primary}
+                disabled={!closed}
+              >
+                {complete ? "Play again" : "Next round"}
+                <span aria-hidden="true">›</span>
+              </button>
+            </div>
+          </footer>
+
+          {revealed && stageBox && (
+            <TeamGrid
+              slots={slots}
+              stageBox={stageBox}
+              caughtCount={report.count}
+              revealKey={revealKey}
+            />
+          )}
+
+          <AnimatePresence initial={false}>
+            {revealed && report.count > 0 && (
+              <TeamReport key="team-report" report={report} />
+            )}
+          </AnimatePresence>
+
+          <p className="visually-hidden" role="status">
+            {revealed
+              ? `Team of ${report.count} revealed. ${slots
+                  .filter(Boolean)
+                  .map((mon) => mon.name)
+                  .join(", ")}.`
+              : ""}
+          </p>
+
+          <div className="team-flight-layer" aria-hidden="true">
+            {flights.map((flight) => (
+              <CatchFlight
+                key={flight.key}
+                mon={flight.mon}
+                from={flight.from}
+                to={flight.to}
+                onDone={() => finishFlight(flight)}
+              />
+            ))}
+          </div>
+        </div>
+      </LayoutGroup>
+    </MotionConfig>
   );
 }

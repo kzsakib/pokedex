@@ -201,6 +201,11 @@ const VOICES = {
     blip({ from: 330, to: 240, type: "triangle", length: 0.1, level: 0.04 });
     blip({ from: 240, to: 170, type: "triangle", length: 0.14, level: 0.035, delay: 0.1 });
   },
+  /* A caught sprite settles into its slot: a soft seat, then a bright tick. */
+  land: () => {
+    thud({ length: 0.07, level: 0.045, from: 1500, to: 380 });
+    blip({ from: 880, to: 1180, type: "sine", length: 0.07, level: 0.026, delay: 0.02 });
+  },
 };
 
 export function playSfx(name) {

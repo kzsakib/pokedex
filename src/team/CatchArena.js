@@ -232,16 +232,6 @@ function ballCells(ink) {
   return cells;
 }
 
-/* "Great Ball ×2, Master Ball ×1." — the rack in words, so the deal can be
-   read at a glance without decoding three sprites. */
-function rackLabel(rack) {
-  const counts = new Map();
-  rack.forEach((type) => counts.set(type, (counts.get(type) || 0) + 1));
-  return `${[...counts]
-    .map(([type, count]) => `${type.name} ×${count}`)
-    .join(", ")} this round.`;
-}
-
 /* A rack for the round, weighted by each ball's chance. */
 function pickBall() {
   let roll = Math.random();
@@ -457,7 +447,8 @@ export class CatchArena {
     this.balls = this.rack.length;
     this.ballInPlay = null;
     this.phase = "ready";
-    this.message = rackLabel(this.rack);
+    /* The rack is not announced: only the ball in hand is shown. */
+    this.message = `New round — ${this.balls} throws.`;
     if (this.ball) this.ball.setTexture(`ball-${this.currentBall.id}`);
     if (!silent) this.emit();
     this.loadRound(this.roundMons);
@@ -508,6 +499,61 @@ export class CatchArena {
     this.message = complete
       ? `Run complete — ${this.team.length} of 6 slots filled.`
       : "Round closed. Next three are waiting.";
+    this.emit();
+    if (complete) this.clearStage();
+  }
+
+  /* The run is over, so the field empties itself: creatures and ball fade,
+     the sprites go, and the stage is left clear for the reveal. */
+  async clearStage() {
+    const scene = this.scene;
+    if (!scene) return;
+
+    const leaving = this.mons;
+    this.mons = [];
+
+    leaving.forEach((entry) => {
+      if (entry.sprite?.active) {
+        scene.tweens.add({
+          targets: entry.sprite,
+          alpha: 0,
+          duration: 380,
+          ease: "Quad.out",
+          onComplete: () => entry.sprite?.destroy(),
+        });
+      }
+      if (entry.shadow?.active) {
+        scene.tweens.add({
+          targets: entry.shadow,
+          alpha: 0,
+          duration: 380,
+          ease: "Quad.out",
+          onComplete: () => entry.shadow?.destroy(),
+        });
+      }
+    });
+
+    if (this.ball?.active) {
+      scene.tweens.add({
+        targets: this.ball,
+        alpha: 0,
+        duration: 260,
+        ease: "Quad.out",
+        onComplete: () => this.ball?.setVisible(false),
+      });
+    }
+    if (this.ballShadow?.active) {
+      scene.tweens.add({
+        targets: this.ballShadow,
+        alpha: 0,
+        duration: 260,
+        ease: "Quad.out",
+        onComplete: () => this.ballShadow?.setVisible(false),
+      });
+    }
+    this.marker?.setVisible(false);
+
+    await wait(420);
     this.emit();
   }
 
@@ -629,6 +675,8 @@ export class CatchArena {
       .setAlpha(1)
       .setVisible(true)
       .setDepth(600 - state.z * 400);
+    /* A cleared stage left the shadow faded out, so reset its alpha too. */
+    this.ballShadow?.setAlpha(1);
     this.ballShadow?.setVisible(true);
     this.marker?.setVisible(false);
     /* the hand now holds whatever was next in the rack */
@@ -1411,6 +1459,14 @@ export class CatchArena {
       { id: target.id, name: target.label || target.name },
     ];
     playSfx("caught");
+
+    /* The DOM layer flies a copy of the sprite from the stage into its slot;
+       the engine only needs to say which member landed where. */
+    this.onEvent({
+      type: "catch",
+      slot: this.team.length - 1,
+      mon: { id: target.id, name: target.label || target.name },
+    });
 
     const burst = scene.add.particles(0, 0, "spark", {
       x: this.ball.x,
