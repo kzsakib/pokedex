@@ -53,7 +53,8 @@ const DEFAULT_CAPTURE_RATE = 120;
 /* Nothing weakens a creature before a throw here, so a plain field ball
    carries a modest multiplier to keep six rounds winnable. Stubborn species
    stay stubborn at this bonus; it only lifts the middle of the range. */
-const FIELD_BONUS = 2.5;
+const FIELD_BONUS = 3;
+const CATCH_ASSIST = 8;
 const SHAKE_EXPONENT = 0.1875;
 /* How near the landing spot has to fall before the HUD quotes the odds of
    the creature standing there. */
@@ -145,9 +146,13 @@ const pick = (list) => list[Math.floor(Math.random() * list.length)];
    a single flat dice roll. */
 export function catchOdds(captureRate, ballMultiplier = 1) {
   const rate = clamp(Number(captureRate) || DEFAULT_CAPTURE_RATE, 1, 255);
-  /* the ball's modifier sits exactly where the games put it, so a Master
-     Ball drives a through the roof and its odds land on 100% */
-  const a = Math.max(1, (rate * FIELD_BONUS * ballMultiplier) / 3);
+  /* The assist is flat and lands before the ball, so it barely moves a
+     Pidgey but pulls the 3-rate second and third stages out of the single
+     digits, where the three-shake product was punishing them. */
+  const a = Math.max(
+    1,
+    ((rate * FIELD_BONUS) / 3 + CATCH_ASSIST) * ballMultiplier,
+  );
   const shake = clamp(65536 / Math.pow(255 / a, SHAKE_EXPONENT) / 65536, 0, 1);
   const chance = shake ** 3;
   return {

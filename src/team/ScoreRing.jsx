@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 
-/* A score that walks up to its value once the panel mounts. Small enough to
-   keep here: the report only needs one counter and it avoids pulling a
-   whole ticker component into the arena bundle. */
-function useCountUp(value, duration = 1.15) {
+/* A score that walks up to its value once its panel is reached in the
+   reveal sequence. Small enough to keep here. */
+function useCountUp(value, active, duration = 1.15) {
   const [shown, setShown] = useState(0);
 
   useEffect(() => {
+    if (!active) {
+      setShown(0);
+      return undefined;
+    }
     let frame = 0;
     const start = performance.now();
     const step = (now) => {
@@ -18,15 +21,15 @@ function useCountUp(value, duration = 1.15) {
     };
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
-  }, [value, duration]);
+  }, [value, active, duration]);
 
   return shown;
 }
 
-export default function ScoreRing({ score, size = 94 }) {
+export default function ScoreRing({ score, size = 94, active = true }) {
   const radius = (size - 10) / 2;
   const circumference = 2 * Math.PI * radius;
-  const shown = useCountUp(score);
+  const shown = useCountUp(score, active);
   const centre = size / 2;
 
   return (
@@ -50,8 +53,16 @@ export default function ScoreRing({ score, size = 94 }) {
           strokeLinecap="round"
           strokeDasharray={circumference}
           initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset: circumference * (1 - score / 100) }}
-          transition={{ duration: 1.1, ease: [0.22, 0.9, 0.3, 1], delay: 0.15 }}
+          animate={{
+            strokeDashoffset: active
+              ? circumference * (1 - score / 100)
+              : circumference,
+          }}
+          transition={{
+            duration: 1.15,
+            ease: [0.22, 0.9, 0.3, 1],
+            delay: active ? 0.2 : 0,
+          }}
           transform={`rotate(-90 ${centre} ${centre})`}
         />
       </svg>

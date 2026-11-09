@@ -367,6 +367,23 @@ export default function TeamBuilder({ roster = [] }) {
 
           </div>
 
+          {revealed && stageBox && (
+            <TeamGrid
+              slots={slots}
+              stageBox={stageBox}
+              caughtCount={report.count}
+              revealKey={revealKey}
+            />
+          )}
+
+          <AnimatePresence initial={false}>
+            {revealed && report.count > 0 && (
+              <TeamReport key="team-report" report={report} />
+            )}
+          </AnimatePresence>
+
+          {/* The strip and its actions sit under the report, so the cards
+              and the results read top to bottom before the controls. */}
           <footer className="team-foot">
             <TeamStrip
               slots={slots}
@@ -398,21 +415,6 @@ export default function TeamBuilder({ roster = [] }) {
               </button>
             </div>
           </footer>
-
-          {revealed && stageBox && (
-            <TeamGrid
-              slots={slots}
-              stageBox={stageBox}
-              caughtCount={report.count}
-              revealKey={revealKey}
-            />
-          )}
-
-          <AnimatePresence initial={false}>
-            {revealed && report.count > 0 && (
-              <TeamReport key="team-report" report={report} />
-            )}
-          </AnimatePresence>
 
           <p className="visually-hidden" role="status">
             {revealed

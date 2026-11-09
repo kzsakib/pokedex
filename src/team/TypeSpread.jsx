@@ -1,55 +1,74 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { softAccent, typeAccent } from "../typeColors";
 
-/* One segmented bar, each slice as wide as its share of the type slots.
-   Pointing at a slice — or its legend entry — lifts it and dims the rest. */
-export default function TypeSpread({ spread, slots }) {
-  const [active, setActive] = useState(null);
+/* The spread as a DMG-style matrix: one block per type slot, so a ×3 type is
+   literally three blocks wide. Blocks pop in one after another while the
+   report walks through its panels. */
+export default function TypeSpread({ spread, slots, active = true }) {
+  const [hot, setHot] = useState(null);
+
+  const cells = useMemo(
+    () =>
+      spread.flatMap((slice) =>
+        Array.from({ length: slice.count }, (_, index) => ({
+          type: slice.type,
+          index,
+        })),
+      ),
+    [spread],
+  );
 
   return (
-    <div className="spread" onPointerLeave={() => setActive(null)}>
-      <div
-        className="spread__bar"
-        role="img"
-        aria-label={`Type spread: ${spread
-          .map((slice) => `${slice.type} ${slice.count}`)
-          .join(", ")}`}
-      >
-        {spread.map((slice, index) => (
-          <motion.span
-            key={slice.type}
-            className="spread__slice"
-            style={{
-              flexGrow: slice.count,
-              background: `linear-gradient(180deg, ${softAccent(slice.type)}, ${typeAccent(slice.type)})`,
-            }}
-            initial={{ scaleX: 0, opacity: 0 }}
-            animate={{
-              scaleX: 1,
-              scaleY: active === slice.type ? 1.32 : 1,
-              opacity: active && active !== slice.type ? 0.3 : 1,
-            }}
-            transition={{
-              scaleX: {
-                delay: 0.5 + index * 0.04,
-                duration: 0.42,
-                ease: [0.2, 0.8, 0.3, 1],
-              },
-              default: { duration: 0.16, ease: "easeOut" },
-            }}
-            onPointerEnter={() => setActive(slice.type)}
-            title={`${slice.type} ×${slice.count}`}
-          />
-        ))}
+    <div className="spread" onPointerLeave={() => setHot(null)}>
+      <div className="spread__screen">
+        <div className="spread__hud">
+          <span>TYPE MATRIX</span>
+          <span>{slots} SLOTS</span>
+        </div>
+
+        <div
+          className="spread__bar"
+          role="img"
+          aria-label={`Type spread: ${spread
+            .map((slice) => `${slice.type} ${slice.count}`)
+            .join(", ")}`}
+        >
+          {cells.map((cell, index) => (
+            <motion.span
+              key={`${cell.type}-${cell.index}`}
+              className="spread__cell"
+              style={{
+                "--cell": typeAccent(cell.type),
+                "--cell-soft": softAccent(cell.type),
+              }}
+              initial={{ opacity: 0, scale: 0.3 }}
+              animate={
+                active
+                  ? {
+                      opacity: hot && hot !== cell.type ? 0.3 : 1,
+                      scale: 1,
+                      y: hot === cell.type ? -3 : 0,
+                    }
+                  : { opacity: 0, scale: 0.3, y: 0 }
+              }
+              transition={{
+                opacity: { duration: 0.14 },
+                default: { type: "spring", stiffness: 420, damping: 24, delay: 0.1 + index * 0.045 },
+              }}
+              onPointerEnter={() => setHot(cell.type)}
+              aria-hidden="true"
+            />
+          ))}
+        </div>
       </div>
 
       <ul className="spread__legend">
         {spread.map((slice) => (
           <li
             key={slice.type}
-            className={active === slice.type ? "is-hot" : undefined}
-            onPointerEnter={() => setActive(slice.type)}
+            className={hot === slice.type ? "is-hot" : undefined}
+            onPointerEnter={() => setHot(slice.type)}
           >
             <i style={{ background: typeAccent(slice.type) }} aria-hidden="true" />
             {slice.type} <b>×{slice.count}</b>

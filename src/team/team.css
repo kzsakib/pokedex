@@ -946,6 +946,19 @@
   min-width: 0;
 }
 
+.report-rank__rule {
+  display: block;
+  width: 46px;
+  height: 2px;
+  margin: 5px 0 6px;
+  transform-origin: left center;
+  background: linear-gradient(90deg, #e3b53c, rgba(227, 181, 60, 0));
+}
+
+.report-panel--matrix {
+  transform-origin: top center;
+}
+
 .report-rank {
   margin: 0;
   font-family: var(--font-body);
@@ -1161,24 +1174,65 @@
 
 /* type spread */
 
+/* A DMG screen inset into the panel: one block per type slot, scanlined. */
+.spread__screen {
+  position: relative;
+  padding: 8px 9px 9px;
+  border: 2px solid #0f380f;
+  background: #9bbc0f;
+  box-shadow:
+    0 0 0 2px #306230,
+    inset 0 0 0 2px rgba(255, 255, 255, 0.22);
+  clip-path: polygon(
+    6px 0,
+    100% 0,
+    100% calc(100% - 6px),
+    calc(100% - 6px) 100%,
+    0 100%,
+    0 6px
+  );
+  overflow: hidden;
+}
+
+.spread__screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(15, 56, 15, 0.14) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+.spread__hud {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: #0f380f;
+}
+
 .spread__bar {
+  position: relative;
+  z-index: 1;
   display: flex;
   gap: 2px;
-  height: 17px;
-  border-radius: 4px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.05);
+  height: 22px;
 }
 
-.spread__slice {
-  flex-basis: 0;
-  min-width: 3px;
-  transform-origin: left bottom;
-  transition: filter 160ms ease;
-}
-
-.spread__bar:hover .spread__slice {
-  filter: brightness(1.1) saturate(1.08);
+.spread__cell {
+  flex: 1 1 0;
+  min-width: 6px;
+  border: 1px solid #0f380f;
+  background: linear-gradient(180deg, var(--cell-soft), var(--cell));
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.28);
 }
 
 .spread__legend {
@@ -1210,13 +1264,14 @@
 }
 
 .spread__legend li.is-hot b {
-  color: #f7d873;
+  color: #c2dc4a;
 }
 
 .spread__legend i {
-  width: 6px;
-  height: 6px;
-  border-radius: 1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
 }
 
 .spread__legend b {
