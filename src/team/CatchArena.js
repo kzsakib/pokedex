@@ -44,7 +44,7 @@ const FLIGHT_PER_PX = 560;
 const SPIN_CURVE = 0.035;
 
 const ROUNDS = 6;
-const BALLS = 3;
+const BALLS_PER_ROUND = 3;
 
 /* A species' capture rate is the 0-255 number the games roll against, and
    this is the figure a throw falls back to before the species has answered:
@@ -53,11 +53,74 @@ const DEFAULT_CAPTURE_RATE = 120;
 /* Nothing weakens a creature before a throw here, so a plain field ball
    carries a modest multiplier to keep six rounds winnable. Stubborn species
    stay stubborn at this bonus; it only lifts the middle of the range. */
-const FIELD_BONUS = 2;
+const FIELD_BONUS = 2.5;
 const SHAKE_EXPONENT = 0.1875;
 /* How near the landing spot has to fall before the HUD quotes the odds of
    the creature standing there. */
 const ODDS_RADIUS = 150;
+
+/* The five balls, each with the modifier the games give it. A round draws one
+   rack, so all three throws in a round use the same ball, and the better the
+   ball the rarer it is to be handed: a Master Ball is a one-in-fifty round,
+   which is why most runs never see one. Premier is a Premier Ball in name and
+   finish only — a multiplier of 1, exactly as in the games. */
+const BALL_TYPES = [
+  {
+    id: "poke",
+    name: "Poké Ball",
+    multiplier: 1,
+    chance: 0.6,
+    ink: { crown: "#e5342c", crownShade: "#bd231e" },
+  },
+  {
+    id: "great",
+    name: "Great Ball",
+    multiplier: 1.5,
+    chance: 0.24,
+    ink: {
+      crown: "#2f74d8",
+      crownShade: "#1f55a8",
+      patch: "#d8452f",
+      patchShade: "#a8321f",
+    },
+  },
+  {
+    id: "ultra",
+    name: "Ultra Ball",
+    multiplier: 2,
+    chance: 0.1,
+    ink: {
+      crown: "#1f2126",
+      crownShade: "#0c0e11",
+      patch: "#f0c419",
+      patchShade: "#c39c0c",
+    },
+  },
+  {
+    id: "premier",
+    name: "Premier Ball",
+    multiplier: 1,
+    chance: 0.04,
+    ink: {
+      crown: "#f1f1ee",
+      crownShade: "#cdcdc9",
+      patch: "#d8452f",
+      patchShade: "#a8321f",
+    },
+  },
+  {
+    id: "master",
+    name: "Master Ball",
+    multiplier: 255,
+    chance: 0.02,
+    ink: {
+      crown: "#8b46c4",
+      crownShade: "#652f96",
+      patch: "#ec7ac0",
+      patchShade: "#bd5793",
+    },
+  },
+];
 
 /* Where the three stand when the round opens: spread across the middle and
    the back of the field, never close enough to the hand to be caught by a
@@ -80,9 +143,11 @@ const pick = (list) => list[Math.floor(Math.random() * list.length)];
    passes with b = 65536 / (255 / a)^0.1875, and three passed shakes are a
    catch — so this returns the real product of the three checks rather than
    a single flat dice roll. */
-export function catchOdds(captureRate) {
+export function catchOdds(captureRate, ballMultiplier = 1) {
   const rate = clamp(Number(captureRate) || DEFAULT_CAPTURE_RATE, 1, 255);
-  const a = Math.max(1, (rate * FIELD_BONUS) / 3);
+  /* the ball's modifier sits exactly where the games put it, so a Master
+     Ball drives a through the roof and its odds land on 100% */
+  const a = Math.max(1, (rate * FIELD_BONUS * ballMultiplier) / 3);
   const shake = clamp(65536 / Math.pow(255 / a, SHAKE_EXPONENT) / 65536, 0, 1);
   const chance = shake ** 3;
   return {
@@ -100,21 +165,19 @@ const WALK_RATE = 2.3;
 const RUN_RATE = 1.4;
 const IDLE_RATE = 2.6;
 
-/* The ball from the reference, drawn on a 32-cell grid: a black outline a
-   cell thick, a red crown with a white plus of shine, a black equator band
-   carrying a white button, and a pale base shaded grey where it turns under.
-   Generated rather than hand-listed so the circle closes cleanly. */
+/* The shell every ball is drawn on: a black outline a cell thick, a black
+   equator band carrying a white button, a pale base shaded grey where it
+   turns under, and a plus-shaped glint on the upper-left shoulder. The crown
+   and its pair of shoulder patches come from each ball's own ink. */
 const BALL_INK = {
   outline: "#0f1417",
-  crown: "#e5342c",
-  crownShade: "#bd231e",
   base: "#ededed",
   baseShade: "#c2c5c8",
   baseDeep: "#9ea3a7",
   shine: "#ffffff",
 };
 
-function ballCells() {
+function ballCells(ink) {
   const n = BALL_CELLS;
   const c = (n - 1) / 2;
   const R = c - 0.4;
@@ -134,13 +197,22 @@ function ballCells() {
       let color;
       if (button) color = r <= 3.1 ? BALL_INK.shine : BALL_INK.outline;
       else if (rim || band) color = BALL_INK.outline;
-      else if (dy < 0) color = BALL_INK.crown;
+      else if (dy < 0) color = ink.crown;
       else color = BALL_INK.base;
 
       /* shading: the crown darkens at its outer edge, the base under its own
          bulge, and the underside is the darkest part of the ball */
-      if (color === BALL_INK.crown && (r > R - 4 || (dx > 6 && dy > -3))) {
-        color = BALL_INK.crownShade;
+      if (color === ink.crown) {
+        if (r > R - 4 || (dx > 6 && dy > -3)) color = ink.crownShade;
+      }
+      /* Every ball but the plain one wears a patch of its accent colour on
+         each shoulder, mirrored either side of the seam. */
+      if (ink.patch && (color === ink.crown || color === ink.crownShade)) {
+        const px = Math.abs(dx) - 7.6;
+        const py = dy + 5.4;
+        const patch = px * px + py * py;
+        if (patch < 6.2) color = ink.patch;
+        else if (patch < 9.8) color = ink.patchShade;
       }
       if (color === BALL_INK.base) {
         if (r > R - 3) color = BALL_INK.baseDeep;
@@ -160,6 +232,38 @@ function ballCells() {
   return cells;
 }
 
+/* A rack for the round, weighted by each ball's chance. */
+function pickBall() {
+  let roll = Math.random();
+  for (const type of BALL_TYPES) {
+    roll -= type.chance;
+    if (roll <= 0) return type;
+  }
+  return BALL_TYPES[0];
+}
+
+const BALL_ICONS = new Map();
+
+/* The cells the arena renders, drawn into a canvas once per ball and handed
+   back as a data URL, so the HUD can wear the sprite that is actually in the
+   player's hand rather than a separate drawing of it. */
+export function ballDataUrl(id, scale = 4) {
+  if (BALL_ICONS.has(id)) return BALL_ICONS.get(id);
+  const type = BALL_TYPES.find((entry) => entry.id === id) || BALL_TYPES[0];
+  if (typeof document === "undefined") return "";
+  const canvas = document.createElement("canvas");
+  canvas.width = BALL_CELLS * scale;
+  canvas.height = BALL_CELLS * scale;
+  const ctx = canvas.getContext("2d");
+  ballCells(type.ink).forEach(([x, y, color]) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(x * scale, y * scale, scale, scale);
+  });
+  const url = canvas.toDataURL("image/png");
+  BALL_ICONS.set(id, url);
+  return url;
+}
+
 export class CatchArena {
   constructor(container, { roster = [], onState, onEvent } = {}) {
     this.container = container;
@@ -168,7 +272,8 @@ export class CatchArena {
     this.onEvent = onEvent || (() => {});
 
     this.round = 1;
-    this.balls = BALLS;
+    this.balls = BALLS_PER_ROUND;
+    this.ballStock = BALL_TYPES[0];
     this.team = [];
     this.phase = "loading";
     this.roundMons = [];
@@ -216,6 +321,12 @@ export class CatchArena {
         this.phase === "aim" && this.markerTarget
           ? this.markerTarget.odds.percent
           : null,
+      ball: {
+        id: this.ballStock.id,
+        name: this.ballStock.name,
+        multiplier: this.ballStock.multiplier,
+        icon: ballDataUrl(this.ballStock.id),
+      },
       mons: this.roundMons.map((mon) => ({ id: mon.id, name: mon.name })),
     });
   }
@@ -311,9 +422,12 @@ export class CatchArena {
        round is being played instead of during it. */
     this.nextMons = this.pickRound(this.roundMons.map((mon) => mon.id));
 
-    this.balls = BALLS;
+    /* One rack per round: the better the ball, the rarer it is to be handed. */
+    this.ballStock = pickBall();
+    this.balls = BALLS_PER_ROUND;
     this.phase = "ready";
-    this.message = "";
+    this.message = `${this.ballStock.name} ×${BALLS_PER_ROUND} this round.`;
+    if (this.ball) this.ball.setTexture(`ball-${this.ballStock.id}`);
     if (!silent) this.emit();
     this.loadRound(this.roundMons);
     this.warm(this.nextMons);
@@ -382,15 +496,19 @@ export class CatchArena {
   }
 
   makeTextures(scene) {
-    if (!scene.textures.exists("ball")) {
+    /* one texture per ball, drawn from the same cell grid, so whichever rack
+       a round draws can be swapped in without redrawing anything */
+    BALL_TYPES.forEach((type) => {
+      const key = `ball-${type.id}`;
+      if (scene.textures.exists(key)) return;
       const g = scene.make.graphics({ add: false });
-      ballCells().forEach(([x, y, color]) => {
+      ballCells(type.ink).forEach(([x, y, color]) => {
         g.fillStyle(parseInt(color.slice(1), 16), 1);
         g.fillRect(x, y, 1, 1);
       });
-      g.generateTexture("ball", BALL_CELLS, BALL_CELLS);
+      g.generateTexture(key, BALL_CELLS, BALL_CELLS);
       g.destroy();
-    }
+    });
     if (!scene.textures.exists("spark")) {
       const g = scene.make.graphics({ add: false });
       g.fillStyle(0xf7d774, 1);
@@ -425,7 +543,11 @@ export class CatchArena {
 
   createBall(scene) {
     this.ballScale = (BALL_R * 2) / BALL_CELLS;
-    this.ball = scene.add.image(BALL_HOME.x, NEAR_Y - BALL_R, "ball");
+    this.ball = scene.add.image(
+      BALL_HOME.x,
+      NEAR_Y - BALL_R,
+      `ball-${this.ballStock.id}`,
+    );
     this.ball.setDepth(600).setScale(this.ballScale);
     /* its shadow on the ground is what tells the eye how high the ball is */
     this.ballShadow = scene.add
@@ -525,7 +647,7 @@ export class CatchArena {
         shadow,
         loaded: false,
         caught: false,
-        odds: catchOdds(DEFAULT_CAPTURE_RATE),
+        odds: catchOdds(DEFAULT_CAPTURE_RATE, this.ballStock.multiplier),
       });
     });
 
@@ -543,7 +665,7 @@ export class CatchArena {
       try {
         const species = await fetchSpecies(entry.id);
         if (!this.alive(roundId)) return;
-        entry.odds = catchOdds(species?.capture_rate);
+        entry.odds = catchOdds(species?.capture_rate, this.ballStock.multiplier);
       } catch {
         /* offline, or a species that has no record yet: keep the default */
       }
@@ -1226,7 +1348,8 @@ export class CatchArena {
     await wait(420);
     if (!this.alive(roundId)) return;
 
-    const odds = target.odds || catchOdds(DEFAULT_CAPTURE_RATE);
+    const odds =
+      target.odds || catchOdds(DEFAULT_CAPTURE_RATE, this.ballStock.multiplier);
     for (let shake = 0; shake < 3; shake += 1) {
       playSfx(["shake", "shake2", "shake3"][shake]);
       await this.tweenBallAngle(scene, -16, 16, 110, true, 1);

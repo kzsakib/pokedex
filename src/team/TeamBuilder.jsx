@@ -24,6 +24,7 @@ const EMPTY = {
   phase: "loading",
   message: "",
   odds: null,
+  ball: null,
   mons: [],
 };
 
@@ -130,13 +131,25 @@ export default function TeamBuilder({ roster = [] }) {
     <div className="team-panel">
       <header className="team-head">
         <span className="team-mark" aria-hidden="true">
-          <BallIcon size={34} />
+          {state.ball?.icon ? (
+            <img
+              className="team-ball team-ball--mark"
+              src={state.ball.icon}
+              alt=""
+              width="34"
+              height="34"
+              decoding="async"
+            />
+          ) : (
+            <BallIcon size={34} />
+          )}
         </span>
         <div className="team-head__copy">
           <h3 className="team-title">Catch 6 Pokémon</h3>
           <p className="team-sub">
             They wander, so lead your throw. The ball lands where the swipe
-            ends, and a curl bends it on the way.
+            ends, and a curl bends it on the way. Every round hands you one
+            kind of ball, and the best ones are the rarest.
           </p>
         </div>
         <p className="team-round">
@@ -148,8 +161,22 @@ export default function TeamBuilder({ roster = [] }) {
 
       <div className="team-stage">
         <div className="team-hud">
-          <span className="team-hud__balls">
-            <BallIcon size={16} />
+          <span
+            className="team-hud__balls"
+            title={state.ball ? `${state.ball.name} ×${state.ball.multiplier}` : undefined}
+          >
+            {state.ball?.icon ? (
+              <img
+                className="team-ball team-ball--sprite"
+                src={state.ball.icon}
+                alt=""
+                width="18"
+                height="18"
+                decoding="async"
+              />
+            ) : (
+              <BallIcon size={16} />
+            )}
             <span aria-hidden="true">×</span>
             <b>{state.balls}</b>
           </span>
