@@ -9,6 +9,7 @@ const HINTS = {
   aim: "Release to throw",
   flying: "In flight",
   catching: "Capturing",
+  broke: "Broke free",
   caught: "Gotcha",
   missed: "Missed",
   roundOver: "Round closed",
@@ -22,6 +23,7 @@ const EMPTY = {
   team: [],
   phase: "loading",
   message: "",
+  odds: null,
   mons: [],
 };
 
@@ -151,7 +153,14 @@ export default function TeamBuilder({ roster = [] }) {
             <span aria-hidden="true">×</span>
             <b>{state.balls}</b>
           </span>
-          <span className="team-hud__hint">{HINTS[state.phase] ?? "Swipe to throw"}</span>
+          <span className="team-hud__hint">
+            {/* While a throw is being lined up the hint gives way to the odds
+                of the creature under the landing spot, so a species' capture
+                rate is legible before the ball is committed. */}
+            {state.odds
+              ? `Catch ${state.odds}%`
+              : (HINTS[state.phase] ?? "Swipe to throw")}
+          </span>
         </div>
 
         <div

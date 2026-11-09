@@ -7,7 +7,7 @@
    stays out of the first paint. */
 
 import { playSfx } from "../audio";
-import { pixelSpriteUrl, pixelSpriteRawUrl } from "../api";
+import { fetchSpecies, pixelSpriteUrl, pixelSpriteRawUrl } from "../api";
 import { fetchPmd, facingRow, installPmdTextures } from "./sprites";
 
 const W = 720;
@@ -46,6 +46,19 @@ const SPIN_CURVE = 0.035;
 const ROUNDS = 6;
 const BALLS = 3;
 
+/* A species' capture rate is the 0-255 number the games roll against, and
+   this is the figure a throw falls back to before the species has answered:
+   roughly the middle of the range. */
+const DEFAULT_CAPTURE_RATE = 120;
+/* Nothing weakens a creature before a throw here, so a plain field ball
+   carries a modest multiplier to keep six rounds winnable. Stubborn species
+   stay stubborn at this bonus; it only lifts the middle of the range. */
+const FIELD_BONUS = 2;
+const SHAKE_EXPONENT = 0.1875;
+/* How near the landing spot has to fall before the HUD quotes the odds of
+   the creature standing there. */
+const ODDS_RADIUS = 150;
+
 /* Where the three stand when the round opens: spread across the middle and
    the back of the field, never close enough to the hand to be caught by a
    throw that was not even aimed at them. */
@@ -61,6 +74,24 @@ const Z_MIN = 0.28;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
+
+/* The games' catch check, reduced to what this arena knows: a capture rate
+   and a ball. At full health the HP term collapses to rate / 3, each shake
+   passes with b = 65536 / (255 / a)^0.1875, and three passed shakes are a
+   catch — so this returns the real product of the three checks rather than
+   a single flat dice roll. */
+export function catchOdds(captureRate) {
+  const rate = clamp(Number(captureRate) || DEFAULT_CAPTURE_RATE, 1, 255);
+  const a = Math.max(1, (rate * FIELD_BONUS) / 3);
+  const shake = clamp(65536 / Math.pow(255 / a, SHAKE_EXPONENT) / 65536, 0, 1);
+  const chance = shake ** 3;
+  return {
+    rate,
+    shake,
+    chance,
+    percent: Math.max(1, Math.round(chance * 100)),
+  };
+}
 
 /* One second of PMD animation is 60 ticks; a creature crossing a room should
    not shuffle through its walk cycle that fast. */
@@ -179,6 +210,12 @@ export class CatchArena {
       team: this.team.slice(),
       phase: this.phase,
       message: this.message,
+      /* quoted only while aiming, and only when the landing spot is actually
+         near a creature */
+      odds:
+        this.phase === "aim" && this.markerTarget
+          ? this.markerTarget.odds.percent
+          : null,
       mons: this.roundMons.map((mon) => ({ id: mon.id, name: mon.name })),
     });
   }
@@ -488,11 +525,45 @@ export class CatchArena {
         shadow,
         loaded: false,
         caught: false,
+        odds: catchOdds(DEFAULT_CAPTURE_RATE),
       });
     });
 
     this.parkBall();
     this.fillMons();
+    this.loadRates();
+  }
+
+  /* Species capture rates, the 0-255 figure the games roll against. api.js
+     caches each response, so a creature met in an earlier round costs
+     nothing, and a failed request simply leaves the default in place. */
+  loadRates() {
+    const roundId = this.roundId;
+    this.mons.forEach(async (entry) => {
+      try {
+        const species = await fetchSpecies(entry.id);
+        if (!this.alive(roundId)) return;
+        entry.odds = catchOdds(species?.capture_rate);
+      } catch {
+        /* offline, or a species that has no record yet: keep the default */
+      }
+    });
+  }
+
+  /* The creature the landing spot is nearest, if one is close enough for the
+     quote to mean anything. */
+  nearestMon(x, z) {
+    let best = null;
+    let bestDistance = ODDS_RADIUS;
+    for (const mon of this.mons) {
+      if (!mon.loaded || mon.caught) continue;
+      const distance = Math.hypot(x - mon.x, (z - mon.z) * Z_SPAN);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = mon;
+      }
+    }
+    return best;
   }
 
   async fillMons() {
@@ -772,6 +843,13 @@ export class CatchArena {
       z: clamp((ground - y) / Z_SPAN, 0.08, 0.94),
     };
     this.aim.target = target;
+    /* Quote the odds of whatever the spot is nearest, so a species' rate is
+       visible before the throw rather than only after it gets away. */
+    const near = this.nearestMon(target.x, target.z);
+    if (near !== this.markerTarget) {
+      this.markerTarget = near;
+      if (this.phase === "aim") this.emit();
+    }
     const point = this.project(target.x, target.z, 0);
     this.marker?.setPosition(point.x, point.y).setScale(point.s).setVisible(true);
     /* the ball tips toward the spot it is about to be thrown at */
@@ -1148,15 +1226,28 @@ export class CatchArena {
     await wait(420);
     if (!this.alive(roundId)) return;
 
+    const odds = target.odds || catchOdds(DEFAULT_CAPTURE_RATE);
     for (let shake = 0; shake < 3; shake += 1) {
       playSfx(["shake", "shake2", "shake3"][shake]);
       await this.tweenBallAngle(scene, -16, 16, 110, true, 1);
       await wait(170);
       if (!this.alive(roundId)) return;
+      /* One check per shake, as the games run it: the shell can open after
+         the first wobble, the second or the third. */
+      if (Math.random() > odds.shake) {
+        await this.breakFree(target);
+        return;
+      }
     }
 
-    this.emit({ phase: "caught", message: `Gotcha! ${target.name} joined the team.` });
-    this.team = [...this.team, { id: target.id, name: target.name }];
+    this.emit({
+      phase: "caught",
+      message: `Gotcha! ${target.label || target.name} joined the team.`,
+    });
+    this.team = [
+      ...this.team,
+      { id: target.id, name: target.label || target.name },
+    ];
     playSfx("caught");
 
     const burst = scene.add.particles(0, 0, "spark", {
@@ -1188,6 +1279,112 @@ export class CatchArena {
     this.ballShadow?.setVisible(false);
     this.emit({ team: this.team.slice() });
     this.finishRound();
+  }
+
+  /* The ball lost a shake check. Red flash over the field, the shell pops,
+     and the creature comes back out and bolts — it keeps the rate it had, so
+     a stubborn one can be tried again but will likely shrug the next ball
+     off as well. */
+  async breakFree(target) {
+    const scene = this.scene;
+    if (!scene) return;
+    const roundId = this.roundId;
+    const at = this.project(
+      this.ballState.x,
+      this.ballState.z,
+      this.ballState.h,
+    );
+
+    const name = target.label || target.name;
+    const percent = target.odds.percent;
+    this.emit({ phase: "broke", message: `${name} broke free — ${percent}% catch.` });
+    playSfx("breakout");
+    /* The red flash is the whole tell. It is a wash over the field rather
+       than a camera flash: the camera's own flash sits at full opacity and
+       would hide the creature coming back out of the shell underneath it. */
+    const wash = scene.add
+      .rectangle(W / 2, H / 2, W, H, 0xff2f24, 0.34)
+      .setDepth(980);
+    scene.tweens.add({
+      targets: wash,
+      alpha: 0,
+      duration: 320,
+      ease: "Quad.out",
+      onComplete: () => wash.destroy(),
+    });
+    scene.cameras.main.shake(160, 0.005);
+
+    const bloom = scene.add.circle(at.x, at.y, 22, 0xff2f24, 0.95).setDepth(970);
+    scene.tweens.add({
+      targets: bloom,
+      scale: 3.2,
+      alpha: 0,
+      duration: 380,
+      ease: "Quad.out",
+      onComplete: () => bloom.destroy(),
+    });
+    for (let i = 0; i < 10; i += 1) {
+      const angle = (Math.PI * 2 * i) / 10 + Math.random() * 0.4;
+      const spark = scene.add
+        .circle(at.x, at.y, 2.6, 0xff6a4d, 0.9)
+        .setDepth(965);
+      scene.tweens.add({
+        targets: spark,
+        x: at.x + Math.cos(angle) * (26 + Math.random() * 34),
+        y: at.y + Math.sin(angle) * (16 + Math.random() * 22),
+        alpha: 0,
+        scale: 0.2,
+        duration: 360 + Math.random() * 200,
+        ease: "Quad.out",
+        onComplete: () => spark.destroy(),
+      });
+    }
+    scene.tweens.add({
+      targets: this.ball,
+      scale: this.ball.scale * 1.28,
+      duration: 90,
+      yoyo: true,
+      repeat: 1,
+      ease: "Quad.out",
+    });
+
+    /* back onto the field, flashing red out of the shell, then running */
+    target.caught = false;
+    target.sprite?.setAlpha(1).clearTint().setTint(0xff5a44);
+    target.shadow?.setAlpha(0.45);
+    scene.time.delayedCall(240, () => target.sprite?.clearTint());
+    this.flee(target);
+
+    await wait(520);
+    if (!this.alive(roundId)) return;
+
+    this.parkBall();
+    if (this.balls > 0) {
+      this.emit({
+        phase: "ready",
+        message: `${name} broke free (${percent}% catch) — ${
+          this.balls === 1 ? "1 ball" : `${this.balls} balls`
+        } left.`,
+      });
+    } else {
+      this.ball?.setVisible(false);
+      this.ballShadow?.setVisible(false);
+      this.emit({ message: `${name} broke free — out of balls.` });
+      this.finishRound();
+    }
+  }
+
+  /* Straight away from the ball, at a run: a creature that just escaped
+     should not stand on the spot and invite the next throw. */
+  flee(entry) {
+    const away = entry.x <= this.ballState.x ? -1 : 1;
+    entry.target = {
+      x: clamp(entry.x + away * (120 + Math.random() * 70), 44, W - 44),
+      z: clamp(entry.z + (Math.random() - 0.5) * 0.34, Z_MIN, 0.94),
+    };
+    entry.state = "run";
+    entry.speed = 150;
+    this.setAnim(entry, entry.parts?.run ? "run" : "walk");
   }
 
   tweenBallAngle(scene, from, to, duration, yoyo, repeat) {

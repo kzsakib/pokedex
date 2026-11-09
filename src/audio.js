@@ -190,6 +190,12 @@ const VOICES = {
     blip({ from: 1046, to: 1046, type: "square", length: 0.26, level: 0.05, delay: 0.3 });
     blip({ from: 1568, to: 1568, type: "sine", length: 0.26, level: 0.025, delay: 0.3 });
   },
+  /* It got out: a low denial under the pop of the shell. */
+  breakout: () => {
+    thud({ length: 0.12, level: 0.085, from: 1400, to: 150 });
+    blip({ from: 300, to: 150, type: "square", length: 0.13, level: 0.05 });
+    blip({ from: 220, to: 110, type: "triangle", length: 0.16, level: 0.04, delay: 0.12 });
+  },
   /* Nothing reached. */
   miss: () => {
     blip({ from: 330, to: 240, type: "triangle", length: 0.1, level: 0.04 });
