@@ -23,7 +23,7 @@ function useCountUp(value, duration = 1.15) {
   return shown;
 }
 
-export default function ScoreRing({ score, size = 86 }) {
+export default function ScoreRing({ score, size = 94 }) {
   const radius = (size - 10) / 2;
   const circumference = 2 * Math.PI * radius;
   const shown = useCountUp(score);
