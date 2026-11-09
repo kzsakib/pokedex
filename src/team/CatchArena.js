@@ -232,6 +232,16 @@ function ballCells(ink) {
   return cells;
 }
 
+/* "Great Ball ×2, Master Ball ×1." — the rack in words, so the deal can be
+   read at a glance without decoding three sprites. */
+function rackLabel(rack) {
+  const counts = new Map();
+  rack.forEach((type) => counts.set(type, (counts.get(type) || 0) + 1));
+  return `${[...counts]
+    .map(([type, count]) => `${type.name} ×${count}`)
+    .join(", ")} this round.`;
+}
+
 /* A rack for the round, weighted by each ball's chance. */
 function pickBall() {
   let roll = Math.random();
@@ -272,8 +282,9 @@ export class CatchArena {
     this.onEvent = onEvent || (() => {});
 
     this.round = 1;
+    this.rack = [BALL_TYPES[0]];
     this.balls = BALLS_PER_ROUND;
-    this.ballStock = BALL_TYPES[0];
+    this.ballInPlay = null;
     this.team = [];
     this.phase = "loading";
     this.roundMons = [];
@@ -304,6 +315,17 @@ export class CatchArena {
     };
   }
 
+  /* The ball in the hand: the next one out of the rack. */
+  get currentBall() {
+    return this.rack[0] || BALL_TYPES[0];
+  }
+
+  /* Odds depend on the ball, and the ball changes throw by throw, so they are
+     worked out when asked rather than stored on the creature. */
+  oddsFor(entry, ball = this.currentBall) {
+    return catchOdds(entry?.captureRate, ball?.multiplier ?? 1);
+  }
+
   emit(patch = {}) {
     Object.assign(this, patch);
     /* A parked arena stays parked between throws, but never mid-capture. */
@@ -319,14 +341,21 @@ export class CatchArena {
          near a creature */
       odds:
         this.phase === "aim" && this.markerTarget
-          ? this.markerTarget.odds.percent
+          ? this.oddsFor(this.markerTarget).percent
           : null,
       ball: {
-        id: this.ballStock.id,
-        name: this.ballStock.name,
-        multiplier: this.ballStock.multiplier,
-        icon: ballDataUrl(this.ballStock.id),
+        id: this.currentBall.id,
+        name: this.currentBall.name,
+        multiplier: this.currentBall.multiplier,
+        icon: ballDataUrl(this.currentBall.id),
       },
+      /* what is left in the rack, so the HUD can show the mix */
+      rack: this.rack.map((type) => ({
+        id: type.id,
+        name: type.name,
+        multiplier: type.multiplier,
+        icon: ballDataUrl(type.id),
+      })),
       mons: this.roundMons.map((mon) => ({ id: mon.id, name: mon.name })),
     });
   }
@@ -422,12 +451,14 @@ export class CatchArena {
        round is being played instead of during it. */
     this.nextMons = this.pickRound(this.roundMons.map((mon) => mon.id));
 
-    /* One rack per round: the better the ball, the rarer it is to be handed. */
-    this.ballStock = pickBall();
-    this.balls = BALLS_PER_ROUND;
+    /* Every ball is drawn on its own, so a round can hold a mixed rack and a
+       Master Ball is one guaranteed throw rather than the whole round. */
+    this.rack = Array.from({ length: BALLS_PER_ROUND }, () => pickBall());
+    this.balls = this.rack.length;
+    this.ballInPlay = null;
     this.phase = "ready";
-    this.message = `${this.ballStock.name} ×${BALLS_PER_ROUND} this round.`;
-    if (this.ball) this.ball.setTexture(`ball-${this.ballStock.id}`);
+    this.message = rackLabel(this.rack);
+    if (this.ball) this.ball.setTexture(`ball-${this.currentBall.id}`);
     if (!silent) this.emit();
     this.loadRound(this.roundMons);
     this.warm(this.nextMons);
@@ -546,7 +577,7 @@ export class CatchArena {
     this.ball = scene.add.image(
       BALL_HOME.x,
       NEAR_Y - BALL_R,
-      `ball-${this.ballStock.id}`,
+      `ball-${this.currentBall.id}`,
     );
     this.ball.setDepth(600).setScale(this.ballScale);
     /* its shadow on the ground is what tells the eye how high the ball is */
@@ -600,6 +631,9 @@ export class CatchArena {
       .setDepth(600 - state.z * 400);
     this.ballShadow?.setVisible(true);
     this.marker?.setVisible(false);
+    /* the hand now holds whatever was next in the rack */
+    this.ball.setTexture(`ball-${this.currentBall.id}`);
+    this.ballInPlay = null;
     this.drawBall();
   }
 
@@ -647,7 +681,7 @@ export class CatchArena {
         shadow,
         loaded: false,
         caught: false,
-        odds: catchOdds(DEFAULT_CAPTURE_RATE, this.ballStock.multiplier),
+        captureRate: DEFAULT_CAPTURE_RATE,
       });
     });
 
@@ -665,7 +699,8 @@ export class CatchArena {
       try {
         const species = await fetchSpecies(entry.id);
         if (!this.alive(roundId)) return;
-        entry.odds = catchOdds(species?.capture_rate, this.ballStock.multiplier);
+        entry.captureRate =
+          Number(species?.capture_rate) || DEFAULT_CAPTURE_RATE;
       } catch {
         /* offline, or a species that has no record yet: keep the default */
       }
@@ -1072,7 +1107,12 @@ export class CatchArena {
     state.still = 0;
     this.throwStart = performance.now();
 
-    this.balls = Math.max(0, this.balls - 1);
+    /* The ball leaves the rack the moment it is thrown; the shell in flight
+       keeps the texture it was thrown with, and the next one is set when the
+       hand is refilled. */
+    this.ballInPlay = this.currentBall;
+    this.rack.shift();
+    this.balls = this.rack.length;
     this.emit({ phase: "flying", balls: this.balls, message: "" });
     playSfx("throw");
   }
@@ -1348,8 +1388,7 @@ export class CatchArena {
     await wait(420);
     if (!this.alive(roundId)) return;
 
-    const odds =
-      target.odds || catchOdds(DEFAULT_CAPTURE_RATE, this.ballStock.multiplier);
+    const odds = this.oddsFor(target, this.ballInPlay || this.currentBall);
     for (let shake = 0; shake < 3; shake += 1) {
       playSfx(["shake", "shake2", "shake3"][shake]);
       await this.tweenBallAngle(scene, -16, 16, 110, true, 1);
@@ -1419,7 +1458,10 @@ export class CatchArena {
     );
 
     const name = target.label || target.name;
-    const percent = target.odds.percent;
+    const percent = this.oddsFor(
+      target,
+      this.ballInPlay || this.currentBall,
+    ).percent;
     this.emit({ phase: "broke", message: `${name} broke free — ${percent}% catch.` });
     playSfx("breakout");
     /* The red flash is the whole tell. It is a wash over the field rather

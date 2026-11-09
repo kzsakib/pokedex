@@ -25,6 +25,7 @@ const EMPTY = {
   message: "",
   odds: null,
   ball: null,
+  rack: [],
   mons: [],
 };
 
@@ -148,8 +149,8 @@ export default function TeamBuilder({ roster = [] }) {
           <h3 className="team-title">Catch 6 Pokémon</h3>
           <p className="team-sub">
             They wander, so lead your throw. The ball lands where the swipe
-            ends, and a curl bends it on the way. Every round hands you one
-            kind of ball, and the best ones are the rarest.
+            ends, and a curl bends it on the way. Every ball on the rack is
+            rolled on its own, and the best ones are the rarest.
           </p>
         </div>
         <p className="team-round">
@@ -161,24 +162,32 @@ export default function TeamBuilder({ roster = [] }) {
 
       <div className="team-stage">
         <div className="team-hud">
+          {/* The rack itself, one sprite per ball still in hand: a mixed
+              round reads at a glance. */}
           <span
             className="team-hud__balls"
-            title={state.ball ? `${state.ball.name} ×${state.ball.multiplier}` : undefined}
+            title={
+              state.rack?.length
+                ? state.rack.map((ball) => ball.name).join(", ")
+                : undefined
+            }
+            aria-label={`${state.balls} ${state.balls === 1 ? "ball" : "balls"} left`}
           >
-            {state.ball?.icon ? (
-              <img
-                className="team-ball team-ball--sprite"
-                src={state.ball.icon}
-                alt=""
-                width="18"
-                height="18"
-                decoding="async"
-              />
+            {state.rack?.length ? (
+              state.rack.map((ball, index) => (
+                <img
+                  key={`${ball.id}-${index}`}
+                  className="team-ball team-ball--sprite"
+                  src={ball.icon}
+                  alt=""
+                  width="16"
+                  height="16"
+                  decoding="async"
+                />
+              ))
             ) : (
               <BallIcon size={16} />
             )}
-            <span aria-hidden="true">×</span>
-            <b>{state.balls}</b>
           </span>
           <span className="team-hud__hint">
             {/* While a throw is being lined up the hint gives way to the odds
