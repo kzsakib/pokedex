@@ -1364,3 +1364,14 @@
     justify-content: center;
   }
 }
+
+/* The gauntlet entry reads as the gold action next to the ghost buttons. */
+.team-gauntlet {
+  border: 1px solid rgba(242, 201, 76, 0.7);
+  background: rgba(242, 201, 76, 0.1);
+  color: #f2c94c;
+}
+
+.team-gauntlet:not(:disabled):hover {
+  background: rgba(242, 201, 76, 0.18);
+}

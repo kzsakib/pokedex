@@ -6,6 +6,7 @@ import { playSfx } from "../audio";
 import TeamStrip from "./TeamStrip";
 import TeamGrid from "./TeamGrid";
 import TeamReport from "./TeamReport";
+import GymGauntlet from "../gauntlet/GymGauntlet";
 import CatchFlight from "./CatchFlight";
 import BallGlyph from "./BallGlyph";
 import { computeTeamReport } from "./teamReport";
@@ -99,6 +100,8 @@ export default function TeamBuilder({ roster = [] }) {
   const [landed, setLanded] = useState(null);
   const [revealed, setRevealed] = useState(false);
   const [revealKey, setRevealKey] = useState(0);
+  /* The gauntlet replaces the report in place; the section stays 04. */
+  const [gauntletOpen, setGauntletOpen] = useState(false);
   /* The reveal floats over the panel at the stage's box rather than inside
      it, so the clipped arena canvas can never spill behind the cards. */
   const [stageBox, setStageBox] = useState(null);
@@ -278,6 +281,7 @@ export default function TeamBuilder({ roster = [] }) {
       arenaRef.current?.resetGame();
       setRevealed(false);
       setFlights([]);
+      setGauntletOpen(false);
       return;
     }
     if (closed) arenaRef.current?.nextRound();
@@ -377,10 +381,17 @@ export default function TeamBuilder({ roster = [] }) {
           )}
 
           <AnimatePresence initial={false}>
-            {revealed && report.count > 0 && (
+            {revealed && report.count > 0 && !gauntletOpen && (
               <TeamReport key="team-report" report={report} />
             )}
           </AnimatePresence>
+
+          {gauntletOpen && complete && (
+            <GymGauntlet
+              team={enriched}
+              onBack={() => setGauntletOpen(false)}
+            />
+          )}
 
           {/* The strip and its actions sit under the report, so the cards
               and the results read top to bottom before the controls. */}
@@ -395,7 +406,7 @@ export default function TeamBuilder({ roster = [] }) {
             />
 
             <div className="team-actions">
-              {complete && (
+              {!gauntletOpen && complete && (
                 <button
                   type="button"
                   className="team-ghost"
@@ -404,15 +415,45 @@ export default function TeamBuilder({ roster = [] }) {
                   {revealed ? "Hide team" : "Show team"}
                 </button>
               )}
-              <button
-                type="button"
-                className="team-cta"
-                onClick={primary}
-                disabled={!closed}
-              >
-                {complete ? "Play again" : "Next round"}
-                <span aria-hidden="true">›</span>
-              </button>
+              {!gauntletOpen && (
+                <button
+                  type="button"
+                  className="team-cta team-gauntlet"
+                  onClick={() => {
+                    setRevealed(true);
+                    setGauntletOpen(true);
+                  }}
+                  disabled={report.count < 6}
+                  title={
+                    report.count < 6
+                      ? "Fill all six slots to start the gauntlet"
+                      : "Take the six through all eight gyms"
+                  }
+                >
+                  Start gym gauntlet
+                  <span aria-hidden="true">›</span>
+                </button>
+              )}
+              {!gauntletOpen && (
+                <button
+                  type="button"
+                  className="team-cta"
+                  onClick={primary}
+                  disabled={!closed}
+                >
+                  {complete ? "Play again" : "Next round"}
+                  <span aria-hidden="true">›</span>
+                </button>
+              )}
+              {gauntletOpen && (
+                <button
+                  type="button"
+                  className="team-ghost"
+                  onClick={() => setGauntletOpen(false)}
+                >
+                  ‹ Back to team
+                </button>
+              )}
             </div>
           </footer>
 

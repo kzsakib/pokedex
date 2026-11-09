@@ -342,6 +342,8 @@ export function runBattle(playerTeam, enemyTeam, options = {}) {
 
       const move = action.move;
       const effectiveness = typeMultiplier(move.type, defender.types);
+      const actorSlot = attackerSide.team.indexOf(attacker);
+      const targetSlot = defenderSide.team.indexOf(defender);
 
       if (rng() * 100 >= move.accuracy) {
         record({
@@ -349,7 +351,9 @@ export function runBattle(playerTeam, enemyTeam, options = {}) {
           turn,
           side: action.side,
           actor: attacker.name,
+          actorSlot,
           target: defender.name,
+          targetSlot,
           move: move.name,
           damage: 0,
           effectiveness,
@@ -376,7 +380,9 @@ export function runBattle(playerTeam, enemyTeam, options = {}) {
         turn,
         side: action.side,
         actor: attacker.name,
+        actorSlot,
         target: defender.name,
+        targetSlot,
         move: move.name,
         damage,
         effectiveness,
@@ -397,6 +403,7 @@ export function runBattle(playerTeam, enemyTeam, options = {}) {
         turn,
         side: defenderSide.side,
         actor: defender.name,
+        actorSlot: targetSlot,
         target: null,
         move: null,
         damage: 0,
@@ -419,6 +426,7 @@ export function runBattle(playerTeam, enemyTeam, options = {}) {
         turn,
         side: defenderSide.side,
         actor: activeOf(defenderSide).name,
+        actorSlot: defenderSide.active,
         target: null,
         move: null,
         damage: 0,
