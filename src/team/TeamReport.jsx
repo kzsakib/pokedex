@@ -146,14 +146,14 @@ export default function TeamReport({ report }) {
       />
 
       <motion.article
-        className="report-panel report-panel--wide report-panel--matrix"
-        initial={{ opacity: 0, scaleY: 0.72 }}
+        className="report-panel report-panel--wide"
+        initial={{ opacity: 0, y: 18, scale: 0.985 }}
         animate={
           stage >= 4
-            ? { opacity: 1, scaleY: 1 }
-            : { opacity: 0, scaleY: 0.72 }
+            ? { opacity: 1, y: 0, scale: 1 }
+            : { opacity: 0, y: 18, scale: 0.985 }
         }
-        transition={{ type: "spring", stiffness: 220, damping: 26 }}
+        transition={spring}
       >
         <h5 className="report-label">Type spread</h5>
         <TypeSpread spread={spread} slots={slots} active={stage >= 4} />

@@ -1,66 +1,60 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { motion } from "motion/react";
 import { softAccent, typeAccent } from "../typeColors";
 
-/* The spread as a DMG-style matrix: one block per type slot, so a ×3 type is
-   literally three blocks wide. Blocks pop in one after another while the
-   report walks through its panels. */
+/* The spread as one continuous bar: every type takes a slice proportional to
+   how many of the team's type slots it fills, so a ×3 type is visibly three
+   times as wide as a ×1. Slices spring open in order while the report walks
+   through its panels, and hovering either a slice or its legend row pulls it
+   forward while the rest dim. */
 export default function TypeSpread({ spread, slots, active = true }) {
   const [hot, setHot] = useState(null);
 
-  const cells = useMemo(
-    () =>
-      spread.flatMap((slice) =>
-        Array.from({ length: slice.count }, (_, index) => ({
-          type: slice.type,
-          index,
-        })),
-      ),
-    [spread],
-  );
-
   return (
     <div className="spread" onPointerLeave={() => setHot(null)}>
-      <div className="spread__screen">
-        <div className="spread__hud">
-          <span>TYPE MATRIX</span>
-          <span>{slots} SLOTS</span>
-        </div>
+      <div
+        className="spread__bar"
+        role="img"
+        aria-label={`Type spread: ${spread
+          .map((slice) => `${slice.type} ${slice.count}`)
+          .join(", ")}`}
+      >
+        {spread.map((slice, index) => {
+          const dimmed = hot !== null && hot !== slice.type;
 
-        <div
-          className="spread__bar"
-          role="img"
-          aria-label={`Type spread: ${spread
-            .map((slice) => `${slice.type} ${slice.count}`)
-            .join(", ")}`}
-        >
-          {cells.map((cell, index) => (
+          return (
             <motion.span
-              key={`${cell.type}-${cell.index}`}
-              className="spread__cell"
+              key={slice.type}
+              className="spread__seg"
               style={{
-                "--cell": typeAccent(cell.type),
-                "--cell-soft": softAccent(cell.type),
+                "--seg": typeAccent(slice.type),
+                "--seg-soft": softAccent(slice.type),
+                flexGrow: slice.count,
               }}
-              initial={{ opacity: 0, scale: 0.3 }}
+              initial={{ scaleX: 0, opacity: 0 }}
               animate={
                 active
                   ? {
-                      opacity: hot && hot !== cell.type ? 0.3 : 1,
-                      scale: 1,
-                      y: hot === cell.type ? -3 : 0,
+                      scaleX: 1,
+                      opacity: dimmed ? 0.32 : 1,
+                      y: hot === slice.type ? -2 : 0,
                     }
-                  : { opacity: 0, scale: 0.3, y: 0 }
+                  : { scaleX: 0, opacity: 0 }
               }
               transition={{
-                opacity: { duration: 0.14 },
-                default: { type: "spring", stiffness: 420, damping: 24, delay: 0.1 + index * 0.045 },
+                opacity: { duration: 0.16 },
+                default: {
+                  type: "spring",
+                  stiffness: 280,
+                  damping: 28,
+                  delay: active ? 0.06 + index * 0.07 : 0,
+                },
               }}
-              onPointerEnter={() => setHot(cell.type)}
+              onPointerEnter={() => setHot(slice.type)}
               aria-hidden="true"
             />
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       <ul className="spread__legend">
