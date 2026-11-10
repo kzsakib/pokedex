@@ -444,10 +444,11 @@ export function runBattle(playerTeam, enemyTeam, options = {}) {
   }
 
   const perPokemon = [
-    ...player.team.map((mon) => ({ side: "player", ...mon })),
-    ...enemy.team.map((mon) => ({ side: "enemy", ...mon })),
+    ...player.team.map((mon, slot) => ({ side: "player", slot, ...mon })),
+    ...enemy.team.map((mon, slot) => ({ side: "enemy", slot, ...mon })),
   ].map((mon) => ({
     side: mon.side,
+    slot: mon.slot,
     id: mon.id,
     name: mon.name,
     level: mon.level,

@@ -33,7 +33,7 @@
 
 .gg-title {
   margin: 0;
-  font-size: 24px;
+  font-size: 29px;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--gg-ink);
@@ -47,7 +47,7 @@
 .gg-label {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--gg-gold);
@@ -56,7 +56,7 @@
 .gg-sub {
   margin: 6px 0 0;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.6;
   color: #b3c0c6;
 }
@@ -64,7 +64,7 @@
 .gg-fine {
   margin: 8px 0 0;
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: 10px;
   line-height: 1.6;
   color: var(--gg-muted);
 }
@@ -74,7 +74,7 @@
 .gg-cta,
 .gg-ghost {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11.5px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   border-radius: 6px;
@@ -160,7 +160,7 @@
 
 .gg-node__name {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--gg-muted);
@@ -168,7 +168,7 @@
 
 .gg-node__type {
   font-family: var(--font-mono);
-  font-size: 7.5px;
+  font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--chip);
@@ -200,20 +200,38 @@
 
 /* badge sprites */
 
-.gg-badge-sprite {
+.gg-badge {
+  position: relative;
   display: block;
+  flex: 0 0 auto;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.gg-badge__art {
+  position: absolute;
+  inset: 0;
   background-repeat: no-repeat;
   image-rendering: pixelated;
   mix-blend-mode: multiply;
-  transition: filter 200ms ease;
 }
 
-.gg-badge-sprite.is-locked {
-  filter: grayscale(1) brightness(0.5);
-  opacity: 0.42;
+/* Type wash: the sheet art is monochrome, so a colour layer turns each badge
+   into its gym's colour while keeping the pixel detail. */
+.gg-badge__tint {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: color;
+  opacity: 0.62;
+  pointer-events: none;
 }
 
-.gg-badge-sprite.is-earned {
+.gg-badge.is-locked .gg-badge__art {
+  filter: grayscale(1) brightness(0.55);
+  opacity: 0.38;
+}
+
+.gg-badge.is-earned {
   animation: gg-stamp 420ms cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 
@@ -225,7 +243,7 @@
 
 .gg-badge-name {
   font-family: var(--font-mono);
-  font-size: 7px;
+  font-size: 9px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #1d2427;
@@ -255,13 +273,13 @@
 
 .gg-card__title {
   margin: 6px 0 0;
-  font-size: 18px;
+  font-size: 21px;
   font-weight: 700;
   color: var(--gg-ink);
 }
 
 .gg-card__title span {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--gg-muted);
 }
@@ -317,7 +335,7 @@
 }
 
 .gg-mon__name {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--gg-ink);
 }
@@ -328,29 +346,34 @@
   align-items: center;
   gap: 4px;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.04em;
   color: var(--gg-muted);
 }
 
+.gg-mon__level,
+.gg-mon__dot {
+  white-space: nowrap;
+}
+
 .gg-chip {
-  padding: 1px 5px;
+  padding: 2px 6px;
   border: 1px solid color-mix(in srgb, var(--chip) 55%, transparent);
   border-radius: 3px;
   font-family: var(--font-mono);
-  font-size: 7.5px;
+  font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--chip);
 }
 
 .gg-lead {
-  padding: 5px 8px;
+  padding: 6px 9px;
   border: 1px solid var(--gg-line);
   border-radius: 4px;
   background: transparent;
   font-family: var(--font-mono);
-  font-size: 7.5px;
+  font-size: 9px;
   letter-spacing: 0.1em;
   color: var(--gg-muted);
   cursor: pointer;
@@ -379,7 +402,7 @@
 
 .gg-scout__value {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--gg-gold);
@@ -416,7 +439,7 @@
   border: 1px solid var(--gg-line);
   border-radius: 3px;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9.5px;
   letter-spacing: 0.05em;
   color: #9aa8af;
 }
@@ -481,7 +504,7 @@
 .gg-loader__who {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 0.14em;
   color: var(--gg-ink);
 }
@@ -507,7 +530,7 @@
 .gg-loader__line {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10.5px;
   letter-spacing: 0.12em;
   color: var(--gg-gold);
 }
@@ -573,34 +596,14 @@
   align-items: flex-start;
 }
 
+/* One sprite set for the whole mode: the same Gen 1 front sprites the roster
+   uses, so the field matches the cards instead of mixing back sprites. */
 .gg-sprite {
   image-rendering: pixelated;
-  width: 96px;
-  height: 96px;
+  width: 132px;
+  height: 132px;
   object-fit: contain;
-}
-
-/* Some cleaned Red/Blue sheets still carry their white plate, so the front
-   sprite sits on a light inset tile: the plate reads as the frame instead of
-   a bright square on the field. */
-.gg-sprite.is-front {
-  padding: 4px;
-  border-radius: 3px;
-  background: #d5d8d9;
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.2),
-    0 6px 14px rgba(0, 0, 0, 0.5);
-}
-
-.gg-sprite.is-back {
-  transform: scale(1.15);
-  transform-origin: bottom left;
-  padding: 4px;
-  border-radius: 3px;
-  background: #d5d8d9;
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.2),
-    0 6px 14px rgba(0, 0, 0, 0.5);
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.55));
 }
 
 .gg-hp {
@@ -617,7 +620,7 @@
   align-items: baseline;
   gap: 8px;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--gg-ink);
@@ -649,7 +652,7 @@
   display: block;
   margin-top: 4px;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9.5px;
   color: var(--gg-muted);
 }
 
@@ -665,7 +668,7 @@
   justify-content: space-between;
   margin: 0 0 6px;
   font-family: var(--font-mono);
-  font-size: 7.5px;
+  font-size: 9px;
   letter-spacing: 0.18em;
   color: var(--gg-gold);
 }
@@ -681,7 +684,7 @@
 
 .gg-log li {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 11.5px;
   line-height: 1.5;
   color: #9aa8af;
 }
@@ -708,12 +711,12 @@
 }
 
 .gg-speed__btn {
-  padding: 5px 10px;
+  padding: 6px 11px;
   border: 1px solid var(--gg-line);
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.03);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.1em;
   color: #b3c0c6;
   cursor: pointer;
@@ -753,7 +756,7 @@
 .gg-banner__kick {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 0.24em;
   color: var(--gg-gold);
 }
@@ -764,14 +767,14 @@
 
 .gg-banner__title {
   margin: 6px 0 4px;
-  font-size: 26px;
+  font-size: 30px;
   color: var(--gg-ink);
 }
 
 .gg-banner__meta {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.06em;
   color: var(--gg-muted);
 }
@@ -792,7 +795,7 @@
 .gg-stat b {
   display: block;
   margin-top: 5px;
-  font-size: 15px;
+  font-size: 19px;
   color: var(--gg-ink);
 }
 
@@ -800,7 +803,7 @@
   display: block;
   margin-top: 2px;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 10px;
   color: var(--gg-muted);
 }
 
@@ -815,9 +818,9 @@
 
 .gg-explain li {
   position: relative;
-  padding-left: 12px;
+  padding-left: 13px;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.6;
   color: #b3c0c6;
 }
@@ -840,14 +843,23 @@
 
 .gg-breakdown li {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) auto minmax(0, 1.2fr);
+  grid-template-columns: 36px minmax(0, 1.1fr) auto minmax(0, 1.1fr);
   gap: 8px;
-  align-items: baseline;
-  padding: 4px 0;
+  align-items: center;
+  padding: 5px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 10px;
   color: #b3c0c6;
+}
+
+.gg-breakdown__sprite {
+  image-rendering: pixelated;
+}
+
+.gg-breakdown li.is-ko .gg-breakdown__sprite {
+  filter: grayscale(1) brightness(0.62);
+  opacity: 0.5;
 }
 
 .gg-breakdown__hp,
@@ -868,16 +880,19 @@
 .gg-breakdown__by {
   text-align: right;
   color: var(--gg-muted);
+  overflow-wrap: anywhere;
 }
 
 .gg-growthcard__row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   margin-top: 10px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(242, 201, 76, 0.18);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--gg-ink);
 }
 
@@ -960,7 +975,7 @@
 
 .gg-complete__title {
   margin: 6px 0 0;
-  font-size: 28px;
+  font-size: 32px;
   color: var(--gg-ink);
 }
 
@@ -988,14 +1003,311 @@
   }
 }
 
+/* results: both rosters as sprites, colour = standing, grey = knocked out */
+
+.gg-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gg-strip li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border: 1px solid var(--gg-line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  text-align: center;
+}
+
+.gg-strip__sprite {
+  display: grid;
+  place-items: center;
+  min-height: 54px;
+}
+
+.gg-strip__sprite img {
+  image-rendering: pixelated;
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+}
+
+.gg-strip__name {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gg-ink);
+}
+
+.gg-strip__hp {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--gg-muted);
+}
+
+.gg-strip li.is-ko {
+  border-color: rgba(196, 84, 60, 0.28);
+}
+
+.gg-strip li.is-ko .gg-strip__sprite img {
+  filter: grayscale(1) brightness(0.62);
+  opacity: 0.55;
+}
+
+.gg-strip li.is-ko .gg-strip__name {
+  color: var(--gg-muted);
+}
+
+.gg-strip li.is-ko .gg-strip__hp {
+  color: #d4553c;
+  letter-spacing: 0.14em;
+}
+
+/* growth: an evolution is the loudest thing on the results screen */
+
+.gg-growthcard {
+  border-color: rgba(242, 201, 76, 0.42);
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(242, 201, 76, 0.16), transparent 60%),
+    var(--gg-panel);
+  box-shadow: 0 0 24px rgba(242, 201, 76, 0.06);
+}
+
+.gg-growthcard__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gg-growthcard__pill {
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--gg-gold);
+  color: #17140a;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.gg-growthcard__side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gg-growthcard__side span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.gg-growthcard__side b {
+  font-size: 13px;
+}
+
+.gg-growthcard__side i {
+  font-style: normal;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gg-muted);
+}
+
+.gg-growthcard__side--after b {
+  color: var(--gg-gold);
+}
+
+.gg-growthcard__side--after img {
+  filter: drop-shadow(0 0 10px rgba(242, 201, 76, 0.4));
+}
+
+.gg-growthcard__arrow {
+  font-size: 16px;
+  color: var(--gg-gold);
+}
+
+.gg-growthcard__stats i.is-up {
+  color: #8fd07c;
+}
+
+/* completion: one row per gym */
+
+.gg-complete {
+  position: relative;
+  overflow: hidden;
+}
+
+.gg-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gg-summary li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1.5fr) repeat(3, minmax(0, 0.8fr)) minmax(0, 1.1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 1px solid var(--gg-line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.gg-summary li.is-locked {
+  opacity: 0.45;
+}
+
+.gg-summary__badge {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  background: #d5d8d9;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.22);
+}
+
+.gg-summary li.is-locked .gg-summary__badge {
+  background: #20292d;
+}
+
+.gg-summary__gym {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.gg-summary__gym b {
+  font-size: 14px;
+  color: var(--gg-ink);
+}
+
+.gg-summary__gym i {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--gg-muted);
+}
+
+.gg-summary__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.gg-summary__stat b {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--gg-ink);
+}
+
+.gg-summary__stat i {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gg-muted);
+}
+
+.gg-summary__mvp {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  text-align: right;
+  color: var(--gg-gold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* confetti */
+
+.gg-confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.gg-confetti i {
+  position: absolute;
+  top: -12vh;
+  display: block;
+  border-radius: 1px;
+  opacity: 0.9;
+  animation-name: gg-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes gg-fall {
+  from {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  to {
+    transform: translate3d(0, 125vh, 0) rotate(var(--spin, 360deg));
+  }
+}
+
+@media (max-width: 640px) {
+  .gg-sprite {
+    width: 100px;
+    height: 100px;
+  }
+
+  .gg-title {
+    font-size: 24px;
+  }
+
+  .gg-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .gg-summary li {
+    grid-template-columns: 38px minmax(0, 1fr) repeat(3, auto);
+  }
+
+  .gg-breakdown li {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+  }
+
+  .gg-breakdown__by {
+    grid-column: 2 / -1;
+    text-align: left;
+  }
+
+  .gg-summary__mvp {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gg-node.is-current,
   .gg-loader__ball,
-  .gg-badge-sprite.is-earned {
+  .gg-badge.is-earned {
     animation: none;
   }
 
   .gg-log li.is-typing::after {
     animation: none;
+  }
+
+  .gg-confetti {
+    display: none;
   }
 }

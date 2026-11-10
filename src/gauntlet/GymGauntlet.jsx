@@ -6,6 +6,7 @@ import { estimateWinChance } from "./estimate";
 import { multipliersForBadges, runBattle, typeMultiplier } from "./gen1Battle";
 import { playSfx } from "../audio";
 import { typeAccent } from "../typeColors";
+import { pixelSpriteUrl } from "../api";
 import BallGlyph from "../team/BallGlyph";
 import "./gauntlet.css";
 
@@ -51,7 +52,10 @@ const typeChip = (type) => (
   </span>
 );
 
-function BadgeSprite({ tile, scale = 3, earned = true, name, loaded = true }) {
+/* The official trainer-card sheet is a PNG of the eight badge tiles. Each
+   earned badge gets a colour wash in its gym's type colour, so the case reads
+   rock / water / electric at a glance instead of eight grey shapes. */
+function BadgeSprite({ tile, scale = 3, earned = true, name, loaded = true, tint }) {
   if (!loaded) {
     return (
       <span className={`gg-badge-name${earned ? " is-earned" : " is-locked"}`}>
@@ -59,19 +63,26 @@ function BadgeSprite({ tile, scale = 3, earned = true, name, loaded = true }) {
       </span>
     );
   }
+  const size = 16 * scale;
   return (
     <span
-      className={`gg-badge-sprite${earned ? " is-earned" : " is-locked"}`}
-      style={{
-        width: 16 * scale,
-        height: 16 * scale,
-        backgroundImage: `url(${BADGE_SHEET})`,
-        backgroundSize: `${16 * scale}px ${256 * scale}px`,
-        backgroundPosition: `0 ${-tile * 16 * scale}px`,
-      }}
+      className={`gg-badge${earned ? " is-earned" : " is-locked"}`}
+      style={{ width: size, height: size }}
       role="img"
       aria-label={`${name}${earned ? "" : " (locked)"}`}
-    />
+    >
+      <span
+        className="gg-badge__art"
+        style={{
+          backgroundImage: `url(${BADGE_SHEET})`,
+          backgroundSize: `${size}px ${256 * scale}px`,
+          backgroundPosition: `0 ${-tile * size}px`,
+        }}
+      />
+      {earned && tint ? (
+        <span className="gg-badge__tint" style={{ background: tint }} aria-hidden="true" />
+      ) : null}
+    </span>
   );
 }
 
@@ -160,6 +171,7 @@ function RouteTrack({ current, cleared, sheetLoaded }) {
                 earned={Boolean(clearedEntry)}
                 name={gym.badgeName}
                 loaded={sheetLoaded}
+                tint={typeAccent(gym.type)}
               />
             </span>
             <span className="gg-node__name">{gym.leader}</span>
@@ -236,7 +248,8 @@ function MonLine({ mon, onLead, isLead, opponent = false }) {
       <span className="gg-mon__copy">
         <span className="gg-mon__name">{mon.name}</span>
         <span className="gg-mon__meta">
-          Lv {mon.level} · {mon.types.map(typeChip)}
+          <span className="gg-mon__level">Lv {mon.level}</span>
+          {mon.types.map(typeChip)}
         </span>
       </span>
       {!opponent && (
@@ -432,7 +445,7 @@ function Arena({ prepared, playerTeam, result, cursor, speed, setSpeed, onSkip }
           />
           <motion.img
             key={`${enemyMon?.id}-${view.enemyIndex}`}
-            className="gg-sprite is-front"
+            className="gg-sprite is-enemy"
             src={enemyMon?.sprite}
             alt=""
             initial={{ opacity: 0, y: -8 }}
@@ -443,14 +456,11 @@ function Arena({ prepared, playerTeam, result, cursor, speed, setSpeed, onSkip }
         <div className="gg-arena__player">
           <motion.img
             key={`${playerMon?.id}-${view.playerIndex}`}
-            className="gg-sprite is-back"
-            src={playerMon?.back ?? playerMon?.sprite}
+            className="gg-sprite is-player"
+            src={playerMon?.sprite}
             alt=""
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            onError={(event) => {
-              if (playerMon?.sprite) event.currentTarget.src = playerMon.sprite;
-            }}
           />
           <Hp
             name={playerMon?.name}
@@ -498,49 +508,109 @@ function Arena({ prepared, playerTeam, result, cursor, speed, setSpeed, onSkip }
 
 /* ---------- results ---------- */
 
+/* Plain-language recap: who carried it, what actually worked, how it ended,
+   and the luck that moved it. No shorthand the reader has to decode. */
 function explain(prepared, playerTeam, result) {
+  const won = result.winner === "player";
+  const mine = result.summary.perPokemon.filter((mon) => mon.side === "player");
+  const theirs = result.summary.perPokemon.filter((mon) => mon.side === "enemy");
+  const kos = mine.reduce((sum, mon) => sum + mon.kos, 0);
+  const mvp = result.summary.mvp;
+  const standing = mine.filter((mon) => !mon.fainted);
   const lines = [];
-  const big = result.log.find(
-    (entry) => entry.kind === "move" && entry.side === "player" && entry.effectiveness > 1,
-  );
-  if (big) {
-    lines.push(`${big.actor}'s ${big.move} landed a ${big.effectiveness}× hit on ${big.target}.`);
+
+  if (mvp) {
+    lines.push(
+      `${mvp.name} did the most damage — ${mvp.damageDealt} across the fight, with ${mvp.kos} knockout${
+        mvp.kos === 1 ? "" : "s"
+      } to their name. Your team took ${kos} of their ${theirs.length} down.`,
+    );
+  } else {
+    lines.push(`No damage was dealt before the fight ended on turn ${result.turns}.`);
   }
 
-  const mine = playerTeam[0];
-  const theirs = prepared.enemy[0];
-  if (mine && theirs) {
-    const faster = mine.stats.speed >= theirs.stats.speed;
+  const supers = result.log.filter(
+    (entry) => entry.kind === "move" && entry.side === "player" && entry.effectiveness > 1,
+  );
+  if (supers.length) {
+    const counts = new Map();
+    supers.forEach((entry) => counts.set(entry.move, (counts.get(entry.move) ?? 0) + 1));
+    const [move, count] = [...counts].sort((a, b) => b[1] - a[1])[0];
     lines.push(
-      `${faster ? mine.name : theirs.name} moved first at the opening (${
-        (faster ? mine : theirs).stats.speed
-      } speed).`,
+      `${move} was your best answer, landing ${count} super-effective hit${count === 1 ? "" : "s"}.`,
+    );
+  } else {
+    lines.push("Nothing landed super effectively, so this was won on stats and speed alone.");
+  }
+
+  const finalKo = [...result.log]
+    .reverse()
+    .find((entry) => entry.kind === "move" && entry.side === "player" && entry.faint);
+  if (won && finalKo) {
+    lines.push(
+      `The winning knockout came on turn ${finalKo.turn}, when ${finalKo.actor} finished ${finalKo.target} with ${finalKo.move}.`,
     );
   }
 
-  const avg = (team) => Math.round(team.reduce((sum, mon) => sum + mon.level, 0) / team.length);
-  const gap = avg(prepared.enemy) - avg(playerTeam);
-  lines.push(
-    gap > 0
-      ? `Their team averaged ${gap} levels higher, so the stat gap was real.`
-      : gap < 0
-        ? `You averaged ${-gap} levels higher.`
-        : "Levels were even across both sides.",
-  );
-
-  if (result.summary.mvp) {
-    const mvp = result.summary.mvp;
-    lines.push(`${mvp.name} did the most work: ${mvp.damageDealt} damage and ${mvp.kos} KO${mvp.kos === 1 ? "" : "s"}.`);
+  if (won) {
+    lines.push(
+      standing.length === mine.length
+        ? `All ${mine.length} of yours were still standing — a clean sweep.`
+        : standing.length <= 2
+          ? `It went to the wire: only ${standing.length} of your ${mine.length} were left standing.`
+          : `You finished with ${standing.length} of ${mine.length} still on their feet.`,
+    );
+  } else {
+    const survivor = theirs
+      .filter((mon) => !mon.fainted)
+      .sort((a, b) => a.hpLeft - b.hpLeft)[0];
+    if (survivor) {
+      lines.push(
+        `${survivor.name} survived on ${survivor.hpLeft}/${survivor.maxHp} HP — a different lead or order can flip this fight.`,
+      );
+    }
   }
 
-  if (result.winner !== "player") {
-    const last = [...result.log].reverse().find((entry) => entry.kind === "move" && entry.faint);
-    if (last) lines.push(`The run ended when ${last.target} fell to ${last.actor}'s ${last.move}.`);
-    const slow = result.log.filter((entry) => entry.kind === "move" && entry.side === "player" && entry.miss).length;
-    if (slow) lines.push(`You missed ${slow} attack${slow === 1 ? "" : "s"} in the run.`);
-  }
+  const crits = result.log.filter(
+    (entry) => entry.crit && entry.kind === "move" && entry.side === "player",
+  ).length;
+  const misses = result.log.filter(
+    (entry) => entry.kind === "move" && entry.side === "player" && entry.miss,
+  ).length;
+  const luck = [];
+  if (crits) luck.push(`landed ${crits} critical hit${crits === 1 ? "" : "s"}`);
+  if (misses) luck.push(`missed ${misses} attack${misses === 1 ? "" : "s"}`);
+  if (luck.length) lines.push(`You ${luck.join(" and ")}.`);
 
   return lines;
+}
+
+/* Both rosters as sprite rows: colour means still standing, black and white
+   means knocked out. */
+function TeamStrip({ team, summary, side }) {
+  return (
+    <ul className="gg-strip">
+      {team.map((mon, index) => {
+        const record = summary.perPokemon.find(
+          (entry) => entry.side === side && entry.slot === index,
+        );
+        const down = record?.fainted;
+        return (
+          <li key={`${mon.id}-${index}`} className={down ? "is-ko" : "is-up"}>
+            <span className="gg-strip__sprite">
+              <img src={mon.sprite} alt="" width="52" height="52" loading="lazy" />
+            </span>
+            <span className="gg-strip__name">{mon.name}</span>
+            <span className="gg-strip__hp">
+              {down
+                ? "KO"
+                : `${record?.hpLeft ?? mon.stats.maxHp}/${record?.maxHp ?? mon.stats.maxHp}`}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 function Results({
@@ -561,7 +631,7 @@ function Results({
   const kos = gone.reduce((sum, mon) => sum + mon.kos, 0);
   const breakdown = prepared.enemy.map((mon, index) => {
     const record = result.summary.perPokemon.find(
-      (entry) => entry.side === "enemy" && entry.name === mon.name && entry.level === mon.level,
+      (entry) => entry.side === "enemy" && entry.slot === index,
     );
     return {
       mon,
@@ -619,6 +689,11 @@ function Results({
         </div>
       </div>
 
+      <article className="gg-card">
+        <p className="gg-label">Your team</p>
+        <TeamStrip team={prepared.player} summary={result.summary} side="player" />
+      </article>
+
       <div className="gg-grid">
         <article className="gg-card">
           <p className="gg-label">What happened</p>
@@ -633,7 +708,18 @@ function Results({
           <p className="gg-label">Their team</p>
           <ul className="gg-breakdown">
             {breakdown.map(({ mon, record, defeatedBy }, index) => (
-              <li key={`${mon.id}-${index}`}>
+              <li
+                key={`${mon.id}-${index}`}
+                className={record?.fainted ? "is-ko" : "is-up"}
+              >
+                <img
+                  className="gg-breakdown__sprite"
+                  src={mon.sprite}
+                  alt=""
+                  width="36"
+                  height="36"
+                  loading="lazy"
+                />
                 <span className="gg-breakdown__mon">
                   {mon.name} <i>Lv {mon.level}</i>
                 </span>
@@ -655,26 +741,40 @@ function Results({
 
       {prepared.growth.length > 0 && (
         <div className="gg-card gg-growthcard">
-          <p className="gg-label">Growth</p>
+          <div className="gg-growthcard__head">
+            <p className="gg-label">Growth</p>
+            <span className="gg-growthcard__pill">EVOLVED</span>
+          </div>
           {prepared.growth.map((entry) => (
             <div key={`${entry.from.id}-${entry.to.id}`} className="gg-growthcard__row">
-              <span className="gg-growthcard__side">
-                <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-i/red-blue/transparent/${entry.from.id}.png`} alt="" width="44" height="44" />
-                <b>{entry.from.name}</b>
+              <span className="gg-growthcard__side gg-growthcard__side--before">
+                <img src={pixelSpriteUrl(entry.from.id)} alt="" width="42" height="42" />
+                <span>
+                  <b>{entry.from.name}</b>
+                  <i>before</i>
+                </span>
               </span>
-              <span className="gg-growthcard__arrow" aria-hidden="true">→</span>
-              <span className="gg-growthcard__side">
-                <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-i/red-blue/transparent/${entry.to.id}.png`} alt="" width="44" height="44" />
-                <b>{entry.to.name}</b>
+              <span className="gg-growthcard__arrow" aria-hidden="true">
+                →
               </span>
-              <span className="gg-growthcard__level">Lv {entry.level}</span>
+              <span className="gg-growthcard__side gg-growthcard__side--after">
+                <img src={pixelSpriteUrl(entry.to.id)} alt="" width="58" height="58" />
+                <span>
+                  <b>{entry.to.name}</b>
+                  <i>now · Lv {entry.level}</i>
+                </span>
+              </span>
               <span className="gg-growthcard__stats">
-                {["maxHp", "attack", "defense", "special", "speed"].map((key) => (
-                  <i key={key}>
-                    {key === "maxHp" ? "HP" : key.slice(0, 3).toUpperCase()}{" "}
-                    {entry.before[key]} → {entry.after[key]}
-                  </i>
-                ))}
+                {["maxHp", "attack", "defense", "special", "speed"].map((key) => {
+                  const delta = entry.after[key] - entry.before[key];
+                  return (
+                    <i key={key} className={delta > 0 ? "is-up" : undefined}>
+                      {key === "maxHp" ? "HP" : key.slice(0, 3).toUpperCase()}{" "}
+                      {entry.before[key]} → {entry.after[key]}
+                      {delta > 0 ? ` (+${delta})` : ""}
+                    </i>
+                  );
+                })}
               </span>
             </div>
           ))}
@@ -730,6 +830,7 @@ function BadgeCase({ cleared, sheetLoaded }) {
                 earned={Boolean(entry)}
                 name={gym.badgeName}
                 loaded={sheetLoaded}
+                tint={typeAccent(gym.type)}
               />
             </li>
           );
@@ -739,19 +840,108 @@ function BadgeCase({ cleared, sheetLoaded }) {
   );
 }
 
-function Complete({ cleared, onRestart, onBack }) {
+const CONFETTI_COLORS = [
+  "#f2c94c",
+  "#f7d76f",
+  "#d4553c",
+  "#78c8e8",
+  "#a98be0",
+  "#7dc36a",
+  "#e79b4f",
+];
+
+function Confetti({ reduced }) {
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: 90 }, (_, index) => ({
+        left: (index * 37.3) % 100,
+        delay: ((index * 13) % 26) / 10,
+        duration: 2.6 + ((index * 7) % 22) / 10,
+        width: 5 + ((index * 3) % 6),
+        spin: ((index * 61) % 720) - 360,
+        color: CONFETTI_COLORS[index % CONFETTI_COLORS.length],
+      })),
+    [],
+  );
+
+  if (reduced) return null;
+
+  return (
+    <div className="gg-confetti" aria-hidden="true">
+      {pieces.map((piece, index) => (
+        <i
+          key={index}
+          style={{
+            left: `${piece.left}%`,
+            width: piece.width,
+            height: piece.width * 1.7,
+            background: piece.color,
+            animationDelay: `${piece.delay}s`,
+            animationDuration: `${piece.duration}s`,
+            "--spin": `${piece.spin}deg`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function Complete({ cleared, onRestart, onBack, sheetLoaded, reduced }) {
   const turns = cleared.reduce((sum, entry) => sum + entry.turns, 0);
+  const kos = cleared.reduce((sum, entry) => sum + (entry.kos ?? 0), 0);
+  const fastest = [...cleared].sort((a, b) => a.turns - b.turns)[0];
+
   return (
     <motion.div
       className="gg-complete"
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
     >
+      <Confetti reduced={reduced} />
       <p className="gg-label">Gauntlet complete</p>
       <h5 className="gg-complete__title">Eight badges, one run</h5>
       <p className="gg-sub">
-        {cleared.length} gyms cleared in {turns} turns.
+        {cleared.length} gyms · {turns} turns · {kos} knockouts
+        {fastest ? ` · fastest was ${fastest.leader} in ${fastest.turns}` : ""}.
       </p>
+
+      <ul className="gg-summary">
+        {GYMS.map((item) => {
+          const entry = cleared.find((row) => row.badge === item.badge);
+          return (
+            <li key={item.id} className={entry ? "is-cleared" : "is-locked"}>
+              <span className="gg-summary__badge">
+                <BadgeSprite
+                  tile={item.badgeTile}
+                  scale={2}
+                  earned={Boolean(entry)}
+                  name={item.badgeName}
+                  loaded={sheetLoaded}
+                  tint={typeAccent(item.type)}
+                />
+              </span>
+              <span className="gg-summary__gym">
+                <b>{item.leader}</b>
+                <i>{item.gym}</i>
+              </span>
+              <span className="gg-summary__stat">
+                <b>{entry?.turns ?? "—"}</b>
+                <i>turns</i>
+              </span>
+              <span className="gg-summary__stat">
+                <b>{entry?.kos ?? "—"}</b>
+                <i>KOs</i>
+              </span>
+              <span className="gg-summary__stat">
+                <b>{entry ? `${entry.standing}/${item.team.length}` : "—"}</b>
+                <i>standing</i>
+              </span>
+              <span className="gg-summary__mvp">{entry?.mvp ?? "—"}</span>
+            </li>
+          );
+        })}
+      </ul>
+
       <div className="gg-actions">
         <button type="button" className="gg-ghost" onClick={onBack}>
           ‹ Back to team
@@ -904,6 +1094,11 @@ export default function GymGauntlet({ team, onBack }) {
                 leader: gym.leader,
                 gym: gym.gym,
                 turns: result.turns,
+                kos: result.summary.perPokemon
+                  .filter((mon) => mon.side === "player")
+                  .reduce((sum, mon) => sum + mon.kos, 0),
+                standing: result.summary.playerLeft,
+                mvp: result.summary.mvp?.name ?? "—",
               },
             ],
       );
@@ -1040,7 +1235,14 @@ export default function GymGauntlet({ team, onBack }) {
         )}
 
         {stage === "complete" && (
-          <Complete key="complete" cleared={cleared} onRestart={restart} onBack={onBack} />
+          <Complete
+            key="complete"
+            cleared={cleared}
+            onRestart={restart}
+            onBack={onBack}
+            sheetLoaded={sheetLoaded}
+            reduced={reduced}
+          />
         )}
       </AnimatePresence>
 

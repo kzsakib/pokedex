@@ -26,9 +26,6 @@ const SPRITE_ROOT =
 export const BADGE_SHEET =
   "https://raw.githubusercontent.com/pret/pokered/master/gfx/trainer_card/badges.png";
 
-export const backSpriteUrl = (id) =>
-  `${SPRITE_ROOT}/versions/generation-i/red-blue/back/${id}.png`;
-
 /* Release order, oldest first. Used to rewind past_values to Gen 1. */
 const VERSION_GROUPS = [
   "red-blue",
@@ -196,7 +193,6 @@ export async function buildCombatant(id, level, { name, specialMove } = {}) {
     stats: statsFor({ base, level }),
     moves,
     sprite: pixelSpriteUrl(id),
-    back: backSpriteUrl(id),
   };
 }
 
