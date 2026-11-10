@@ -22,6 +22,36 @@
   gap: 12px;
 }
 
+.gg-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.gg-music-toggle.is-on {
+  border-color: rgba(242, 201, 76, 0.55);
+  color: var(--gg-gold);
+}
+
+/* The video is only ever used for its audio track. */
+.gg-music {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.gg-music iframe {
+  width: 1px;
+  height: 1px;
+  border: 0;
+}
+
 .gg-kicker {
   margin: 0 0 4px;
   font-family: var(--font-mono);
@@ -150,12 +180,8 @@
   width: 40px;
   height: 40px;
   border-radius: 4px;
-  background: #d5d8d9;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
-}
-
-.gg-node.is-upcoming .gg-node__badge {
-  background: #20292d;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px var(--gg-line);
 }
 
 .gg-node__name {
@@ -185,9 +211,6 @@
   color: var(--gg-ink);
 }
 
-.gg-node.is-cleared .gg-node__badge {
-  background: #d5d8d9;
-}
 
 .gg-node.is-upcoming {
   opacity: 0.45;
@@ -201,34 +224,22 @@
 /* badge sprites */
 
 .gg-badge {
-  position: relative;
   display: block;
   flex: 0 0 auto;
-  border-radius: 2px;
-  overflow: hidden;
+  line-height: 0;
 }
 
+/* The badge PNGs already carry their type colour and a transparent card. */
 .gg-badge__art {
-  position: absolute;
-  inset: 0;
-  background-repeat: no-repeat;
+  display: block;
+  width: 100%;
+  height: 100%;
   image-rendering: pixelated;
-  mix-blend-mode: multiply;
-}
-
-/* Type wash: the sheet art is monochrome, so a colour layer turns each badge
-   into its gym's colour while keeping the pixel detail. */
-.gg-badge__tint {
-  position: absolute;
-  inset: 0;
-  mix-blend-mode: color;
-  opacity: 0.62;
-  pointer-events: none;
 }
 
 .gg-badge.is-locked .gg-badge__art {
-  filter: grayscale(1) brightness(0.55);
-  opacity: 0.38;
+  filter: grayscale(1) brightness(0.75);
+  opacity: 0.45;
 }
 
 .gg-badge.is-earned {
@@ -400,31 +411,6 @@
   gap: 10px;
 }
 
-.gg-scout__value {
-  font-family: var(--font-mono);
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--gg-gold);
-}
-
-.gg-meter {
-  position: relative;
-  height: 8px;
-  margin-top: 8px;
-  border-radius: 4px;
-  background: #0a1013;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.7);
-  overflow: hidden;
-}
-
-.gg-meter__fill {
-  position: absolute;
-  inset: 0;
-  transform-origin: left center;
-  background: linear-gradient(90deg, var(--gg-gold-deep), var(--gg-gold));
-}
-
 .gg-chips--matchup {
   display: flex;
   flex-wrap: wrap;
@@ -565,9 +551,9 @@
 }
 
 .gg-arena__field {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   gap: 10px;
   padding: 12px;
   min-height: 250px;
@@ -579,21 +565,26 @@
     var(--gg-well);
 }
 
-
-.gg-arena__enemy,
-.gg-arena__player {
+/* One lane per side: the HP card and the sprite always sit together, so the
+   enemy card can never appear beside the player's Pokémon. */
+.gg-arena__lane {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 14px;
 }
 
-.gg-arena__enemy {
+.gg-arena__lane--enemy {
   align-items: flex-end;
 }
 
-.gg-arena__player {
+.gg-arena__lane--player {
   align-items: flex-start;
+}
+
+.gg-arena__lane .gg-hp {
+  flex: 1 1 auto;
+  max-width: 260px;
 }
 
 /* One sprite set for the whole mode: the same Gen 1 front sprites the roster
@@ -604,6 +595,16 @@
   height: 132px;
   object-fit: contain;
   filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.55));
+}
+
+.gg-sprite-missing {
+  display: block;
+  border-radius: 4px;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.05) 0 6px,
+    transparent 6px 12px
+  );
 }
 
 .gg-hp {
@@ -620,7 +621,7 @@
   align-items: baseline;
   gap: 8px;
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--gg-ink);
@@ -652,7 +653,7 @@
   display: block;
   margin-top: 4px;
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 11px;
   color: var(--gg-muted);
 }
 
@@ -944,7 +945,7 @@
 
 .gg-case__grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 8px;
   margin: 10px 0 0;
   padding: 0;
@@ -956,12 +957,13 @@
   place-items: center;
   padding: 8px;
   border-radius: 6px;
-  background: #d5d8d9;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.22);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px var(--gg-line);
 }
 
-.gg-case__grid li.is-locked {
-  background: #1b2428;
+.gg-case__grid li.is-earned {
+  background: rgba(242, 201, 76, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(242, 201, 76, 0.28);
 }
 
 .gg-complete {
@@ -984,17 +986,36 @@
 }
 
 @media (max-width: 640px) {
+  .gg-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .gg-head__actions {
+    justify-content: space-between;
+  }
+
+  .gg-title {
+    flex-wrap: wrap;
+  }
+
   .gg-route {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .gg-grid,
+  /* Below a phone's width the two briefing cards stack: side by side they
+     squeeze the roster into overlapping chips and lead buttons. */
+  .gg-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .gg-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .gg-case__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .gg-sprite {
@@ -1176,12 +1197,13 @@
   width: 40px;
   height: 40px;
   border-radius: 4px;
-  background: #d5d8d9;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.22);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px var(--gg-line);
 }
 
-.gg-summary li.is-locked .gg-summary__badge {
-  background: #20292d;
+.gg-summary li.is-cleared .gg-summary__badge {
+  background: rgba(242, 201, 76, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(242, 201, 76, 0.26);
 }
 
 .gg-summary__gym {

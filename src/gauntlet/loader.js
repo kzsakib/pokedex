@@ -209,7 +209,7 @@ function findChainNode(node, id) {
 }
 
 /* Gen 1 evolution gates: level-ups at their level, stones once three badges
-   are in hand, trades once five are. */
+   are in hand, trades once five are. Only the original 151 can be reached. */
 function evolutionAllowed(details, level, badges) {
   if (!details) return false;
   const trigger = details.trigger?.name;
@@ -234,6 +234,10 @@ export async function resolveEvolution(member, level, badges) {
     if (!next) break;
 
     const nextId = idFromUrl(next.species.url);
+    /* Stay inside the original 151: modern branches (Magmar to Magmortar,
+       Magneton to Magnezone) have no Red/Blue learnset and would land on the
+       team with no usable moves. */
+    if (nextId > 151) break;
     const [beforeMon, afterMon] = await Promise.all([
       fetchPokemon(speciesId),
       fetchPokemon(nextId),

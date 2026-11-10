@@ -113,9 +113,27 @@ export const BADGE_BOOSTS = {
 
 export const BADGE_BOOST_RATE = 0.125;
 
+/* Gym leaders do not hit quite as hard as a player at the same level: at full
+   parity a fair team kept losing the middle gyms outright. This trims their
+   damage (never their HP or speed), so the fight stays honest but winnable. */
+export const LEADER_HANDICAP = 0.88;
+
+/* The player's side leans into the fight a little: after a full heal and with
+   a first look at the leader's six, the same level should not be a handicap. */
+export const PLAYER_EDGE = 1.05;
+
+/* Gym leaders are not perfect players: this often they pick any damaging move
+   instead of the best one, which keeps a stacked psychic or electric party
+   from becoming a wall without touching levels or stats. */
+export const LEADER_SLACK = 0.2;
+
 /* DV 8 / statExp 0 is the neutral cartridge spread. */
 const DV = 8;
 const STAT_EXP = 0;
+
+/* Moves that cost the user its remaining HP. Without this, the AI happily
+   spams Self-Destruct for 130 power and never pays for it. */
+export const SELF_SACRIFICE = new Set(["self destruct", "self-destruct", "explosion"]);
 
 export const STRUGGLE = {
   name: "Struggle",
@@ -241,7 +259,7 @@ export function expectedDamage(attacker, defender, move) {
   return base * stab * effectiveness * (move.accuracy / 100) * (236 / 255);
 }
 
-export function chooseMove(attacker, defender) {
+export function chooseMove(attacker, defender, { rng, slack = 0 } = {}) {
   let best = null;
   let bestScore = -1;
 
@@ -253,11 +271,19 @@ export function chooseMove(attacker, defender) {
     }
   });
 
+  /* An imperfect trainer sometimes throws out a different damaging move. */
+  if (best && slack > 0 && rng && rng() < slack) {
+    const damaging = attacker.moves.filter(
+      (move) => expectedDamage(attacker, defender, move) > 0,
+    );
+    if (damaging.length > 1) return damaging[Math.floor(rng() * damaging.length)];
+  }
+
   /* Nothing damaging left: the cartridge forces Struggle. */
   return best ?? STRUGGLE;
 }
 
-function damageFor({ attacker, defender, move, crit, rng }) {
+function damageFor({ attacker, defender, move, crit, rng, handicap = 1 }) {
   const physical = PHYSICAL_TYPES.has(move.type);
   const attack = physical ? attacker.stats.attack : attacker.stats.special;
   const defense = physical ? defender.stats.defense : defender.stats.special;
@@ -273,7 +299,7 @@ function damageFor({ attacker, defender, move, crit, rng }) {
         50,
     ) + 2;
   const roll = 217 + Math.floor(rng() * 39);
-  const rolled = beforeRoll * stab * effectiveness * (roll / 255);
+  const rolled = beforeRoll * stab * effectiveness * (roll / 255) * handicap;
 
   return Math.max(1, Math.floor(rolled));
 }
@@ -295,7 +321,14 @@ function damageFor({ attacker, defender, move, crit, rng }) {
  * @param {{seed?:number, multipliers?:object, maxTurns?:number}} options
  */
 export function runBattle(playerTeam, enemyTeam, options = {}) {
-  const { seed = 1, multipliers = {}, maxTurns = 400 } = options;
+  const {
+    seed = 1,
+    multipliers = {},
+    maxTurns = 400,
+    leaderHandicap = LEADER_HANDICAP,
+    playerEdge = PLAYER_EDGE,
+    leaderSlack = LEADER_SLACK,
+  } = options;
 
   if (!playerTeam?.length || !enemyTeam?.length) {
     throw new Error("runBattle needs a non-empty team on both sides");
@@ -320,7 +353,11 @@ export function runBattle(playerTeam, enemyTeam, options = {}) {
 
     const actions = [
       { side: "player", mon: playerMon, move: chooseMove(playerMon, enemyMon) },
-      { side: "enemy", mon: enemyMon, move: chooseMove(enemyMon, playerMon) },
+      {
+        side: "enemy",
+        mon: enemyMon,
+        move: chooseMove(enemyMon, playerMon, { rng, slack: leaderSlack }),
+      },
     ].map((action) => ({
       ...action,
       priority: action.move.priority ?? 0,
@@ -367,7 +404,14 @@ export function runBattle(playerTeam, enemyTeam, options = {}) {
       }
 
       const crit = isCritical(attacker.base.speed, rng);
-      const damage = damageFor({ attacker, defender, move, crit, rng });
+      const damage = damageFor({
+        attacker,
+        defender,
+        move,
+        crit,
+        rng,
+        handicap: action.side === "enemy" ? leaderHandicap : playerEdge,
+      });
 
       defender.hp = Math.max(0, defender.hp - damage);
       defender.taken += damage;
@@ -393,50 +437,104 @@ export function runBattle(playerTeam, enemyTeam, options = {}) {
         faint: fainted,
       });
 
-      if (!fainted) continue;
+      if (fainted) {
+        defender.fainted = true;
+        attacker.kos += 1;
 
-      defender.fainted = true;
-      attacker.kos += 1;
+        record({
+          kind: "faint",
+          turn,
+          side: defenderSide.side,
+          actor: defender.name,
+          actorSlot: targetSlot,
+          target: null,
+          move: null,
+          damage: 0,
+          effectiveness: 1,
+          crit: false,
+          miss: false,
+          hpAfter: 0,
+          hpMax: defender.stats.maxHp,
+          faint: true,
+        });
+      }
 
-      record({
-        kind: "faint",
-        turn,
-        side: defenderSide.side,
-        actor: defender.name,
-        actorSlot: targetSlot,
-        target: null,
-        move: null,
-        damage: 0,
-        effectiveness: 1,
-        crit: false,
-        miss: false,
-        hpAfter: 0,
-        hpMax: defender.stats.maxHp,
-        faint: true,
-      });
+      /* Self-Destruct and Explosion take the user down with the target. */
+      const sacrificed = SELF_SACRIFICE.has(move.name.toLowerCase());
+      if (sacrificed) {
+        attacker.hp = 0;
+        attacker.fainted = true;
+        record({
+          kind: "faint",
+          turn,
+          side: action.side,
+          actor: attacker.name,
+          actorSlot,
+          target: null,
+          move: null,
+          damage: 0,
+          effectiveness: 1,
+          crit: false,
+          miss: false,
+          hpAfter: 0,
+          hpMax: attacker.stats.maxHp,
+          faint: true,
+        });
+      }
 
-      if (!aliveOf(defenderSide)) {
-        winner = action.side;
+      const defenderLeft = aliveOf(defenderSide);
+      const attackerLeft = aliveOf(attackerSide);
+
+      if (!defenderLeft) {
+        /* Both sides wiped: the Pokémon that blew itself up loses. */
+        winner = attackerLeft ? action.side : defenderSide.side;
         break;
       }
 
-      defenderSide.active = defenderSide.team.findIndex((mon) => !mon.fainted);
-      record({
-        kind: "switch",
-        turn,
-        side: defenderSide.side,
-        actor: activeOf(defenderSide).name,
-        actorSlot: defenderSide.active,
-        target: null,
-        move: null,
-        damage: 0,
-        effectiveness: 1,
-        crit: false,
-        miss: false,
-        hpAfter: activeOf(defenderSide).hp,
-        hpMax: activeOf(defenderSide).stats.maxHp,
-        faint: false,
-      });
+      if (!attackerLeft) {
+        winner = defenderSide.side;
+        break;
+      }
+
+      if (fainted) {
+        defenderSide.active = defenderSide.team.findIndex((mon) => !mon.fainted);
+        record({
+          kind: "switch",
+          turn,
+          side: defenderSide.side,
+          actor: activeOf(defenderSide).name,
+          actorSlot: defenderSide.active,
+          target: null,
+          move: null,
+          damage: 0,
+          effectiveness: 1,
+          crit: false,
+          miss: false,
+          hpAfter: activeOf(defenderSide).hp,
+          hpMax: activeOf(defenderSide).stats.maxHp,
+          faint: false,
+        });
+      }
+
+      if (sacrificed) {
+        attackerSide.active = attackerSide.team.findIndex((mon) => !mon.fainted);
+        record({
+          kind: "switch",
+          turn,
+          side: action.side,
+          actor: activeOf(attackerSide).name,
+          actorSlot: attackerSide.active,
+          target: null,
+          move: null,
+          damage: 0,
+          effectiveness: 1,
+          crit: false,
+          miss: false,
+          hpAfter: activeOf(attackerSide).hp,
+          hpMax: activeOf(attackerSide).stats.maxHp,
+          faint: false,
+        });
+      }
     }
 
     if (winner) break;

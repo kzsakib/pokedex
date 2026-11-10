@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, MotionConfig } from "motion/react";
 import { CatchArena } from "./CatchArena";
 import { fetchPokemon, formatNumber } from "../api";
@@ -107,7 +107,30 @@ export default function TeamBuilder({ roster = [] }) {
   const [stageBox, setStageBox] = useState(null);
 
   const team = state.team || [];
-  const enriched = useTeamFacts(team);
+  /* Evolutions the gauntlet has triggered this run, keyed by the caught id.
+     The six big cards read the evolved species while the run holds the map. */
+  const [grown, setGrown] = useState({});
+  const handleEvolve = useCallback((map) => {
+    setGrown((previous) => {
+      const next = map ?? {};
+      const keys = Object.keys(next);
+      const same =
+        keys.length === Object.keys(previous).length &&
+        keys.every((key) => previous[key]?.id === next[key]?.id);
+      return same ? previous : next;
+    });
+  }, []);
+  const displayTeam = useMemo(
+    () =>
+      team.map((mon) => {
+        const grownMon = grown[mon.id];
+        return grownMon
+          ? { ...mon, id: grownMon.id, name: grownMon.name }
+          : mon;
+      }),
+    [team, grown],
+  );
+  const enriched = useTeamFacts(displayTeam);
   const slots = useMemo(() => {
     const filled = enriched.slice(0, 6);
     while (filled.length < 6) filled.push(null);
@@ -282,6 +305,7 @@ export default function TeamBuilder({ roster = [] }) {
       setRevealed(false);
       setFlights([]);
       setGauntletOpen(false);
+      setGrown({});
       return;
     }
     if (closed) arenaRef.current?.nextRound();
@@ -388,7 +412,8 @@ export default function TeamBuilder({ roster = [] }) {
 
           {gauntletOpen && complete && (
             <GymGauntlet
-              team={enriched}
+              team={team}
+              onTeamEvolve={handleEvolve}
               onBack={() => setGauntletOpen(false)}
             />
           )}

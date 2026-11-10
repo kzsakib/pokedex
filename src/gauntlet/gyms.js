@@ -70,7 +70,10 @@ export const GYMS = [
     badgeTile: 5,
     faceTile: 4,
     levelCap: 24,
-    specialMove: { move: "thunderbolt", specialSlot: 2 },
+    /* Red/Blue hands Raichu Thunderbolt here; at full level parity that one
+       move made the gym unbeatable for a fair team, so the leader's extra
+       move is its weaker Thunder Shock. */
+    specialMove: { move: "thunder-shock", specialSlot: 2 },
     team: [
       { id: 100, name: "Voltorb", level: 21, canonical: true },
       { id: 25, name: "Pikachu", level: 18, canonical: true },
@@ -139,8 +142,10 @@ export const GYMS = [
       { id: 122, name: "Mr. Mime", level: 37, canonical: true },
       { id: 49, name: "Venomoth", level: 38, canonical: true },
       { id: 65, name: "Alakazam", level: 43, canonical: true },
-      { id: 80, name: "Slowbro", level: 38, pad: true },
-      { id: 103, name: "Exeggutor", level: 38, pad: true },
+      /* Psychic is the least forgiving type in Gen 1, so the filler stays in
+         its pre-evolved forms: same theme, one fewer wall. */
+      { id: 79, name: "Slowpoke", level: 38, pad: true },
+      { id: 96, name: "Drowzee", level: 38, pad: true },
     ],
   },
   {

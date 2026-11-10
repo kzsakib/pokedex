@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { GYMS, gymTeam } from "./gyms";
-import { BADGE_SHEET, prepareGym, prepareTeam } from "./loader";
+import { prepareGym, prepareTeam } from "./loader";
 import { estimateWinChance } from "./estimate";
 import { multipliersForBadges, runBattle, typeMultiplier } from "./gen1Battle";
 import { playSfx } from "../audio";
 import { typeAccent } from "../typeColors";
-import { pixelSpriteUrl } from "../api";
+import { pixelSpriteFallbackUrl, pixelSpriteUrl } from "../api";
 import BallGlyph from "../team/BallGlyph";
 import "./gauntlet.css";
 
@@ -52,55 +52,115 @@ const typeChip = (type) => (
   </span>
 );
 
-/* The official trainer-card sheet is a PNG of the eight badge tiles. Each
-   earned badge gets a colour wash in its gym's type colour, so the case reads
-   rock / water / electric at a glance instead of eight grey shapes. */
-function BadgeSprite({ tile, scale = 3, earned = true, name, loaded = true, tint }) {
-  if (!loaded) {
+/* Badges are real PNGs (built by scripts/build-badges.py from the official
+   trainer-card art): the white card is gone and each badge is painted in its
+   gym's type colour, so nothing rectangles over the sprite. */
+const badgeSrc = (badge) => `${import.meta.env.BASE_URL}badges/${badge}.png`;
+
+function BadgeSprite({ badge, scale = 3, earned = true, name }) {
+  const [failed, setFailed] = useState(false);
+  const size = 16 * scale;
+
+  if (failed) {
     return (
       <span className={`gg-badge-name${earned ? " is-earned" : " is-locked"}`}>
         {name}
       </span>
     );
   }
-  const size = 16 * scale;
+
   return (
     <span
       className={`gg-badge${earned ? " is-earned" : " is-locked"}`}
       style={{ width: size, height: size }}
-      role="img"
-      aria-label={`${name}${earned ? "" : " (locked)"}`}
     >
-      <span
+      <img
         className="gg-badge__art"
-        style={{
-          backgroundImage: `url(${BADGE_SHEET})`,
-          backgroundSize: `${size}px ${256 * scale}px`,
-          backgroundPosition: `0 ${-tile * size}px`,
-        }}
+        src={badgeSrc(badge)}
+        alt={`${name}${earned ? "" : " (locked)"}`}
+        width={size}
+        height={size}
+        draggable={false}
+        onError={() => setFailed(true)}
       />
-      {earned && tint ? (
-        <span className="gg-badge__tint" style={{ background: tint }} aria-hidden="true" />
-      ) : null}
     </span>
   );
 }
 
-/* One probe for the whole sprite sheet; if it never loads the badge falls
-   back to its name in mono text. */
-const useBadgeSheet = () => {
-  const [loaded, setLoaded] = useState(false);
+/* Sprites come from a raw GitHub CDN that occasionally drops a request, so a
+   failed load retries once and then falls back to the FireRed set instead of
+   leaving a hole in the roster. */
+function useSpriteSource(mon) {
+  const base = mon?.sprite ?? null;
+  const [src, setSrc] = useState(base);
+  const tries = useRef(0);
+
   useEffect(() => {
-    let live = true;
-    const image = new Image();
-    image.onload = () => live && setLoaded(true);
-    image.src = BADGE_SHEET;
-    return () => {
-      live = false;
-    };
-  }, []);
-  return loaded;
-};
+    tries.current = 0;
+    setSrc(base);
+  }, [base]);
+
+  const onError = () => {
+    tries.current += 1;
+    if (tries.current === 1) {
+      setSrc(`${base}?retry=${Date.now()}`);
+    } else if (tries.current === 2 && mon?.id) {
+      setSrc(pixelSpriteFallbackUrl(mon.id));
+    } else {
+      setSrc(null);
+    }
+  };
+
+  return [src, onError];
+}
+
+function Sprite({ mon, size = 48, className = "", style, ...rest }) {
+  const [src, onError] = useSpriteSource(mon);
+
+  if (!src) {
+    return (
+      <span
+        className={`gg-sprite-missing ${className}`}
+        style={{ width: size, height: size, ...style }}
+        aria-hidden="true"
+      />
+    );
+  }
+
+  return (
+    <img
+      className={className}
+      src={src}
+      alt=""
+      width={size}
+      height={size}
+      loading="lazy"
+      decoding="async"
+      onError={onError}
+      style={style}
+      {...rest}
+    />
+  );
+}
+
+/* Gauntlet soundtrack: one YouTube embed, invisible, mounted with the mode so
+   it starts on entry, and unmounted by the toggle. Nothing loops. */
+const MUSIC_ID = "JuYeHPFR3f0";
+
+function GauntletMusic({ playing }) {
+  if (!playing) return null;
+  return (
+    <div className="gg-music" aria-hidden="true">
+      <iframe
+        title="Gauntlet soundtrack"
+        src={`https://www.youtube.com/embed/${MUSIC_ID}?autoplay=1&rel=0&modestbranding=1&playsinline=1&controls=0&loop=0`}
+        allow="autoplay; encrypted-media"
+        referrerPolicy="strict-origin-when-cross-origin"
+        frameBorder="0"
+      />
+    </div>
+  );
+}
 
 /* The playback cursor resolved into who is on the field and how much HP each
    side has. Pure, so the arena only has to render. */
@@ -152,7 +212,7 @@ function describe(entry) {
 
 /* ---------- route ---------- */
 
-function RouteTrack({ current, cleared, sheetLoaded }) {
+function RouteTrack({ current, cleared }) {
   return (
     <ol className="gg-route" aria-label="Gym route">
       {GYMS.map((gym, index) => {
@@ -166,12 +226,10 @@ function RouteTrack({ current, cleared, sheetLoaded }) {
           <li key={gym.id} className={`gg-node ${state}`}>
             <span className="gg-node__badge" title={`${gym.badgeName} · ${gym.leader}`}>
               <BadgeSprite
-                tile={gym.badgeTile}
+                badge={gym.badge}
                 scale={2}
                 earned={Boolean(clearedEntry)}
                 name={gym.badgeName}
-                loaded={sheetLoaded}
-                tint={typeAccent(gym.type)}
               />
             </span>
             <span className="gg-node__name">{gym.leader}</span>
@@ -243,7 +301,7 @@ function MonLine({ mon, onLead, isLead, opponent = false }) {
   return (
     <li className={`gg-mon${isLead ? " is-lead" : ""}`}>
       <span className="gg-mon__sprite" style={{ "--type": typeAccent(mon.types[0] ?? "normal") }}>
-        <img src={mon.sprite} alt="" width="48" height="48" loading="lazy" decoding="async" />
+        <Sprite mon={mon} size={48} />
       </span>
       <span className="gg-mon__copy">
         <span className="gg-mon__name">{mon.name}</span>
@@ -273,7 +331,6 @@ function Briefing({
   lead,
   setLead,
   chance,
-  scout,
   onBegin,
   onBack,
   error,
@@ -323,7 +380,7 @@ function Briefing({
             {gym.leader} <span>· {gym.gym}</span>
           </h5>
           <p className="gg-sub">
-            {gym.badgeName} on the line · cap Lv {gym.levelCap}
+            {gym.badgeName} on the line · everyone fights at Lv {gym.levelCap}
           </p>
           <ul className="gg-roster">
             {enemy.map((mon, index) => (
@@ -347,10 +404,6 @@ function Briefing({
               />
             ))}
           </ul>
-          <p className="gg-fine">
-            Lead: {playerTeam[0]?.name ?? "—"} · order follows the list, next one
-            up steps in on a faint.
-          </p>
         </article>
       </div>
 
@@ -367,20 +420,16 @@ function Briefing({
 
       <div className="gg-scout">
         <div className="gg-scout__head">
-          <p className="gg-label">Win chance</p>
-          <span className="gg-scout__value">
-            {chance == null ? `SCOUTING… ${scout}/200` : `${chance}%`}
+          <p className="gg-label">Matchups</p>
+          <span className="gg-fine">
+            {chance == null ? "SCOUTING…" : "SCOUTED"}
           </span>
         </div>
-        <div className="gg-meter" aria-hidden="true">
-          <motion.span
-            className="gg-meter__fill"
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: chance == null ? scout / 200 : chance / 100 }}
-            transition={{ duration: 0.3 }}
-          />
-        </div>
         <MatchupChips player={playerTeam} enemy={enemy} />
+        <p className="gg-fine">
+          Lead: {playerTeam[0]?.name ?? "—"} · the rest follow this order on a
+          faint.
+        </p>
       </div>
 
       <div className="gg-actions">
@@ -426,6 +475,8 @@ function Arena({ prepared, playerTeam, result, cursor, speed, setSpeed, onSkip }
   const lines = result.log.slice(Math.max(0, cursor - 6), cursor);
   const latest = lines[lines.length - 1];
   const typed = useTypewriter(latest ? describe(latest) : "", 8);
+  const [enemySrc, enemyError] = useSpriteSource(enemyMon);
+  const [playerSrc, playerError] = useSpriteSource(playerMon);
 
   return (
     <motion.div
@@ -435,7 +486,9 @@ function Arena({ prepared, playerTeam, result, cursor, speed, setSpeed, onSkip }
       transition={{ duration: 0.25 }}
     >
       <div className="gg-arena__field">
-        <div className="gg-arena__enemy">
+        {/* Each lane keeps its own HP card and sprite together, so a label
+            can never end up beside the other side's Pokémon. */}
+        <div className="gg-arena__lane gg-arena__lane--enemy">
           <Hp
             name={enemyMon?.name}
             level={enemyMon?.level}
@@ -443,25 +496,35 @@ function Arena({ prepared, playerTeam, result, cursor, speed, setSpeed, onSkip }
             maxHp={enemyMon?.stats.maxHp}
             side="enemy"
           />
-          <motion.img
-            key={`${enemyMon?.id}-${view.enemyIndex}`}
-            className="gg-sprite is-enemy"
-            src={enemyMon?.sprite}
-            alt=""
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-          />
+          {enemySrc ? (
+            <motion.img
+              key={`${enemyMon?.id}-${view.enemyIndex}`}
+              className="gg-sprite is-enemy"
+              src={enemySrc}
+              alt=""
+              onError={enemyError}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+            />
+          ) : (
+            <span className="gg-sprite is-enemy gg-sprite-missing" aria-hidden="true" />
+          )}
         </div>
 
-        <div className="gg-arena__player">
-          <motion.img
-            key={`${playerMon?.id}-${view.playerIndex}`}
-            className="gg-sprite is-player"
-            src={playerMon?.sprite}
-            alt=""
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-          />
+        <div className="gg-arena__lane gg-arena__lane--player">
+          {playerSrc ? (
+            <motion.img
+              key={`${playerMon?.id}-${view.playerIndex}`}
+              className="gg-sprite is-player"
+              src={playerSrc}
+              alt=""
+              onError={playerError}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+            />
+          ) : (
+            <span className="gg-sprite is-player gg-sprite-missing" aria-hidden="true" />
+          )}
           <Hp
             name={playerMon?.name}
             level={playerMon?.level}
@@ -598,7 +661,7 @@ function TeamStrip({ team, summary, side }) {
         return (
           <li key={`${mon.id}-${index}`} className={down ? "is-ko" : "is-up"}>
             <span className="gg-strip__sprite">
-              <img src={mon.sprite} alt="" width="52" height="52" loading="lazy" />
+              <Sprite mon={mon} size={52} />
             </span>
             <span className="gg-strip__name">{mon.name}</span>
             <span className="gg-strip__hp">
@@ -712,14 +775,7 @@ function Results({
                 key={`${mon.id}-${index}`}
                 className={record?.fainted ? "is-ko" : "is-up"}
               >
-                <img
-                  className="gg-breakdown__sprite"
-                  src={mon.sprite}
-                  alt=""
-                  width="36"
-                  height="36"
-                  loading="lazy"
-                />
+                <Sprite mon={mon} size={36} className="gg-breakdown__sprite" />
                 <span className="gg-breakdown__mon">
                   {mon.name} <i>Lv {mon.level}</i>
                 </span>
@@ -748,7 +804,10 @@ function Results({
           {prepared.growth.map((entry) => (
             <div key={`${entry.from.id}-${entry.to.id}`} className="gg-growthcard__row">
               <span className="gg-growthcard__side gg-growthcard__side--before">
-                <img src={pixelSpriteUrl(entry.from.id)} alt="" width="42" height="42" />
+                <Sprite
+                  mon={{ id: entry.from.id, sprite: pixelSpriteUrl(entry.from.id) }}
+                  size={42}
+                />
                 <span>
                   <b>{entry.from.name}</b>
                   <i>before</i>
@@ -758,7 +817,10 @@ function Results({
                 →
               </span>
               <span className="gg-growthcard__side gg-growthcard__side--after">
-                <img src={pixelSpriteUrl(entry.to.id)} alt="" width="58" height="58" />
+                <Sprite
+                  mon={{ id: entry.to.id, sprite: pixelSpriteUrl(entry.to.id) }}
+                  size={58}
+                />
                 <span>
                   <b>{entry.to.name}</b>
                   <i>now · Lv {entry.level}</i>
@@ -806,7 +868,7 @@ function Results({
 
 /* ---------- badge case + completion ---------- */
 
-function BadgeCase({ cleared, sheetLoaded }) {
+function BadgeCase({ cleared }) {
   return (
     <div className="gg-case">
       <div className="gg-case__head">
@@ -825,12 +887,10 @@ function BadgeCase({ cleared, sheetLoaded }) {
               title={`${gym.badgeName} · ${gym.leader}${entry ? ` · ${entry.turns} turns` : " · locked"}`}
             >
               <BadgeSprite
-                tile={gym.badgeTile}
-                scale={4}
+                badge={gym.badge}
+                scale={3}
                 earned={Boolean(entry)}
                 name={gym.badgeName}
-                loaded={sheetLoaded}
-                tint={typeAccent(gym.type)}
               />
             </li>
           );
@@ -886,7 +946,7 @@ function Confetti({ reduced }) {
   );
 }
 
-export function Complete({ cleared, onRestart, onBack, sheetLoaded, reduced }) {
+export function Complete({ cleared, onRestart, onBack, reduced }) {
   const turns = cleared.reduce((sum, entry) => sum + entry.turns, 0);
   const kos = cleared.reduce((sum, entry) => sum + (entry.kos ?? 0), 0);
   const fastest = [...cleared].sort((a, b) => a.turns - b.turns)[0];
@@ -912,12 +972,10 @@ export function Complete({ cleared, onRestart, onBack, sheetLoaded, reduced }) {
             <li key={item.id} className={entry ? "is-cleared" : "is-locked"}>
               <span className="gg-summary__badge">
                 <BadgeSprite
-                  tile={item.badgeTile}
+                  badge={item.badge}
                   scale={2}
                   earned={Boolean(entry)}
                   name={item.badgeName}
-                  loaded={sheetLoaded}
-                  tint={typeAccent(item.type)}
                 />
               </span>
               <span className="gg-summary__gym">
@@ -956,15 +1014,15 @@ export function Complete({ cleared, onRestart, onBack, sheetLoaded, reduced }) {
 
 /* ---------- the mode ---------- */
 
-export default function GymGauntlet({ team, onBack }) {
+export default function GymGauntlet({ team, onBack, onTeamEvolve }) {
   const [gymIndex, setGymIndex] = useState(0);
   const [cleared, setCleared] = useState([]);
   const [stage, setStage] = useState("briefing");
   const [prepared, setPrepared] = useState(null);
   const [error, setError] = useState(null);
   const [chance, setChance] = useState(null);
-  const [scout, setScout] = useState(0);
   const [lead, setLead] = useState(0);
+  const [music, setMusic] = useState(true);
   const [seed, setSeed] = useState(101);
   const [result, setResult] = useState(null);
   const [cursor, setCursor] = useState(0);
@@ -973,8 +1031,10 @@ export default function GymGauntlet({ team, onBack }) {
   const [loadPct, setLoadPct] = useState(0);
 
   const reduced = usePrefersReducedMotion();
-  const sheetLoaded = useBadgeSheet();
   const finished = useRef(false);
+  const grownRef = useRef({});
+  const onTeamEvolveRef = useRef(onTeamEvolve);
+  onTeamEvolveRef.current = onTeamEvolve;
   const gym = GYMS[gymIndex];
   const badges = useMemo(() => cleared.map((entry) => entry.badge), [cleared]);
   const multipliers = useMemo(() => multipliersForBadges(badges), [badges]);
@@ -990,7 +1050,6 @@ export default function GymGauntlet({ team, onBack }) {
     let live = true;
     setPrepared(null);
     setChance(null);
-    setScout(0);
     setError(null);
     setLoadPct(0);
 
@@ -1007,6 +1066,17 @@ export default function GymGauntlet({ team, onBack }) {
       });
       if (!live) return;
       setPrepared({ gym: current, enemy, player: built.team, growth: built.growth });
+
+      /* Tell the team builder which of the six have evolved, so its big
+         cards show the new species instead of the caught one. */
+      if (built.growth.length) {
+        const next = { ...grownRef.current };
+        built.growth.forEach((entry) => {
+          next[entry.from.id] = { id: entry.to.id, name: entry.to.name };
+        });
+        grownRef.current = next;
+        onTeamEvolveRef.current?.(next);
+      }
     })().catch((cause) => {
       if (live) setError(cause.message ?? "Could not load the league records.");
     });
@@ -1023,16 +1093,45 @@ export default function GymGauntlet({ team, onBack }) {
     return [leadMon, ...prepared.player.filter((mon) => mon !== leadMon)];
   }, [prepared, lead]);
 
+  /* Scout a short run for every possible lead and put the best one in front
+     by default; the player can still override it from the roster. */
+  useEffect(() => {
+    if (!prepared) return undefined;
+    let live = true;
+    const orders = prepared.player.map((mon, index) => [
+      mon,
+      ...prepared.player.filter((_, other) => other !== index),
+    ]);
+
+    Promise.all(
+      orders.map((order, index) =>
+        estimateWinChance(order, prepared.enemy, {
+          sims: 40,
+          multipliers,
+          baseSeed: 900 + gymIndex * 17 + index,
+        }).then((pct) => ({ index, pct })),
+      ),
+    )
+      .then((rows) => {
+        if (!live) return;
+        const best = rows.sort((a, b) => b.pct - a.pct)[0];
+        if (best) setLead(best.index);
+      })
+      .catch(() => {});
+
+    return () => {
+      live = false;
+    };
+  }, [prepared, multipliers, gymIndex, seed]);
+
   useEffect(() => {
     if (!prepared) return undefined;
     let live = true;
     setChance(null);
-    setScout(0);
     estimateWinChance(playerTeam, prepared.enemy, {
       sims: 200,
       multipliers,
       baseSeed: gymIndex + seed,
-      onProgress: (done) => live && setScout(done),
     })
       .then((pct) => live && setChance(pct))
       .catch(() => {});
@@ -1147,6 +1246,8 @@ export default function GymGauntlet({ team, onBack }) {
   const restart = () => {
     setGymIndex(0);
     setCleared([]);
+    grownRef.current = {};
+    onTeamEvolveRef.current?.({});
     setLead(0);
     setSeed((value) => value + 1);
     setResult(null);
@@ -1163,12 +1264,25 @@ export default function GymGauntlet({ team, onBack }) {
             {gym.leader} <span>· {gym.gym}</span>
           </h4>
         </div>
-        <button type="button" className="gg-ghost gg-back" onClick={onBack}>
-          ‹ Back to team
-        </button>
+        <div className="gg-head__actions">
+          <button
+            type="button"
+            className={`gg-ghost gg-music-toggle${music ? " is-on" : ""}`}
+            onClick={() => setMusic((value) => !value)}
+            aria-pressed={music}
+            title={music ? "Turn the soundtrack off" : "Play the soundtrack"}
+          >
+            <span aria-hidden="true">♪</span> Music {music ? "on" : "off"}
+          </button>
+          <button type="button" className="gg-ghost gg-back" onClick={onBack}>
+            ‹ Back to team
+          </button>
+        </div>
       </header>
 
-      <RouteTrack current={gymIndex} cleared={cleared} sheetLoaded={sheetLoaded} />
+      <GauntletMusic playing={music} />
+
+      <RouteTrack current={gymIndex} cleared={cleared} />
 
       <AnimatePresence mode="wait" initial={false}>
         {stage === "briefing" && (
@@ -1180,7 +1294,6 @@ export default function GymGauntlet({ team, onBack }) {
               lead={lead}
               setLead={setLead}
               chance={chance}
-              scout={scout}
               onBegin={beginBattle}
               onBack={onBack}
               error={error}
@@ -1240,13 +1353,12 @@ export default function GymGauntlet({ team, onBack }) {
             cleared={cleared}
             onRestart={restart}
             onBack={onBack}
-            sheetLoaded={sheetLoaded}
             reduced={reduced}
           />
         )}
       </AnimatePresence>
 
-      <BadgeCase cleared={cleared} sheetLoaded={sheetLoaded} />
+      <BadgeCase cleared={cleared} />
     </section>
   );
 }
