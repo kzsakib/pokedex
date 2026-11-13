@@ -12,13 +12,13 @@ const PokePins = (() => {
   const W = 360;
   const H = 280;
 
-  const LANE = { half: 1.72, gutter: 0.62, foul: 7.6, head: -6.4, pit: -9.6 };
+  const LANE = { half: 1.72, gutter: 0.62, foul: 7.6, head: -6.4, pit: -10.2 };
   const BALL_R = 0.34;
   const PIN_R = 0.22;
   const GRAVITY = 12;
   const MAX_SPEED = 14;
   const HOOK = 2.2;
-  const SETTLE_LIMIT = 6;
+  const SETTLE_LIMIT = 3;
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -376,7 +376,7 @@ const PokePins = (() => {
     const canvas = rootEl.querySelector(".pp-canvas");
     if (!canvas) return null;
 
-    const engine = PixelEngine.createEngine(canvas, { originY: 18, scale: 15 });
+    const engine = PixelEngine.createEngine(canvas, { originY: 10, scale: 16.5 });
     const q = (key) => rootEl.querySelector(`[data-bowl="${key}"]`);
     const hud = {
       you: q("you"),
@@ -536,21 +536,30 @@ const PokePins = (() => {
     }
 
     function palm(e, x, y, h, seed) {
-      e.capsule([x, y, 0.3], [x + 0.18, y, h * 0.62], 0.17, 0.11, () => [138, 104, 64], "solid");
-      e.capsule([x + 0.18, y, h * 0.62], [x + 0.34, y, h], 0.12, 0.08, () => [122, 92, 58], "solid");
-      for (let i = 0; i < 7; i += 1) {
-        const a = (i / 7) * TAU + seed;
-        const tx = x + 0.34 + Math.cos(a) * 1.15;
-        const ty = y + Math.sin(a) * 1.15;
-        e.capsule([x + 0.34, y, h + 0.12], [tx, ty, h + 0.05 + Math.sin(a * 2) * 0.18], 0.22, 0.02, () => [64, 116, 62], "solid");
+      const top = [x + 0.22, y, h];
+      for (let i = 0; i < 4; i += 1) {
+        const a = 0.3 + (i / 4) * (h - 0.3);
+        const b = 0.3 + ((i + 1) / 4) * (h - 0.3);
+        const ax = x + Math.sin(i * 0.4 + seed) * 0.06;
+        const bx = x + Math.sin((i + 1) * 0.4 + seed) * 0.06;
+        e.capsule([ax, y, a], [bx, y, b], 0.15 - i * 0.02, 0.13 - i * 0.02, () => (i % 2 ? [124, 92, 60] : [140, 106, 68]), "solid");
       }
-      e.sphere(x + 0.34, y, h + 0.16, 0.15, [112, 86, 54], "solid");
+      e.capsule([x, y, h - 0.25], [top[0], top[1], top[2]], 0.12, 0.09, () => [130, 98, 64], "solid");
+      for (let i = 0; i < 8; i += 1) {
+        const a = (i / 8) * TAU + seed;
+        const mid = [top[0] + Math.cos(a) * 0.6, top[1] + Math.sin(a) * 0.6, h + 0.1];
+        const end = [top[0] + Math.cos(a) * 1.25, top[1] + Math.sin(a) * 1.25, h - 0.28];
+        e.capsule(top, mid, 0.14, 0.08, () => [58, 108, 60], "solid");
+        e.capsule(mid, end, 0.08, 0.015, () => [74, 126, 66], "solid");
+      }
+      e.sphere(top[0] + 0.06, top[1] + 0.02, h - 0.12, 0.15, [104, 80, 52], "solid");
+      e.sphere(top[0] - 0.12, top[1] + 0.08, h - 0.16, 0.12, [96, 74, 48], "solid");
     }
 
     function buildScene(e, map) {
       e.field(-14, -8, 11, 8, 0.07, (x, y) => {
         const ay = Math.abs(y);
-        if (ay > 6.2 || x < -12.6 || x > 9.6) return null;
+        if (ay > 6.0 || x < -12.2 || x > 9.2) return null;
         if (ay < LANE.half) {
           return { z: 0.3, color: laneColor(map, x, y), kind: e.KIND_GROUND, shade: 0.1 };
         }
@@ -608,6 +617,16 @@ const PokePins = (() => {
         }
         e.box(2.4, -4.3, 1.95, 5.2, -2.5, 2.1, [198, 172, 104], 9);
         e.box(2.6, -4.1, 2.1, 5.0, -2.7, 2.2, [176, 150, 88], 10);
+        /* parasol */
+        e.capsule([6.5, -3.9, 0.3], [6.5, -3.9, 2.15], 0.05, 0.04, () => [226, 216, 196], "solid");
+        for (let i = 0; i < 8; i += 1) {
+          const a = (i / 8) * TAU;
+          e.sphere(6.5 + Math.cos(a) * 0.62, -3.9 + Math.sin(a) * 0.62, 2.08, 0.3, i % 2 ? [210, 92, 80] : [242, 234, 216], "solid");
+        }
+        e.sphere(6.5, -3.9, 2.18, 0.26, [232, 224, 206], "solid");
+        /* driftwood bench */
+        e.box(0.6, -4.9, 0.3, 2.4, -4.4, 0.52, [156, 120, 80], 7);
+        e.box(0.7, -4.6, 0.5, 2.3, -4.45, 0.62, [176, 140, 96], 8);
         /* sea breeze flag */
         e.capsule([7.4, 1.9, 0.3], [7.4, 1.9, 2.2], 0.05, 0.04, () => [236, 232, 218], "solid");
         e.box(7.4, 1.75, 1.9, 8.2 + state.wind * 0.5, 1.95, 2.15, [214, 96, 76], 11);
@@ -653,7 +672,7 @@ const PokePins = (() => {
       if (map.id === "lavender" || map.id === "ice-cavern") e.growGrass();
       for (let a = 0; a < TAU; a += 0.1) {
         const rr = 6.7;
-        e.castShadow(Math.cos(a) * rr, Math.sin(a) * rr, 0.3, 0.5, 0.5, 0.35);
+        e.castShadow(Math.cos(a) * rr, Math.sin(a) * rr, 0.3, 0.5, 0.5, 0.22);
       }
     }
 
@@ -687,6 +706,7 @@ const PokePins = (() => {
         exploded: false,
         duck: 0,
         duckCooldown: 0,
+        willDuck: state.map.duck ? Math.random() < 0.1 : false,
         wobble: 0,
         rollAngle: 0,
       }));
@@ -777,6 +797,14 @@ const PokePins = (() => {
         pin.vx += nx * relative * 0.9;
         pin.vy += ny * relative * 0.9;
         sfx.cry("voltorb");
+        for (const other of state.pins) {
+          if (other === pin || other.down || other.exploded || Math.abs(other.id - pin.id) > 3) continue;
+          const ox = other.x - pin.x;
+          const oy = other.y - pin.y;
+          const od = hypot(ox, oy);
+          if (od > 1.15) continue;
+          pinBurst(other, 1.2, ox / od, oy / od);
+        }
         return;
       }
       if (state.map.pin === "diglett") {
@@ -786,6 +814,14 @@ const PokePins = (() => {
         pin.launched = true;
         pin.down = true;
         sfx.cry("diglett");
+        for (const other of state.pins) {
+          if (other === pin || other.down || other.exploded) continue;
+          const ox = other.x - pin.x;
+          const oy = other.y - pin.y;
+          const od = hypot(ox, oy);
+          if (od > 1.3) continue;
+          pinBurst(other, 2.0, ox / od, oy / od);
+        }
         return;
       }
       pin.thetaVel = Math.max(pin.thetaVel, 3.2 * relative);
@@ -793,6 +829,14 @@ const PokePins = (() => {
       pin.latched = false;
       sfx.clack();
       if (state.map.pin === "gastly") sfx.cry("gastly");
+    }
+
+    function pinBurst(pin, speed, nx, ny) {
+      pin.thetaVel = Math.max(pin.thetaVel, 4.2 * speed);
+      pin.phi = Math.atan2(ny, nx);
+      pin.latched = false;
+      pin.vx += nx * speed * 1.6;
+      pin.vy += ny * speed * 1.6;
     }
 
     function stepBall(dt) {
@@ -858,20 +902,26 @@ const PokePins = (() => {
           continue;
         }
         if (pin.down && !pin.rolling) continue;
-        const friction = map.pin === "swinub" ? 1.6 : 3.5;
+        const friction = map.pin === "swinub" ? 1.4 : 2.6;
         const sp = hypot(pin.vx, pin.vy);
         if (sp > 0) {
           const f = Math.max(0, (sp - friction * dt) / sp);
           pin.vx *= f;
           pin.vy *= f;
         }
+        const capped = hypot(pin.vx, pin.vy);
+        if (capped > 12) {
+          pin.vx *= 12 / capped;
+          pin.vy *= 12 / capped;
+        }
+        pin.thetaVel = clamp(pin.thetaVel, -16, 16);
         pin.x += pin.vx * dt;
         pin.y += pin.vy * dt;
         if (Math.abs(pin.y) > LANE.half + LANE.gutter - PIN_R) {
           pin.y = Math.sign(pin.y) * (LANE.half + LANE.gutter - PIN_R);
           pin.vy *= -0.5;
         }
-        if (pin.x < LANE.pit + 0.6) {
+        if (pin.x < LANE.pit + 0.25) {
           pin.down = true;
           pin.exploded = true;
           continue;
@@ -902,33 +952,41 @@ const PokePins = (() => {
         }
       }
 
-      /* pin-pin */
+      /* pin-pin, including pins already toppling onto their neighbours */
       for (let i = 0; i < state.pins.length; i += 1) {
         const a = state.pins[i];
-        if (a.down || a.exploded || a.duck > 0) continue;
-        for (let j = i + 1; j < state.pins.length; j += 1) {
+        if (a.exploded || a.launched || a.duck > 0) continue;
+        const falling = !a.down && a.theta > 0.06;
+        const lying = a.down && a.lying;
+        const rolling = !a.down && a.rolling;
+        if (!falling && !lying && !rolling) continue;
+        if (map.pin === "voltorb" && !lying) continue;
+        const reach = lying || rolling ? 0 : Math.sin(Math.min(1.5, a.theta)) * 0.78;
+        const ax = a.x + Math.cos(a.phi) * reach;
+        const ay = a.y + Math.sin(a.phi) * reach;
+        const aSpeed = lying || rolling ? hypot(a.vx, a.vy) : Math.max(hypot(a.vx, a.vy), Math.abs(a.thetaVel) * 0.45);
+        if (aSpeed < 0.5) continue;
+        for (let j = 0; j < state.pins.length; j += 1) {
+          if (i === j) continue;
           const b = state.pins[j];
-          if (b.down || b.exploded || b.duck > 0) continue;
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
+          if (b.down || b.exploded || b.duck > 0 || b.launched) continue;
+          const dx = b.x - ax;
+          const dy = b.y - ay;
           const d = hypot(dx, dy) || 0.001;
-          const min = PIN_R * 2;
+          const min = 0.58;
           if (d >= min) continue;
           const nx = dx / d;
           const ny = dy / d;
-          const overlap = (min - d) / 2;
-          a.x -= nx * overlap;
-          a.y -= ny * overlap;
-          b.x += nx * overlap;
-          b.y += ny * overlap;
-          const rel = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
-          if (rel > 0) {
-            const impulse = rel * 1.6 * 0.5;
-            a.vx -= impulse * nx;
-            a.vy -= impulse * ny;
-            b.vx += impulse * nx;
-            b.vy += impulse * ny;
-            if (rel > 0.7) tipPin(b, rel * 0.8, nx, ny);
+          const push = min - d + 0.01;
+          b.x += nx * push * 0.7;
+          b.y += ny * push * 0.7;
+          b.vx += nx * aSpeed * 0.45;
+          b.vy += ny * aSpeed * 0.45;
+          tipPin(b, Math.max(1, aSpeed * 0.8), nx, ny);
+          if (!lying) {
+            a.vx *= 0.8;
+            a.vy *= 0.8;
+            a.thetaVel *= 0.75;
           }
         }
       }
@@ -938,38 +996,45 @@ const PokePins = (() => {
       if (!ball || ball.gone || ball.gutter) return;
       for (const pin of state.pins) {
         if (!pinActive(pin)) continue;
-        if (map.duck && pin.duck <= 0 && ball.x > pin.x && ball.x - pin.x < 2.2 && Math.random() < 0.01) {
+        if (map.duck && pin.willDuck && pin.duck <= 0 && ball.x > pin.x && ball.x - pin.x < 1.7) {
           pin.duck = 0.6;
+          pin.willDuck = false;
           sfx.cry("diglett");
           continue;
         }
         if (map.pin === "gastly" || map.pin === "diglett") {
           const dx = ball.x - pin.x;
           const dy = ball.y - pin.y;
-          if (hypot(dx, dy) < BALL_R + PIN_R) {
-            tipPin(pin, Math.max(1, hypot(ball.vx, ball.vy)), -dx, -dy);
+          if (hypot(dx, dy) < BALL_R + PIN_R + 0.16) {
+            tipPin(pin, Math.max(1, hypot(ball.vx, ball.vy)), -dx / (hypot(dx, dy) || 1), -dy / (hypot(dx, dy) || 1));
             pin.down = true;
             pin.theta = 1.45;
           }
           continue;
         }
-        const dx = ball.x - pin.x;
-        const dy = ball.y - pin.y;
+        const dx = pin.x - ball.x;
+        const dy = pin.y - ball.y;
         const d = hypot(dx, dy) || 0.001;
         const min = BALL_R + PIN_R;
         if (d >= min) continue;
         const nx = dx / d;
         const ny = dy / d;
         const rel = (ball.vx - pin.vx) * nx + (ball.vy - pin.vy) * ny;
+        const push = min - d + 0.01;
+        ball.x -= nx * push * 0.25;
+        ball.y -= ny * push * 0.25;
+        pin.x += nx * push * 0.75;
+        pin.y += ny * push * 0.75;
         if (rel <= 0) continue;
-        const impulse = (rel * 1.75) / 1.18;
+        const impulse = rel * 1.05;
         ball.vx -= impulse * 0.18 * nx;
         ball.vy -= impulse * 0.18 * ny;
         pin.vx += impulse * nx;
         pin.vy += impulse * ny;
-        pin.x += nx * (min - d) * 0.4;
-        pin.y += ny * (min - d) * 0.4;
-        if (rel > 0.6) tipPin(pin, rel, nx, ny);
+        pin.thetaVel = Math.max(pin.thetaVel, 4.2 * rel);
+        pin.phi = Math.atan2(ny, nx);
+        pin.latched = false;
+        if (rel > 0.35) sfx.clack();
       }
     }
 
@@ -979,7 +1044,8 @@ const PokePins = (() => {
       for (const pin of state.pins) {
         if (pin.launched) return false;
         if (pin.duck > 0) return false;
-        if (pin.theta > 0.02 && pin.theta < 1.44) return false;
+        if (pin.theta > 0.12 && pin.theta < 1.44) return false;
+        if (pin.theta > 0.05 && Math.abs(pin.thetaVel) > 0.35) return false;
         if (Math.abs(pin.thetaVel) > 0.06) return false;
         if (hypot(pin.vx, pin.vy) > 0.04) return false;
       }
@@ -1192,7 +1258,7 @@ const PokePins = (() => {
 
     function paintBall(e, x, y, z, phase) {
       const p = e.project(x, y, z);
-      const rp = BALL_R * e.camera.s;
+      const rp = BALL_R * e.camera.s * 1.18;
       const map = state.map;
       const cos = Math.cos(phase);
       const sin = Math.sin(phase);
@@ -1223,105 +1289,200 @@ const PokePins = (() => {
       }
     }
 
-  const EGG = [246, 232, 200];
-  const EGG_SPOT = [214, 138, 120];
+  const EGG = [250, 238, 206];
+  const EGG_SPOT = [198, 108, 92];
+  const INK = [40, 36, 34];
+
+  function faceAt(e, x, y, z, spread, eye, mouth) {
+    const p = e.project(x, y, z);
+    const c = e.rgb(eye[0], eye[1], eye[2]);
+    for (const ox of [-spread, spread]) {
+      e.dot(p.sx + ox, p.sy, c);
+      e.dot(p.sx + ox + 1, p.sy, c);
+      e.dot(p.sx + ox, p.sy + 1, c);
+      e.dot(p.sx + ox + 1, p.sy + 1, c);
+    }
+    if (mouth) {
+      const m = e.rgb(mouth[0], mouth[1], mouth[2]);
+      e.dot(p.sx, p.sy + 3, m);
+      e.dot(p.sx + 1, p.sy + 3, m);
+    }
+  }
 
   function drawPin(e, pin) {
-      const map = state.map;
-      const kind = map.pin;
-      const tilt = pin.theta;
-      const dx = Math.cos(pin.phi) * Math.sin(tilt);
-      const dy = Math.sin(pin.phi) * Math.sin(tilt);
-      const lift = pin.z || 0;
-      const base = [pin.x, pin.y, lift];
-      const height = kind === "gastly" ? 1.2 : kind === "swinub" ? 0.92 : 1.12;
-      const tip = [pin.x + dx * height, pin.y + dy * height, lift + Math.cos(tilt) * height];
-      const solid = "solid";
+    const map = state.map;
+    const kind = map.pin;
+    const tilt = pin.theta;
+    const dx = Math.cos(pin.phi) * Math.sin(tilt);
+    const dy = Math.sin(pin.phi) * Math.sin(tilt);
+    const lift = pin.z || 0;
+    const height = kind === "gastly" ? 1.3 : kind === "swinub" ? 1.0 : 1.18;
+    const tip = [pin.x + dx * height, pin.y + dy * height, lift + Math.cos(tilt) * height];
+    const solid = "solid";
 
-      if (kind === "exeggcute") {
-        const k = 1;
-        const eggs = [
-          [-0.16, 0, 0.22], [0.16, 0.02, 0.22], [0, -0.18, 0.22],
-          [-0.08, 0.04, 0.52], [0.12, -0.02, 0.5], [0.02, 0.02, 0.8],
-        ];
-        for (const [ox, oy, oz] of eggs) {
-          e.sphere(pin.x + ox * k + dx * oz * 0.9, pin.y + oy * k + dy * oz * 0.9, lift + oz * Math.cos(tilt), 0.22 * k, EGG, solid);
-          e.sphere(pin.x + ox * k + dx * oz * 0.9 + 0.06, pin.y + oy * k + dy * oz * 0.9, lift + oz * Math.cos(tilt) + 0.08, 0.085, EGG_SPOT, solid);
-        }
-        e.capsule([pin.x, pin.y, lift + 0.9], [pin.x + 0.1, pin.y, lift + 1.08], 0.09, 0.03, () => [92, 150, 80], solid);
-      } else if (kind === "diglett") {
-        e.sphere(pin.x, pin.y, lift + 0.04, 0.3, [118, 86, 58], "rough");
-        e.capsule([pin.x, pin.y, lift + 0.1], [tip[0], tip[1], tip[2] * 0.8], 0.24, 0.2, () => [122, 82, 58], solid);
-        e.sphere(tip[0], tip[1], tip[2] * 0.82, 0.23, [128, 88, 62], solid);
-        const nose = e.project(tip[0] + dx * 0.16, tip[1] + dy * 0.16, tip[2] * 0.82 + 0.05);
-        e.dot(nose.sx, nose.sy, e.rgb(232, 150, 150));
-      } else if (kind === "voltorb") {
-        const red = pin.id === 5 || pin.id === 8;
-        const top = red ? [214, 62, 54] : [206, 66, 58];
-        const ballZ = lift + 0.42 + (pin.rolling ? 0 : 0);
-        e.sphere(pin.x + dx * 0.35, pin.y + dy * 0.35, ballZ, 0.4, top, solid);
-        e.sphere(pin.x + dx * 0.35, pin.y + dy * 0.35, ballZ - 0.12, 0.34, [240, 238, 230], solid);
-        e.capsule([pin.x + dx * 0.35 - 0.32, pin.y + dy * 0.35, ballZ], [pin.x + dx * 0.35 + 0.32, pin.y + dy * 0.35, ballZ], 0.05, 0.05, () => [36, 34, 38], solid);
-        const eye = e.project(pin.x + dx * 0.35 + 0.1, pin.y + dy * 0.35, ballZ + 0.14);
-        e.dot(eye.sx, eye.sy, e.rgb(32, 30, 34));
-        e.dot(eye.sx + 2, eye.sy, e.rgb(32, 30, 34));
-      } else if (kind === "gastly") {
-        e.sphere(pin.x + dx * 0.4, pin.y + dy * 0.4, lift + 0.5 + Math.sin(state.clock * 2 + pin.id) * 0.03, 0.4, [104, 74, 148], solid);
-        e.ring(0, 0, 0, 0, e.rgb(0, 0, 0), 0);
-        for (let i = 0; i < 5; i += 1) {
-          const a = state.clock * 1.4 + i * 1.25;
-          e.sphere(pin.x + Math.cos(a) * 0.42, pin.y + Math.sin(a) * 0.42, lift + 0.5, 0.16, [128, 96, 168], solid);
-        }
-        const eye = e.project(pin.x + 0.1, pin.y + 0.04, lift + 0.62);
-        e.dot(eye.sx, eye.sy, e.rgb(240, 238, 230));
-        e.dot(eye.sx, eye.sy + 1, e.rgb(240, 238, 230));
-        const eye2 = e.project(pin.x - 0.1, pin.y + 0.04, lift + 0.62);
-        e.dot(eye2.sx, eye2.sy, e.rgb(240, 238, 230));
+    if (kind === "exeggcute") {
+      const cz = lift + 0.62 * Math.cos(tilt);
+      const cx = pin.x + dx * 0.55;
+      const cy = pin.y + dy * 0.55;
+      /* the big egg carries the face, two smaller ones ride at its base */
+      e.sphere(cx, cy, cz, 0.42, EGG, solid);
+      e.sphere(cx + dx * 0.18, cy + dy * 0.18, cz + 0.05, 0.3, [242, 226, 190], solid);
+      e.sphere(pin.x - 0.3 + dx * 0.16, pin.y + 0.12 + dy * 0.16, lift + 0.3, 0.28, EGG, solid);
+      e.sphere(pin.x + 0.3 + dx * 0.16, pin.y - 0.1 + dy * 0.16, lift + 0.3, 0.27, [244, 228, 194], solid);
+      for (const [sx, sy, sz, r] of [
+        [cx + 0.18, cy + 0.16, cz + 0.22, 0.11],
+        [cx - 0.16, cy - 0.1, cz + 0.24, 0.09],
+        [pin.x - 0.34, pin.y + 0.2, lift + 0.42, 0.08],
+        [pin.x + 0.36, pin.y - 0.02, lift + 0.4, 0.07],
+      ]) {
+        e.sphere(sx, sy, sz, r, EGG_SPOT, solid);
+      }
+      const fp = e.project(cx + 0.27, cy + 0.21, cz + 0.08);
+      e.dot(fp.sx - 3, fp.sy, e.rgb(INK[0], INK[1], INK[2]));
+      e.dot(fp.sx - 2, fp.sy, e.rgb(INK[0], INK[1], INK[2]));
+      e.dot(fp.sx + 3, fp.sy, e.rgb(INK[0], INK[1], INK[2]));
+      e.dot(fp.sx + 4, fp.sy, e.rgb(INK[0], INK[1], INK[2]));
+      e.dot(fp.sx, fp.sy + 3, e.rgb(168, 96, 84));
+      e.dot(fp.sx + 1, fp.sy + 3, e.rgb(168, 96, 84));
+      e.capsule([pin.x, pin.y, lift + 1.04], [pin.x + 0.18, pin.y - 0.04, lift + 1.3], 0.1, 0.025, () => [82, 148, 76], solid);
+      e.capsule([pin.x + 0.12, pin.y + 0.02, lift + 1.02], [pin.x + 0.34, pin.y + 0.1, lift + 1.16], 0.07, 0.02, () => [70, 132, 66], solid);
+    } else if (kind === "diglett") {
+      e.sphere(pin.x, pin.y, lift + 0.04, 0.44, [96, 70, 48], "rough");
+      e.sphere(pin.x, pin.y, lift + 0.1, 0.34, [112, 82, 56], "rough");
+      const hz = lift + 0.62 * Math.cos(tilt);
+      const hxp = pin.x + dx * 0.62;
+      const hyp = pin.y + dy * 0.62;
+      e.sphere(hxp, hyp, hz, 0.4, [148, 104, 74], solid);
+      e.sphere(hxp + 0.26, hyp + 0.2, hz - 0.02, 0.13, [236, 162, 158], solid);
+      const f = e.project(hxp + 0.2, hyp + 0.16, hz + 0.16);
+      e.dot(f.sx - 5, f.sy, e.rgb(34, 30, 28));
+      e.dot(f.sx - 4, f.sy, e.rgb(34, 30, 28));
+      e.dot(f.sx + 4, f.sy, e.rgb(34, 30, 28));
+      e.dot(f.sx + 5, f.sy, e.rgb(34, 30, 28));
+      e.capsule([hxp + 0.1, hyp + 0.2, hz - 0.12], [hxp + 0.3, hyp + 0.24, hz - 0.16], 0.05, 0.02, () => [90, 60, 40], solid);
+    } else if (kind === "voltorb") {
+      const electrode = pin.id === 5 || pin.id === 8;
+      const top = electrode ? [242, 240, 232] : [212, 62, 52];
+      const bottom = electrode ? [212, 62, 52] : [242, 240, 232];
+      const cx = pin.x + dx * 0.34;
+      const cy = pin.y + dy * 0.34;
+      const cz = lift + 0.47 + (pin.rolling ? Math.sin(pin.rollAngle) * 0.02 : 0);
+      e.sphere(cx, cy, cz, 0.43, top, solid);
+      e.sphere(cx, cy, cz - 0.17, 0.37, bottom, solid);
+      e.capsule([cx - 0.35, cy, cz - 0.02], [cx + 0.35, cy, cz - 0.02], 0.055, 0.055, () => [34, 32, 34], solid);
+      faceAt(e, cx + 0.14, cy + 0.1, cz + 0.17, 3, INK, [120, 40, 40]);
+    } else if (kind === "gastly") {
+      const cz = lift + 0.55 + Math.sin(state.clock * 2 + pin.id) * 0.03;
+      e.sphere(pin.x + dx * 0.4, pin.y + dy * 0.4, cz, 0.45, [96, 66, 136], solid);
+      for (let i = 0; i < 6; i += 1) {
+        const a = state.clock * 0.8 + i * 1.05 + pin.id;
+        e.sphere(
+          pin.x + dx * 0.4 + Math.cos(a) * 0.4,
+          pin.y + dy * 0.4 + Math.sin(a) * 0.4,
+          cz + Math.sin(a * 2) * 0.08,
+          0.17,
+          [116, 84, 154],
+          solid,
+        );
+      }
+      faceAt(e, pin.x + 0.2, pin.y + 0.14, cz + 0.08, 3, [244, 240, 228]);
+      const m = e.project(pin.x + 0.22, pin.y + 0.16, cz + 0.02);
+      e.dot(m.sx, m.sy + 2, e.rgb(196, 104, 108));
+    } else {
+      const snorunt = pin.id % 3 === 0;
+      if (snorunt) {
+        e.capsule([pin.x, pin.y, lift + 0.06], [tip[0], tip[1], tip[2] * 0.9], 0.26, 0.17, () => [228, 236, 242], solid);
+        e.sphere(tip[0], tip[1], tip[2] * 0.92, 0.24, [238, 244, 248], solid);
+        e.capsule([tip[0] - 0.2, tip[1] - 0.02, tip[2] * 0.92], [tip[0] + 0.2, tip[1] - 0.02, tip[2] * 0.92], 0.1, 0.1, () => [96, 152, 196], solid);
+        faceAt(e, tip[0] + 0.1, tip[1] + 0.05, tip[2] * 0.92 + 0.08, 3, [250, 200, 84]);
       } else {
-        const tall = pin.id % 3 !== 0;
-        if (tall) {
-          e.capsule([pin.x, pin.y, lift + 0.1], [tip[0], tip[1], tip[2]], 0.26, 0.16, () => [228, 236, 240], solid);
-          e.sphere(tip[0], tip[1], tip[2], 0.22, [236, 242, 244], solid);
-          e.capsule([pin.x - 0.12, pin.y, lift + 0.9], [pin.x + 0.1, pin.y, lift + 1.18], 0.07, 0.04, () => [196, 128, 74], solid);
-        } else {
-          e.sphere(pin.x + dx * 0.2, pin.y + dy * 0.2, lift + 0.28, 0.36, [176, 130, 100], solid);
-          e.sphere(pin.x + dx * 0.34, pin.y + dy * 0.34, lift + 0.34, 0.22, [198, 150, 114], solid);
-          e.dot(e.project(pin.x + 0.2, pin.y, lift + 0.4).sx, e.project(pin.x + 0.2, pin.y, lift + 0.4).sy, e.rgb(46, 40, 40));
-        }
+        e.sphere(pin.x + dx * 0.08, pin.y + dy * 0.08, lift + 0.3, 0.38, [156, 112, 88], solid);
+        e.sphere(pin.x + dx * 0.24 + 0.02, pin.y + dy * 0.24 + 0.02, lift + 0.46, 0.28, [176, 128, 100], solid);
+        e.capsule([pin.x + 0.1, pin.y + 0.05, lift + 0.42], [pin.x + 0.36, pin.y + 0.2, lift + 0.38], 0.13, 0.11, () => [196, 148, 116], solid);
+        faceAt(e, pin.x + 0.3, pin.y + 0.16, lift + 0.52, 3, INK);
+        e.capsule([pin.x + 0.12, pin.y + 0.02, lift + 0.2], [pin.x + 0.12, pin.y + 0.02, lift + 0.08], 0.04, 0.02, () => [240, 240, 230], solid);
       }
     }
+  }
 
     function drawBowler(e) {
-      const map = state.map;
-      const pal = map.rival;
-      const pose = { z: 0.1, stance: 0.22, scale: 1.2 };
-      if (state.turn === "rival") {
-        if (state.phase === "aim") {
-          pose.armR = 0.9;
-          pose.lean = 0.2;
-        } else if (state.phase === "roll") {
-          pose.armR = 1.8;
-          pose.lean = 0.5;
-        }
-      } else if (state.phase === "aim") {
-        pose.armR = 0.2 + state.power * 1.5;
-        pose.lean = 0.1 + state.power * 0.15;
-      } else if (state.phase === "roll") {
-        pose.armR = 1.9;
-        pose.lean = 0.55;
-      } else {
-        pose.armR = 0.5;
-      }
-      const palette = state.turn === "rival"
-        ? { shirt: pal.shirt, stripe: pal.stripe, legs: [58, 64, 72], skin: pal.skin, hair: pal.hair }
-        : { shirt: [230, 224, 204], stripe: [188, 92, 56], legs: [56, 62, 70], skin: [226, 182, 142], hair: [70, 50, 38] };
-      const hand = e.figure(8.0, state.bowlerX, Math.PI, pose, palette);
+      const pal = state.turn === "rival" ? state.map.rival : null;
+      const shirt = pal ? pal.shirt : [238, 234, 220];
+      const stripe = pal ? pal.stripe : [182, 72, 52];
+      const skin = pal ? pal.skin : [228, 178, 132];
+      const cap = pal ? pal.hair : [178, 56, 44];
+      const shorts = [46, 50, 62];
+      const shoe = [32, 30, 32];
+      const x = 8.05;
+      const y = state.bowlerX;
+      const z = 0.12;
+      const swinging = state.phase === "roll";
+      const arm = swinging ? 2.35 : state.turn === "rival" ? 1.0 : 0.32 + state.power * 1.25;
+      const lean = swinging ? 0.34 : 0.12;
+      const hip = z + 0.78;
+      const chest = z + 1.3;
+
+      e.castShadow(x - 0.08, y, 0.05, 0.7, 0.75, 0.55);
+      /* legs */
+      e.capsule([x, y - 0.16, z + 0.02], [x + 0.02, y - 0.17, hip], 0.13, 0.11, () => shorts, "solid");
+      e.capsule([x, y + 0.16, z + 0.02], [x + 0.02, y + 0.17, hip], 0.13, 0.11, () => shorts, "solid");
+      /* shoes */
+      e.box(x - 0.1, y - 0.27, z, x + 0.34, y - 0.05, z + 0.12, shoe, 8);
+      e.box(x - 0.1, y + 0.05, z, x + 0.34, y + 0.27, z + 0.12, shoe, 9);
+      /* shorts then shirt, so both read */
+      e.capsule([x + 0.02, y, z + 0.5], [x + 0.02, y, z + 0.92], 0.26, 0.24, () => shorts, "solid");
+      e.capsule([x + 0.02, y, z + 0.88], [x + 0.02 + lean * 0.3, y, chest], 0.25, 0.2, () => shirt, "solid");
+      e.box(x + 0.12, y - 0.17, z + 1.02, x + 0.24, y + 0.17, z + 1.16, stripe, 10);
+      e.capsule([x + 0.02, y, chest - 0.02], [x + 0.02, y, chest + 0.1], 0.1, 0.08, () => skin, "solid");
+      /* off arm: sleeve then bare forearm */
+      e.capsule([x + 0.02, y - 0.24, chest - 0.08], [x + 0.06, y - 0.3, z + 1.02], 0.09, 0.075, () => shirt, "solid");
+      e.capsule([x + 0.06, y - 0.3, z + 1.02], [x + 0.12, y - 0.34, z + 0.76], 0.065, 0.055, () => skin, "solid");
+      e.sphere(x + 0.12, y - 0.34, z + 0.73, 0.075, skin, "solid");
+      /* head */
+      const hx = x + 0.02 + lean * 0.32;
+      e.capsule([hx, y, chest], [hx + 0.01, y, chest + 0.08], 0.1, 0.1, () => skin, "solid");
+      e.sphere(hx, y, chest + 0.2, 0.2, skin, "solid");
+      /* cap dome and brim */
+      e.sphere(hx - 0.02, y, chest + 0.28, 0.19, cap, "solid");
+      e.box(hx + 0.12, y - 0.15, chest + 0.22, hx + 0.28, y + 0.15, chest + 0.29, cap, 11);
+      const eye = e.project(hx + 0.17, y + 0.07, chest + 0.18);
+      e.dot(eye.sx, eye.sy, e.rgb(30, 28, 28));
+      e.dot(eye.sx + 1, eye.sy, e.rgb(30, 28, 28));
+      const eye2 = e.project(hx + 0.16, y - 0.07, chest + 0.18);
+      e.dot(eye2.sx, eye2.sy, e.rgb(30, 28, 28));
+      const mouth = e.project(hx + 0.19, y + 0.0, chest + 0.11);
+      e.dot(mouth.sx, mouth.sy, e.rgb(150, 96, 78));
+      /* throwing arm */
+      const shoulder = [hx, y + 0.26, chest - 0.06];
+      const hand = [
+        hx + Math.sin(arm) * 0.42,
+        y + 0.34 + Math.cos(arm) * 0.08,
+        z + 0.72 + Math.cos(arm) * 0.56,
+      ];
+      const elbow = [shoulder[0] + Math.sin(arm) * 0.2, shoulder[1] + 0.06, shoulder[2] - 0.22];
+      e.capsule(shoulder, elbow, 0.09, 0.07, () => shirt, "solid");
+      e.capsule(elbow, hand, 0.065, 0.055, () => skin, "solid");
+      e.sphere(hand[0], hand[1], hand[2], 0.08, skin, "solid");
       e.flushShadows();
-      return hand;
+      return { x: hand[0] + 0.02, y: hand[1], z: hand[2] };
     }
 
     function drawAim(e) {
       if (state.phase !== "aim" || state.turn === "rival") return;
+      if (state.dragging) {
+        const from = e.project(7.55, state.bowlerX, 0.4);
+        const back = 14 + state.power * 46;
+        for (let i = 2; i < back; i += 4) {
+          e.dot(from.sx + i * 0.55, from.sy + i * 0.5, e.rgb(244, 238, 220));
+        }
+        const barX = e.W - 16;
+        const barTop = e.H - 70;
+        for (let i = 0; i < 10; i += 1) {
+          const filled = i < Math.round(state.power * 10);
+          e.dot(barX, barTop + i * 4, filled ? e.rgb(214, 92, 64) : e.rgb(120, 116, 108));
+          e.dot(barX + 1, barTop + i * 4, filled ? e.rgb(196, 78, 54) : e.rgb(120, 116, 108));
+        }
+      }
       const speed = 6 + state.power * 8;
       let x = 7.55;
       let y = state.bowlerX;
@@ -1372,7 +1533,7 @@ const PokePins = (() => {
       const ball = state.ball;
       if (ball && !ball.gone) paintBall(engine, ball.x, ball.y, Math.max(ball.z, BALL_R * 0.5), ball.phase);
       else if (state.phase === "aim") {
-        paintBall(engine, 7.25, state.bowlerX, 0.5, state.clock * 2);
+        paintBall(engine, hand.x + 0.16, hand.y + 0.3, hand.z + 0.12, state.clock * 2);
       }
       for (const pin of state.pins) {
         if (pin.down && !pin.lying && !pin.launched) continue;
@@ -1424,7 +1585,8 @@ const PokePins = (() => {
       const dy = event.clientY - state.dragStart.y;
       const pull = Math.hypot(dx, dy);
       state.power = clamp(pull / 130, 0, 1);
-      state.aim = clamp(dx * 0.0028, -0.22, 0.22);
+      state.aim = clamp(-dx * 0.0022, -0.2, 0.2);
+      say(`power ${Math.round(state.power * 100)} · spin ${state.spin.toFixed(1)}`);
     }
 
     function onPointerUp(event) {
