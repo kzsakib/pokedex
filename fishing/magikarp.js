@@ -6,6 +6,11 @@
 
 import PixelEngine from "./engine.js";
 import { isMuted } from "../src/audio.js";
+import {
+  pixelSpriteFallbackUrl,
+  pixelSpriteRawUrl,
+  pixelSpriteUrl,
+} from "../src/api.js";
 
 const MagikarpCast = (() => {
   const TAU = Math.PI * 2;
@@ -13,12 +18,12 @@ const MagikarpCast = (() => {
   const STORAGE_KEY = "pixel-plays:magikarp-cast:best";
 
   /* island, in world units; the pier runs from the south bank into the pond */
-  const ISLAND_R = 11.2;
-  const GRASS_R = 8.2;
-  const SAND_R = 7.1;
+  const ISLAND_R = 11.6;
+  const GRASS_R = 8.8;
+  const SAND_R = 7.15;
   const POND_R = 6.5;
-  const PIER = { x0: -0.95, x1: 0.95, y0: 5.1, y1: 11.1 };
-  const ANGLER = { x: 0, y: 5.35, yaw: -Math.PI / 2 };
+  const PIER = { x0: -1.95, x1: -0.15, y0: 5.3, y1: 10.9 };
+  const ANGLER = { x: -1.05, y: 5.6, yaw: -Math.PI / 2 };
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -30,14 +35,28 @@ const MagikarpCast = (() => {
   ];
 
   const PALETTE = {
-    water: [64, 138, 136],
-    waterDeep: [40, 104, 116],
-    sand: [233, 224, 197],
-    shore: [98, 134, 66],
-    grass: [130, 164, 78],
-    rock: [96, 96, 88],
-    leaf: { deep: [32, 60, 46], mid: [54, 92, 54], silver: [86, 120, 66], bark: [72, 52, 38] },
+    water: [62, 142, 138],
+    waterDeep: [38, 104, 118],
+    sand: [204, 212, 196],
+    sandWet: [178, 192, 184],
+    shore: [84, 126, 56],
+    grass: [130, 172, 80],
+    grassLight: [166, 192, 100],
+    rock: [152, 158, 148],
+    leaf: { deep: [34, 66, 48], mid: [62, 104, 58], silver: [104, 142, 76], bark: [150, 134, 106] },
   };
+
+  /* The pond holds real registry fish: a common carp, three uncommon pond
+     dwellers, and one very long serpent for a perfect cast and hook. */
+  const SPECIES = {
+    magikarp: { id: 129, name: "Magikarp", min: 42, max: 96 },
+    poliwag: { id: 60, name: "Poliwag", min: 26, max: 54 },
+    goldeen: { id: 118, name: "Goldeen", min: 34, max: 72 },
+    psyduck: { id: 54, name: "Psyduck", min: 40, max: 78 },
+    tentacool: { id: 72, name: "Tentacool", min: 44, max: 86 },
+    gyarados: { id: 130, name: "Gyarados", min: 340, max: 520 },
+  };
+  const UNCOMMON = ["poliwag", "goldeen", "psyduck", "tentacool"];
 
   const CARP = [232, 96, 60];
   const CARP_DARK = [186, 66, 46];
@@ -142,25 +161,96 @@ const MagikarpCast = (() => {
     miss: () => tone({ from: 300, to: 150, type: "triangle", length: 0.18, level: 0.03 }),
   };
 
+  /* ---------------- registry sprites ---------------- */
+
+  const sprites = new Map();
+
+  function loadSprite(id) {
+    if (sprites.has(id)) return sprites.get(id);
+    const entry = { id, img: null, data: null, w: 0, h: 0, status: "loading" };
+    sprites.set(id, entry);
+    const plan = [
+      [pixelSpriteUrl(id), true],
+      [pixelSpriteUrl(id), false],
+      [pixelSpriteRawUrl(id), false],
+      [pixelSpriteFallbackUrl(id), false],
+    ];
+    let attempt = 0;
+    const img = new Image();
+    img.decoding = "async";
+    const load = () => {
+      const [url, cors] = plan[attempt];
+      if (cors) img.crossOrigin = "anonymous";
+      else img.removeAttribute("crossorigin");
+      img.src = url;
+    };
+    img.onload = () => {
+      entry.img = img;
+      try {
+        const scratch = document.createElement("canvas");
+        scratch.width = img.naturalWidth;
+        scratch.height = img.naturalHeight;
+        const context = scratch.getContext("2d", { willReadFrequently: true });
+        context.imageSmoothingEnabled = false;
+        context.drawImage(img, 0, 0);
+        const pixels = context.getImageData(0, 0, scratch.width, scratch.height);
+        entry.data = new Uint32Array(pixels.data.buffer.slice(0));
+        entry.w = scratch.width;
+        entry.h = scratch.height;
+      } catch {
+        entry.data = null;
+      }
+      entry.status = "ready";
+    };
+    img.onerror = () => {
+      attempt += 1;
+      if (attempt < plan.length) load();
+      else entry.status = "error";
+    };
+    load();
+    return entry;
+  }
+
+  function drawFishSprite(e, key, x, y, z, height, opts = {}) {
+    const entry = loadSprite(SPECIES[key].id);
+    const p = e.project(x, y, z);
+    if (entry.status === "ready") {
+      e.drawSprite(entry, p.sx, p.sy, height, opts);
+    } else {
+      drawCarp(e, x, y, z, 1.6, e.hash(x, y) * 6, { dark: true });
+    }
+    return entry;
+  }
+
   /* ---------------- island art ---------------- */
 
   function buildIsland(e, onTree) {
     const p = PALETTE;
     e.field(-15, -15, 15, 15, 0.055, (x, y) => {
-      const wob = e.noise(x * 0.32, y * 0.32) * 1.15 + e.noise(x * 0.95, y * 0.95) * 0.4;
-      const r = Math.hypot(x, y) + wob - 0.85;
+      const wob =
+        e.noise(x * 0.26, y * 0.26) * 1.5 +
+        e.noise(x * 0.62, y * 0.62) * 0.7 +
+        e.noise(x * 1.3, y * 1.3) * 0.25;
+      const r = Math.hypot(x, y) + wob - 1.15;
       if (r > ISLAND_R) return null;
       if (r > GRASS_R) {
-        const shade = (e.hash(x * 3, y * 3) - 0.5) * 0.5;
-        const tone = Math.sin(x * 0.55 + y * 0.3) * 0.5 + Math.sin(y * 0.8 - x * 0.2) * 0.5;
-        return { z: 0.66, color: mix(p.shore, p.grass, 0.45 + tone * 0.18), kind: e.KIND_GRASS, shade };
+        const shade = (e.hash(x * 3, y * 3) - 0.5) * 0.6;
+        const patch = e.noise(x * 0.9 + 2.5, y * 0.9 - 1.5);
+        const tone = Math.sin(x * 0.5 + y * 0.3) * 0.5 + Math.sin(y * 0.7 - x * 0.2) * 0.5;
+        const base = mix(p.shore, p.grass, 0.55 + tone * 0.15 + patch * 0.2);
+        return {
+          z: 0.68,
+          color: patch > 0.62 ? mix(base, p.grassLight, 0.4) : base,
+          kind: e.KIND_GRASS,
+          shade,
+        };
       }
       if (r > SAND_R) {
         const shade = e.noise(x * 0.8, y * 0.8) * 0.35;
-        return { z: 0.6, color: mix(p.sand, [252, 248, 236], 0.2 + shade * 0.4), kind: e.KIND_GROUND, shade };
+        return { z: 0.6, color: mix(p.sand, [248, 248, 240], 0.15 + shade * 0.4), kind: e.KIND_GROUND, shade };
       }
       if (r > POND_R) {
-        return { z: 0.4, color: mix(p.sand, p.shore, 0.3), shade: -0.15 };
+        return { z: 0.4, color: mix(p.sandWet, p.shore, 0.18), shade: -0.1 };
       }
       const deep = Math.hypot(x, y) / POND_R;
       return {
@@ -173,8 +263,15 @@ const MagikarpCast = (() => {
 
     /* raised grassy lip around the shelf */
     for (let a = 0; a < TAU; a += 0.02) {
-      const rr = ISLAND_R - 0.55;
-      e.sphere(Math.cos(a) * rr, Math.sin(a) * rr, 0.58, 0.34, p.shore, "rough");
+      const rr = ISLAND_R - 0.5;
+      e.sphere(Math.cos(a) * rr, Math.sin(a) * rr, 0.56, 0.4, p.shore, "rough");
+    }
+    /* pale stones edging the sand, as in the reference */
+    for (let i = 0; i < 12; i += 1) {
+      const a = i * 0.53 + 0.7;
+      const rr = POND_R + 0.55 + (i % 3) * 0.18;
+      const r = 0.22 + (i % 2) * 0.06;
+      e.sphere(Math.cos(a) * rr, Math.sin(a) * rr, 0.44, r, p.rock, "solid");
     }
 
     /* pier: planks, posts, a crate and a lantern */
@@ -197,9 +294,9 @@ const MagikarpCast = (() => {
       e.growTree(x, y, scale, 240, seed, p.leaf);
       e.castShadow(x, y, 0, 0.55 * scale, 0.5, 0.3);
     };
-    treeAt(-5.9, 2.9, 1.0, 7);
-    treeAt(6.1, 3.5, 0.82, 14);
-    treeAt(-1.8, 8.7, 0.58, 23);
+    treeAt(-1.1, -7.7, 1.3, 7);
+    treeAt(-7.2, 1.9, 1.05, 14);
+    treeAt(6.9, 1.6, 1.12, 23);
 
     /* bushes, lily pads, reeds, stones */
     const bushAt = (x, y, s, seed) => {
@@ -216,10 +313,11 @@ const MagikarpCast = (() => {
       }
       e.castShadow(x, y, 0.6, 0.42 * s, 0.5, 0.3);
     };
-    bushAt(-3.0, 8.3, 0.9, 1);
-    bushAt(3.2, 8.1, 0.8, 2.4);
-    bushAt(-7.4, 4.2, 0.8, 3.7);
-    bushAt(7.5, 2.6, 0.72, 5.2);
+    bushAt(-5.2, 6.9, 0.9, 1);
+    bushAt(4.6, 6.6, 0.82, 2.4);
+    bushAt(-9.0, -2.4, 0.8, 3.7);
+    bushAt(8.8, -3.2, 0.78, 5.2);
+    bushAt(0.4, 8.9, 0.66, 6.3);
 
     const pad = (x, y, r) => {
       const q = e.project(x, y, 0.03);
@@ -231,10 +329,10 @@ const MagikarpCast = (() => {
     pad(2.5, 2.1, 6);
     pad(-2.9, -1.5, 5);
 
-    for (let i = 0; i < 9; i += 1) {
-      const a = i * 0.78 + 1.2;
-      const rr = ISLAND_R - 1.4 - (i % 3) * 0.5;
-      e.sphere(Math.cos(a) * rr, Math.sin(a) * rr, 0.66, 0.25 + (i % 3) * 0.05, p.rock, "solid");
+    for (let i = 0; i < 10; i += 1) {
+      const a = i * 0.72 + 1.2;
+      const rr = ISLAND_R - 1.6 - (i % 3) * 0.5;
+      e.sphere(Math.cos(a) * rr, Math.sin(a) * rr, 0.66, 0.26 + (i % 3) * 0.06, p.rock, "solid");
     }
     for (let i = 0; i < 14; i += 1) {
       const a = i * 0.44 + 0.3;
@@ -573,9 +671,10 @@ const MagikarpCast = (() => {
       sfx.plop();
       const angle = rand(0, TAU);
       const radius = rand(1.4, 4.2);
+      const swimmers = ["magikarp", ...UNCOMMON];
       state.shadows = [
-        { id: "a", angle, radius, speed: rand(0.5, 0.9), wobble: rand(0, TAU) },
-        { id: "b", angle: angle + Math.PI, radius: radius + rand(-0.5, 0.5), speed: rand(0.35, 0.7), wobble: rand(0, TAU) },
+        { species: swimmers[(Math.random() * swimmers.length) | 0], angle, radius, speed: rand(0.5, 0.9), wobble: rand(0, TAU) },
+        { species: swimmers[(Math.random() * swimmers.length) | 0], angle: angle + Math.PI, radius: radius + rand(-0.5, 0.5), speed: rand(0.35, 0.7), wobble: rand(0, TAU) },
       ];
       say(`watch the float · ${currentLine()}`);
     }
@@ -606,13 +705,20 @@ const MagikarpCast = (() => {
       state.phase = "reel";
       state.reelT = 0;
       state.sweetD = rand(2.4, 6.6);
-      const size = rand(30, 78) + (state.perfectCast ? rand(6, 18) : 0) + (state.perfectHook ? rand(3, 9) : 0);
-      const serpent = state.perfectCast && state.perfectHook && Math.random() < 0.25;
+      let key = "magikarp";
+      if (state.perfectCast) key = UNCOMMON[(Math.random() * UNCOMMON.length) | 0];
+      if (state.perfectCast && state.perfectHook && Math.random() < 0.25) key = "gyarados";
+      const species = SPECIES[key];
+      const size = rand(species.min, species.max);
+      const bonus = key === "gyarados" ? 90 + Math.round(size / 12) : Math.round(size / 10) * (state.perfectHook ? 1.5 : 1) * (state.perfectCast ? 1.25 : 1);
       state.fish = {
-        serpent,
-        size: serpent ? rand(215, 320) : size,
-        points: serpent ? 90 + Math.round(size / 12) : Math.round(size / 10) * (state.perfectHook ? 1.5 : 1) * (state.perfectCast ? 1.25 : 1),
+        species: key,
+        name: species.name,
+        serpent: key === "gyarados",
+        size,
+        points: bonus,
       };
+      loadSprite(species.id);
       sfx.hook();
       say(state.perfectHook ? "perfect hook · hold on" : "hooked · hold on");
     }
@@ -630,8 +736,8 @@ const MagikarpCast = (() => {
       paintHud();
       say(
         fish.serpent
-          ? `serpent splash · ${Math.round(fish.size)} cm · +${points}`
-          : `${state.perfectHook ? "perfect" : "clean"} hook · carp ${Math.round(fish.size)} cm · +${points}`,
+          ? `serpent splash · ${fish.name.toLowerCase()} ${Math.round(fish.size)} cm · +${points}`
+          : `${state.perfectHook ? "perfect" : "clean"} hook · ${fish.name.toLowerCase()} ${Math.round(fish.size)} cm · +${points}`,
       );
     }
 
@@ -670,10 +776,10 @@ const MagikarpCast = (() => {
           <p class="mc-card__size">${Math.round(result.size)} <span>cm</span></p>
         </div>
         <div class="mc-card__body">
-          <img class="mc-card__art" alt="" src="${portrait(result.serpent)}" />
+          <img class="mc-card__art" alt="${result.name}" src="${pixelSpriteUrl(SPECIES[result.species].id)}" data-mc-art />
           <div>
-            <p class="mc-card__name">${result.serpent ? "Serpent" : "Carp"}</p>
-            <p class="mc-card__meta">${result.serpent ? "hooked in the deep" : "pond variety"} · ${state.perfectHook ? "perfect hook" : "clean hook"} · ${state.perfectCast ? "ripple cast" : "open cast"}</p>
+            <p class="mc-card__name">${result.name}</p>
+            <p class="mc-card__meta">${result.serpent ? "hooked in the deep" : "pond catch"} · ${state.perfectHook ? "perfect hook" : "clean hook"} · ${state.perfectCast ? "ripple cast" : "open cast"}</p>
             <p class="mc-card__points">+${Math.round(result.points)} points</p>
             ${over ? `<p class="mc-card__meta">round total ${Math.round(state.score)}${record ? " · new best" : ""}</p>` : ""}
           </div>
@@ -682,6 +788,23 @@ const MagikarpCast = (() => {
           ${over ? "Cast again" : "Next cast"}
         </button>`;
       hud.card.hidden = false;
+
+      /* the sprite CDN occasionally misses: walk the same fallback chain the
+         rest of the site uses before giving up on the art */
+      const art = hud.card.querySelector("[data-mc-art]");
+      if (art) {
+        const urls = [
+          pixelSpriteUrl(SPECIES[result.species].id),
+          pixelSpriteRawUrl(SPECIES[result.species].id),
+          pixelSpriteFallbackUrl(SPECIES[result.species].id),
+        ];
+        let step = 0;
+        art.addEventListener("error", () => {
+          step += 1;
+          if (step < urls.length) art.src = urls[step];
+          else art.src = portrait(result.serpent);
+        });
+      }
     }
 
     /* ---------- portrait ---------- */
@@ -870,9 +993,15 @@ const MagikarpCast = (() => {
           const y = Math.sin(shadow.angle) * shadow.radius;
           const p = engine.project(x, y, 0.02);
           const wiggle = Math.sin(state.clock * 2 + shadow.wobble);
-          drawCarp(engine, x, y, 0.02, 1.5 + shadow.radius * 0.2, wiggle, { dark: true });
+          const flip = Math.cos(shadow.angle) < 0;
+          drawFishSprite(engine, shadow.species, x, y, 0.02, 20 + shadow.radius * 2, {
+            tint: [22, 62, 68],
+            alpha: 0.7,
+            dither: 0.25,
+            flip,
+          });
           if (Math.sin(state.clock * 0.9 + shadow.wobble) > 0.995) {
-            engine.ring(p.sx, p.sy + 2, 5, 0.4, engine.rgb(214, 240, 236), 3);
+            engine.ring(p.sx + wiggle, p.sy + 2, 5, 0.4, engine.rgb(214, 240, 236), 3);
           }
         }
       }
@@ -881,8 +1010,10 @@ const MagikarpCast = (() => {
         const base = state.cast.target;
         const fishX = lerp(base.x, ANGLER.x, t * 0.85);
         const fishY = lerp(base.y, ANGLER.y - 1.2, t * 0.7);
-        drawCarp(engine, fishX, fishY, lerp(0.02, 0.16, t), state.fish.serpent ? 2.4 : 1.9, state.clock * 6, {
-          dark: true,
+        drawFishSprite(engine, state.fish.species, fishX, fishY, lerp(0.02, 0.16, t), state.fish.serpent ? 42 : 26, {
+          tint: [22, 62, 68],
+          alpha: 0.72,
+          dither: 0.2,
         });
         for (let i = 0; i < 2; i += 1) {
           const p = engine.project(fishX, fishY, 0.02);
@@ -895,8 +1026,9 @@ const MagikarpCast = (() => {
         const x = lerp(base.x, ANGLER.x - 1.4, t);
         const y = lerp(base.y, ANGLER.y - 1.6, t);
         const z = 0.1 + Math.sin(Math.PI * t) * 4.6;
-        if (state.fish.serpent) drawSerpent(engine, x, y, z, 3.6, state.clock * 3);
-        else drawCarp(engine, x, y, z, 2.6, Math.sin(t * 12) * 0.7);
+        drawFishSprite(engine, state.fish.species, x, y, z, state.fish.serpent ? 62 : 34, {
+          flip: t > 0.6,
+        });
       }
     }
 
@@ -1149,6 +1281,7 @@ const MagikarpCast = (() => {
     const api = { pause, resume, step };
 
     syncSize();
+    Object.values(SPECIES).forEach((species) => loadSprite(species.id));
     bakeScene();
     resetRound();
     paintHud();

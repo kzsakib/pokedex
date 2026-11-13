@@ -27,8 +27,9 @@ export default function MagikarpCast() {
       <div className="mc-shell" ref={rootRef}>
         <p className="mc-intro">
           One pond, five casts. Hold to fill the meter, release over the ripple
-          patch, then strike the instant the float dips. Most casts land a carp;
-          a perfect cast with a perfect hook sometimes wakes something longer.
+          patch, then strike the instant the float dips. Magikarp are the usual
+          catch; a perfect cast tempts rarer pond Pokémon, and a perfect cast
+          with a perfect hook sometimes wakes something much longer.
         </p>
 
         <div className="mc-stage">
