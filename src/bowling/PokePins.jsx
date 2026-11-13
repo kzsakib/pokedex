@@ -72,6 +72,26 @@ export default function PokePins() {
           </div>
         </div>
 
+        <div className="pp-touch" aria-label="Position and spin">
+          <span className="pp-touch__label">pos</span>
+          <button type="button" className="pp-touch__btn" data-nudge="pos-left" aria-label="Move left">
+            ‹
+          </button>
+          <button type="button" className="pp-touch__btn" data-nudge="pos-right" aria-label="Move right">
+            ›
+          </button>
+          <span className="pp-touch__label">spin</span>
+          <button type="button" className="pp-touch__btn" data-nudge="spin-left" aria-label="Less spin">
+            ‹
+          </button>
+          <span className="pp-touch__val" data-bowl="spin">
+            0
+          </span>
+          <button type="button" className="pp-touch__btn" data-nudge="spin-right" aria-label="More spin">
+            ›
+          </button>
+        </div>
+
         <div className="pp-controls">
           <div className="pp-modes" role="group" aria-label="Mode">
             <button type="button" className="pp-mode" data-mode="solo">

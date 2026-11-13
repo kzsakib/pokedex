@@ -385,6 +385,7 @@ const PokePins = (() => {
       status: q("status"),
       total: q("total"),
       best: q("best"),
+      spin: q("spin"),
       banner: q("banner"),
       merc: q("merc"),
       mute: q("mute"),
@@ -503,6 +504,7 @@ const PokePins = (() => {
       }
       if (hud.total) hud.total.textContent = mine.total == null ? "" : String(mine.total);
       if (hud.best) hud.best.textContent = String(state.best);
+      if (hud.spin) hud.spin.textContent = String(Math.round(state.spin * 10) / 10);
       if (hud.banner) {
         hud.banner.textContent = state.banner;
         hud.banner.hidden = !state.banner;
@@ -1529,6 +1531,18 @@ const PokePins = (() => {
       paintMaps();
     }
     rootEl.addEventListener("click", onModeClick);
+
+    function onNudge(event) {
+      const button = event.target.closest("[data-nudge]");
+      if (!button || state.phase !== "aim") return;
+      const step = button.dataset.nudge;
+      if (step === "pos-left") state.bowlerX = clamp(state.bowlerX - 0.15, -1.2, 1.2);
+      if (step === "pos-right") state.bowlerX = clamp(state.bowlerX + 0.15, -1.2, 1.2);
+      if (step === "spin-left") state.spin = clamp(state.spin - 0.2, -1, 1);
+      if (step === "spin-right") state.spin = clamp(state.spin + 0.2, -1, 1);
+      paintHud();
+    }
+    rootEl.addEventListener("click", onNudge);
 
     function onMute() {
       window.dispatchEvent(new CustomEvent("pokedex:sound-toggle"));

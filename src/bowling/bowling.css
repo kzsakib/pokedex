@@ -255,6 +255,53 @@
   border-color: var(--pp-ink);
 }
 
+/* touch steppers */
+
+.pp-touch {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pp-muted);
+}
+
+.pp-touch__label {
+  margin-left: 4px;
+}
+
+.pp-touch__btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--pp-rule);
+  background: transparent;
+  color: var(--pp-ink);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pp-touch__btn:active {
+  background: rgba(28, 27, 25, 0.08);
+}
+
+.pp-touch__val {
+  min-width: 22px;
+  text-align: center;
+  font-size: 9px;
+  color: var(--pp-ink);
+}
+
+@media (pointer: coarse) {
+  .pp-touch {
+    display: flex;
+  }
+}
+
 /* controls */
 
 .pp-controls {
