@@ -491,9 +491,9 @@ const PixelEngine = (() => {
     }
 
     function drawTufts(t) {
-      /* Whole pixels at 8 fps: the sway should look hand-animated. */
-      const stepped = Math.floor(t * WIND_FPS) / WIND_FPS;
-      t = stepped;
+      /* Whole pixels at 8 fps: the sway should look hand-animated. Under
+         reduced motion the tufts still draw, just at rest. */
+      t = STILL ? 0 : Math.floor(t * WIND_FPS) / WIND_FPS;
       for (const tuft of tufts) {
         const gust =
           Math.sin(t * 0.8 + tuft.phase) +
@@ -518,7 +518,7 @@ const PixelEngine = (() => {
     }
 
     function drawLeaves(t) {
-      t = Math.floor(t * WIND_FPS) / WIND_FPS;
+      t = STILL ? 0 : Math.floor(t * WIND_FPS) / WIND_FPS;
       for (const leaf of leaves) {
         const reach = clamp((leaf.z - 2.5) / 3, 0.3, 1);
         const swayX =

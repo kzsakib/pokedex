@@ -80,10 +80,10 @@
 .fish-map__art {
   display: block;
   width: 100%;
-  height: 84px;
+  height: 100px;
   background-color: #cfd9d8;
-  background-size: cover;
-  background-position: 50% 42%;
+  background-size: contain;
+  background-position: 50% 58%;
   background-repeat: no-repeat;
   image-rendering: pixelated;
   border-bottom: 1px solid var(--fish-line-soft);

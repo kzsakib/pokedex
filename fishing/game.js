@@ -297,7 +297,7 @@ const AnglingStation = (() => {
         };
       }
       if (r > POND_R) {
-        return { z: 0.4, color: mix(p.sand, p.water, 0.35), shade: -0.3 };
+        return { z: 0.4, color: mix(p.sand, p.shore, 0.3), shade: -0.15 };
       }
       return { z: 0, color: waterColor(p, x, y), kind: e.KIND_WATER, shade: 0.1 };
     });
@@ -327,7 +327,7 @@ const AnglingStation = (() => {
 
     const treeAt = (x, y, scale, seed) => {
       onTree?.(x, y, scale);
-      e.growTree(x, y, scale, 240, seed, p.leaf);
+      e.growTree(x, y, scale, 240, seed, { ...p.leaf, bark: [74, 52, 38] });
       e.castShadow(x, y, 0, 0.55 * scale, 0.5, 0.3);
     };
 
@@ -337,8 +337,8 @@ const AnglingStation = (() => {
       e.capsule([6.7, -1.9, 2.5], [6.7, -1.9, 6.4], 0.4, 0.28, () => [232, 228, 214], "solid");
       e.sphere(6.7, -1.9, 6.5, 0.5, [250, 238, 190], "gloss");
       e.box(6.1, -2.5, 6.2, 7.3, -1.3, 6.3, [120, 112, 100], 7);
-      treeAt(-5.4, -3.0, 1.0, 21);
-      treeAt(2.6, -6.6, 0.72, 33);
+      treeAt(-6.6, 3.6, 1.0, 21);
+      treeAt(3.6, 8.6, 0.78, 33);
     } else if (level.art === "dock") {
       e.box(3.6, 4.4, 0.6, 4.9, 5.7, 1.3, [146, 108, 68], 8);
       e.box(3.8, 4.6, 1.3, 4.7, 5.5, 1.86, [160, 120, 76], 9);
@@ -348,8 +348,8 @@ const AnglingStation = (() => {
       e.box(-4.35, 0.7, 0.2, -3.45, 2.8, 0.44, [176, 132, 84], 11);
       e.capsule([-3.9, 1.9, 0.4], [-3.9, 1.9, 3.1], 0.09, 0.06, () => [110, 86, 64], "solid");
       e.box(-4.3, 1.8, 2.6, -3.5, 2.0, 3.35, [232, 224, 202], 0);
-      treeAt(-6.2, 3.4, 0.85, 12);
-      treeAt(3.4, 7.2, 0.7, 14);
+      treeAt(-7.0, 4.0, 0.88, 12);
+      treeAt(4.2, 8.8, 0.74, 14);
     } else if (level.art === "cavern") {
       e.box(-5.4, -5.6, 0.6, -2.2, -2.6, 2.0, [136, 152, 164], 15);
       e.box(-5.2, -5.4, 2.0, -2.4, -2.8, 2.02, [176, 194, 204], 16);
@@ -359,19 +359,60 @@ const AnglingStation = (() => {
       }
       e.capsule([-7.4, -6.6, 8], [-7.0, -6.4, 5.1], 0.26, 0.05, () => [214, 234, 240], "gloss");
       e.capsule([-6.4, -7.2, 7.4], [-6.1, -7.0, 5.4], 0.2, 0.05, () => [214, 234, 240], "gloss");
-      treeAt(6.4, -3.2, 0.8, 18);
+      treeAt(7.4, 1.6, 0.78, 18);
     } else if (level.art === "night") {
       for (let i = 0; i < 6; i += 1) {
         const a = i * 1.05 + 0.4;
         const rr = 2.6 + (i % 3) * 0.9;
         e.sphere(Math.cos(a) * rr, Math.sin(a) * rr, 0.4, 0.2, [150, 132, 200], "gloss");
       }
-      treeAt(-5.8, 1.4, 0.95, 24);
-      treeAt(4.8, -4.6, 0.75, 29);
+      treeAt(-7.0, 3.4, 0.95, 24);
+      treeAt(7.2, 2.8, 0.75, 29);
     } else {
-      treeAt(-4.6, -2.4, 1.05, 3);
-      treeAt(5.2, -3.4, 0.86, 8);
+      treeAt(-6.8, 4.2, 1.05, 3);
+      treeAt(6.8, 5.0, 0.86, 8);
+      treeAt(-1.4, 8.4, 0.6, 17);
     }
+
+    /* crate and lantern on the dock end: the one bit of human clutter */
+    e.box(0.28, 9.15, 0.72, 0.94, 9.8, 1.34, [140, 102, 64], 19);
+    e.box(0.28, 9.15, 1.34, 0.94, 9.8, 1.36, [168, 126, 82], 20);
+    e.capsule([0.82, 10.45, 0.72], [0.82, 10.45, 2.3], 0.07, 0.045, () => [86, 70, 52], "solid");
+    e.sphere(0.82, 10.45, 2.36, 0.19, [252, 214, 138], "gloss");
+    e.castShadow(0.82, 10.45, 0.7, 0.3, 0.5, 0.25);
+
+    /* bushes and ferns thicken the bank so the ring of grass is not bare */
+    const bushAt = (x, y, s, seed) => {
+      for (let i = 0; i < 5; i += 1) {
+        const a = seed + i * 1.6;
+        e.sphere(
+          x + Math.cos(a) * 0.5 * s,
+          y + Math.sin(a) * 0.42 * s,
+          0.74 + (i % 2) * 0.14,
+          (0.34 + (i % 3) * 0.1) * s,
+          mix(p.leaf.mid, [64, 96, 54], i % 2 ? 0.45 : 0.1),
+          "rough",
+        );
+      }
+      e.castShadow(x, y, 0.6, 0.42 * s, 0.5, 0.3);
+    };
+    bushAt(-3.0, 8.3, 0.9, 1);
+    bushAt(3.1, 8.0, 0.8, 2.4);
+    bushAt(-7.4, 4.1, 0.85, 3.7);
+    bushAt(7.6, 2.4, 0.75, 5.2);
+    bushAt(2.2, -7.9, 0.8, 0.6);
+
+    /* lily pads: flat discs laid straight into the water surface */
+    const pad = (x, y, r) => {
+      const q = e.project(x, y, 0.03);
+      for (let rr = r; rr > 1; rr -= 2) e.ring(q.sx, q.sy, rr, 0.6, [92, 138, 76], 2);
+      e.ring(q.sx - 1, q.sy - 1, Math.max(1, r - 4), 0.5, [122, 166, 96], 2);
+    };
+    pad(-2.1, 2.6, 7);
+    pad(-1.2, 3.3, 5);
+    pad(2.4, 2.0, 6);
+    pad(1.5, 2.9, 4);
+    pad(-2.8, -1.6, 5);
 
     /* rocks and reeds around the shore */
     for (let i = 0; i < 9; i += 1) {
@@ -382,14 +423,11 @@ const AnglingStation = (() => {
     for (let i = 0; i < 16; i += 1) {
       const a = i * 0.42 + 0.3;
       const rr = POND_R + 0.5 + (i % 4) * 0.25;
-      e.capsule(
-        [Math.cos(a) * rr, Math.sin(a) * rr, 0.5],
-        [Math.cos(a) * rr + 0.05, Math.sin(a) * rr - 0.05, 1.25 + (i % 3) * 0.2],
-        0.05,
-        0.03,
-        () => mix(p.shore, [96, 138, 74], 0.5),
-        "solid",
-      );
+      const rx = Math.cos(a) * rr;
+      const ry = Math.sin(a) * rr;
+      const top = 1.3 + (i % 3) * 0.22;
+      e.capsule([rx, ry, 0.5], [rx + 0.05, ry - 0.05, top], 0.05, 0.03, () => mix(p.shore, [96, 138, 74], 0.5), "solid");
+      e.sphere(rx + 0.05, ry - 0.05, top, 0.09, mix(p.shore, [76, 108, 58], 0.6), "rough");
     }
 
     /* long hard shadow of the island shelf, falling screen-right */
@@ -509,7 +547,12 @@ const AnglingStation = (() => {
       preview.applyShadows();
       preview.bakeOcclusion();
       preview.bake();
+      preview.growGrass();
       preview.resetFrame();
+      /* canopies and tufts are painted each frame, not baked, so the thumb
+         has to ask for them too or every tree comes out as a stump */
+      preview.drawTufts(0);
+      preview.drawLeaves(0);
       preview.present();
       thumbUrls.set(level.id, scratch.toDataURL("image/png"));
       paintMaps();
@@ -591,8 +634,8 @@ const AnglingStation = (() => {
        are captured before the tree is drawn and put back before the swaying
        leaves are repainted. Otherwise the rest pose bakes in and ghosts. */
     function captureTree(e, cx, cy, scale = 1) {
-      const box = e.project(cx - 3.2 * scale, cy - 3.2 * scale, 0);
-      const box2 = e.project(cx + 3.2 * scale, cy + 3.2 * scale, 6.4 * scale);
+      const box = e.project(cx - 4.4 * scale, cy - 4.4 * scale, 0);
+      const box2 = e.project(cx + 4.4 * scale, cy + 4.4 * scale, 7.2 * scale);
       const x0 = Math.max(0, Math.floor(Math.min(box.sx, box2.sx)) - 6);
       const x1 = Math.min(e.W - 1, Math.ceil(Math.max(box.sx, box2.sx)) + 6);
       const y0 = Math.max(0, Math.floor(Math.min(box.sy, box2.sy)) - 6);
@@ -1326,7 +1369,7 @@ const AnglingStation = (() => {
     }
 
     function drawAngler() {
-      const pose = { z: 0.7, stance: 0.22, scale: 1.1 };
+      const pose = { z: 0.7, stance: 0.22, scale: 1.26 };
       if (state.phase === "flight") {
         pose.lean = 0.45;
         pose.armR = 1.0;
@@ -1542,10 +1585,8 @@ const AnglingStation = (() => {
       engine.resetFrame();
       restoreTree();
       engine.animateWater(state.clock, engine.KIND_WATER, 0.9);
-      if (!engine.STILL) {
-        engine.drawTufts(state.clock);
-        engine.drawLeaves(state.clock);
-      }
+      engine.drawTufts(state.clock);
+      engine.drawLeaves(state.clock);
       if (state.rain && !engine.STILL) {
         for (let i = 0; i < 34; i += 1) {
           const x = (i * 73 + state.clock * 70) % engine.W;
