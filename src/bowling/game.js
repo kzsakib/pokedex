@@ -1437,7 +1437,7 @@ const PokePins = (() => {
     }
 
     function onKeyDown(event) {
-      if (event.code === "Space" || event.key === "Enter") {
+      if (event.code === "Space" || event.key === " " || event.key === "Enter") {
         event.preventDefault();
         if (event.repeat) return;
         if (state.phase === "over") {
@@ -1472,7 +1472,7 @@ const PokePins = (() => {
       if (!mounted || mounted.root !== rootEl) return;
       const raw = Math.min(50, now - (state.lastFrame || now));
       state.lastFrame = now;
-      if (!state.paused && state.visible) {
+      if (!state.paused) {
         state.accumulator += raw;
         let guard = 0;
         while (state.accumulator >= 1000 / 60 && guard < 4) {

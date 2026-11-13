@@ -86,8 +86,8 @@
 }
 
 .pp-canvas:focus-visible {
-  outline: 1px dashed rgba(28, 27, 25, 0.3);
-  outline-offset: 4px;
+  outline: 1px dashed rgba(28, 27, 25, 0.22);
+  outline-offset: -1px;
 }
 
 .pp-status {
