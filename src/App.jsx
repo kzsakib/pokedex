@@ -38,6 +38,7 @@ import ShinyText from "./components/ShinyText";
 import EvolutionTray from "./EvolutionTray";
 import SpecimenScreen from "./SpecimenScreen";
 import TeamBuilder from "./team/TeamBuilder";
+import PokePins from "./bowling/PokePins";
 
 const LEDE =
   "A field instrument for the original 151. Search the field archive, load a specimen record, switch between Pokédex entries by game, and trace the evolution line. Every reading below streams live from PokéAPI.";
@@ -852,11 +853,13 @@ export default function App() {
         </section>
 
 
+        <PokePins />
+
         <footer className="bay closing">
           <div>
             <p className="bay-tag">
               <span className="bay-index" aria-hidden="true">
-                05
+                06
               </span>
               Field unit
             </p>
