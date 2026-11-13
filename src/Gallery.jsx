@@ -43,6 +43,7 @@ export default function Gallery({
   hoverType = null,
   hotIds = null,
   typeById = null,
+  caughtIds = null,
   onTypeHover,
 }) {
   const rootRef = useRef(null);
@@ -388,6 +389,13 @@ export default function Gallery({
                 loading="lazy"
                 decoding="async"
               />
+              {caughtIds?.has(item.id) ? (
+                <span
+                  className="fish-caught-dot"
+                  aria-hidden="true"
+                  title="Logged at the angling station"
+                />
+              ) : null}
             </button>
           ))}
         </div>

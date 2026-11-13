@@ -38,6 +38,7 @@ import ShinyText from "./components/ShinyText";
 import EvolutionTray from "./EvolutionTray";
 import SpecimenScreen from "./SpecimenScreen";
 import TeamBuilder from "./team/TeamBuilder";
+import FishingSection from "./fishing/FishingSection";
 
 const LEDE =
   "A field instrument for the original 151. Search the field archive, load a specimen record, switch between Pokédex entries by game, and trace the evolution line. Every reading below streams live from PokéAPI.";
@@ -280,6 +281,18 @@ export default function App() {
     });
     return ids;
   }, [hoverType, entries]);
+
+  /* Species logged at the angling station, kept here so the archive can mark
+     them without the game and the gallery knowing about each other. */
+  const [caughtFish, setCaughtFish] = useState(() => new Set());
+  const handleCaught = useCallback((ids) => {
+    setCaughtFish((current) => {
+      if (ids.length === current.size && ids.every((id) => current.has(id))) {
+        return current;
+      }
+      return new Set(ids);
+    });
+  }, []);
 
   const { contextSafe } = useGSAP({ scope: shellRef });
 
@@ -805,6 +818,7 @@ export default function App() {
             feed={feed}
             hoverType={hoverType}
             hotIds={hotIds}
+            caughtIds={caughtFish}
             typeById={typeById}
             onTypeHover={previewType}
           />
@@ -851,11 +865,13 @@ export default function App() {
           <TeamBuilder roster={index} />
         </section>
 
+        <FishingSection onSelect={select} onCaught={handleCaught} />
+
         <footer className="bay closing">
           <div>
             <p className="bay-tag">
               <span className="bay-index" aria-hidden="true">
-                05
+                06
               </span>
               Field unit
             </p>
@@ -881,6 +897,17 @@ export default function App() {
                 >
                   Sprite archive
                 </a>
+              </li>
+              <li>
+                Fishing engine adapted from{" "}
+                <a
+                  href="https://github.com/amirmushichge/pixel-plays"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Pixel Plays
+                </a>{" "}
+                by AmirMushich (MIT)
               </li>
             </ul>
           </div>
