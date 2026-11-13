@@ -1,211 +1,137 @@
-/* Angling Station. Same instruments as the rest of the page: pale steel shell,
-   near-black panel, one fixed gold, Martian Mono micro-labels. Every class and
-   id in here is prefixed fish- so nothing can reach the bay or team styles. */
+/* Angling Station — a diorama on the bench, not a screen in a box. The canvas
+   is transparent, the island dissolves into the chassis, and every control is
+   the site's own pale field-instrument hardware: Martian Mono micro-labels,
+   hairline rules, ink on steel, one gold. All classes are fish- prefixed. */
 
 .fish-bay {
-  --fish-gold: #f2c94c;
-  --fish-gold-deep: #a8801a;
-  --fish-line: rgba(255, 255, 255, 0.08);
-  --fish-field: #11181b;
-  --fish-well: #0a1012;
-  --fish-ink: #dfe7ea;
-  --fish-muted: #84929a;
+  --fish-gold: #b3891a;
+  --fish-gold-soft: #f2c94c;
+  --fish-ink: #1b2226;
+  --fish-muted: #5c6a70;
+  --fish-line: rgba(24, 32, 36, 0.16);
+  --fish-line-soft: rgba(24, 32, 36, 0.1);
+  --fish-paper: #e9ecec;
+  --fish-paper-2: #dfe4e4;
+  --fish-well: #d6dcdd;
 }
 
-.fish-panel {
-  position: relative;
-  padding: 14px;
-  border-radius: 12px;
-  border: 1px solid var(--fish-line);
-  background: linear-gradient(180deg, #1c2429 0%, #151c20 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 16px 34px -26px rgba(0, 0, 0, 0.95);
-  color: var(--fish-ink);
+.fish-shell {
+  margin-top: 10px;
 }
 
-/* ---------- head ---------- */
-
-.fish-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 0 0 12px;
-  border-bottom: 1px solid var(--fish-line);
-}
-
-.fish-head__copy {
-  min-width: 0;
-}
-
-.fish-eyebrow {
-  margin: 0 0 4px;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--fish-gold);
-}
-
-.fish-title {
-  margin: 0;
-  font-family: var(--font-body);
-  font-size: 21px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: #f2f5f6;
-}
-
-.fish-sub {
-  margin: 5px 0 0;
-  max-width: 56ch;
+.fish-intro {
+  margin: 0 0 12px;
+  max-width: 62ch;
   font-family: var(--font-mono);
   font-size: 10px;
-  line-height: 1.6;
+  line-height: 1.75;
   color: var(--fish-muted);
 }
 
-.fish-hud {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(64px, auto));
-  gap: 0;
-  margin: 0;
-  padding: 0;
-  flex: 0 0 auto;
-  border: 1px solid var(--fish-line);
-  border-radius: 6px;
-  background: var(--fish-well);
-  overflow: hidden;
-}
+/* ---------- map picker ---------- */
 
-.fish-stat {
-  padding: 7px 10px 6px;
-  border-left: 1px solid var(--fish-line);
-}
-
-.fish-stat:first-child {
-  border-left: 0;
-}
-
-.fish-stat dt {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 8px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--fish-muted);
-  white-space: nowrap;
-}
-
-.fish-stat dd {
-  margin: 3px 0 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.35;
-  font-variant-numeric: tabular-nums;
-  color: var(--fish-ink);
-  text-wrap: balance;
-}
-
-.fish-stat dd.is-hot,
-.fish-hud .is-hot {
-  color: var(--fish-gold);
-}
-
-/* ---------- stage rail ---------- */
-
-.fish-rail {
+.fish-maps {
   display: flex;
-  gap: 6px;
-  margin: 12px 0 0;
-  padding: 0 0 2px;
+  gap: 10px;
+  margin: 4px 0 0;
+  padding: 2px 2px 8px;
   overflow-x: auto;
   scrollbar-width: none;
 }
 
-.fish-rail::-webkit-scrollbar {
+.fish-maps::-webkit-scrollbar {
   display: none;
 }
 
-.fish-level {
+.fish-map {
+  position: relative;
   flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 2px 7px;
-  padding: 7px 10px 6px;
+  width: 168px;
+  padding: 0;
   border: 1px solid var(--fish-line);
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  background: var(--fish-paper);
   color: var(--fish-ink);
   text-align: left;
   cursor: pointer;
+  overflow: hidden;
   transition:
-    border-color 140ms ease,
-    background-color 140ms ease;
+    transform 160ms cubic-bezier(0.3, 0.7, 0.4, 1.05),
+    border-color 160ms ease,
+    background-color 160ms ease;
 }
 
-.fish-level:hover:not(:disabled) {
-  border-color: rgba(242, 201, 76, 0.45);
-  background: rgba(242, 201, 76, 0.05);
+.fish-map:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(24, 32, 36, 0.34);
 }
 
-.fish-level.is-current {
-  border-color: rgba(242, 201, 76, 0.7);
-  background: rgba(242, 201, 76, 0.08);
+.fish-map.is-current {
+  border-color: var(--fish-ink);
+  background: #f1f4f4;
+  box-shadow: inset 0 0 0 1px rgba(24, 32, 36, 0.12);
 }
 
-.fish-level:disabled {
-  opacity: 0.38;
+.fish-map:disabled {
+  opacity: 0.44;
   cursor: not-allowed;
 }
 
-.fish-level__no {
-  grid-row: span 2;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--fish-gold);
+.fish-map__art {
+  display: block;
+  width: 100%;
+  height: 84px;
+  background-color: #cfd9d8;
+  background-size: cover;
+  background-position: 50% 42%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  border-bottom: 1px solid var(--fish-line-soft);
 }
 
-.fish-level__name {
+.fish-map__no {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: rgba(233, 236, 236, 0.9);
   font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.fish-level__stars {
-  font-size: 9px;
+  font-size: 8px;
   letter-spacing: 0.08em;
+  color: var(--fish-ink);
+}
+
+.fish-map__name {
+  display: block;
+  padding: 6px 8px 1px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  line-height: 1.35;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  min-height: 24px;
+}
+
+.fish-map__stars {
+  display: block;
+  padding: 0 8px 6px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
   color: var(--fish-gold);
 }
 
-/* ---------- canvas ---------- */
+/* ---------- the place itself ---------- */
 
 .fish-stage-wrap {
-  margin-top: 12px;
+  margin-top: 4px;
 }
 
 .fish-stage {
   position: relative;
   display: grid;
   place-items: center;
-  padding: 6px;
-  border-radius: 8px;
-  border: 1px solid var(--fish-line);
-  background:
-    radial-gradient(
-      120% 90% at 50% 0%,
-      rgba(64, 82, 88, 0.35),
-      transparent 70%
-    ),
-    #0d1316;
-  box-shadow:
-    inset 0 2px 10px rgba(0, 0, 0, 0.6),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
-  overflow: hidden;
+  padding: 4px 0 0;
 }
 
 .fish-canvas {
@@ -216,45 +142,100 @@
   image-rendering: crisp-edges;
   touch-action: none;
   cursor: crosshair;
-  outline-offset: 4px;
+  outline: none;
   background: transparent;
 }
 
 .fish-canvas:focus-visible {
-  outline: 1px solid rgba(242, 201, 76, 0.55);
-  outline-offset: 2px;
+  outline: 1px dashed rgba(24, 32, 36, 0.3);
+  outline-offset: 4px;
 }
 
 .fish-status {
-  margin: 8px 0 0;
+  margin: 2px 0 0;
   min-height: 1.4em;
+  text-align: center;
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #b9c6cc;
+  color: var(--fish-muted);
+}
+
+/* ---------- readouts ---------- */
+
+.fish-hud {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  margin: 10px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--fish-line);
+  border-bottom: 1px solid var(--fish-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.06));
+}
+
+.fish-stat {
+  padding: 8px 10px 9px;
+  border-left: 1px solid var(--fish-line-soft);
+  min-width: 0;
+}
+
+.fish-stat:first-child {
+  border-left: 0;
+}
+
+.fish-stat dt {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fish-muted);
+}
+
+.fish-stat dd {
+  margin: 4px 0 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  color: var(--fish-ink);
+  overflow-wrap: anywhere;
+}
+
+.fish-stat dd.is-hot {
+  color: var(--fish-gold);
 }
 
 /* ---------- result card ---------- */
 
 .fish-card {
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 8px;
+  margin-top: 14px;
+  padding: 13px 14px 14px;
   border: 1px solid var(--fish-line);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 60%),
-    var(--fish-field);
+  border-radius: 7px;
+  background: linear-gradient(180deg, #f2f5f5, #e6eaea);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 10px 24px -22px rgba(8, 14, 18, 0.9);
   color: var(--fish-ink);
+  animation: fish-card-in 220ms cubic-bezier(0.3, 0.7, 0.4, 1.05);
+}
+
+@keyframes fish-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .fish-card[data-tone="epic"] {
-  border-color: rgba(242, 201, 76, 0.4);
-  box-shadow: 0 0 0 1px rgba(242, 201, 76, 0.08) inset;
-}
-
-.fish-card[data-tone="gold"] {
-  border-color: rgba(242, 201, 76, 0.55);
+  border-color: rgba(179, 137, 26, 0.6);
 }
 
 .fish-card__head {
@@ -262,14 +243,14 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  padding-bottom: 7px;
-  border-bottom: 1px solid var(--fish-line);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--fish-line-soft);
 }
 
 .fish-card__eyebrow {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 8.5px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--fish-gold);
@@ -278,7 +259,7 @@
 .fish-card__no {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9.5px;
   letter-spacing: 0.14em;
   color: var(--fish-muted);
 }
@@ -286,32 +267,32 @@
 .fish-card__body {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 13px;
   margin-top: 10px;
 }
 
 .fish-card__art {
   display: grid;
   place-items: center;
-  width: 92px;
-  height: 92px;
+  width: 84px;
+  height: 84px;
   flex: 0 0 auto;
   border-radius: 6px;
-  border: 1px solid var(--fish-line);
-  background: radial-gradient(circle at 50% 40%, #1b2429, #0b1114 72%);
+  border: 1px solid var(--fish-line-soft);
+  background:
+    radial-gradient(circle at 50% 36%, #ffffff, #dde3e3 74%);
 }
 
 .fish-card__art img {
-  width: 84px;
-  height: 84px;
+  width: 76px;
+  height: 76px;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   object-fit: contain;
 }
 
 .fish-card__art.is-shiny img {
-  filter: drop-shadow(0 0 8px rgba(242, 201, 76, 0.65)) saturate(1.25)
-    hue-rotate(-12deg);
+  filter: drop-shadow(0 0 7px rgba(226, 170, 40, 0.7)) saturate(1.2);
 }
 
 .fish-card__copy {
@@ -321,13 +302,14 @@
 .fish-card__name {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin: 0;
   font-family: var(--font-body);
-  font-size: 20px;
+  font-size: 21px;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: #f2f5f6;
+  color: var(--fish-ink);
 }
 
 .fish-card__types {
@@ -341,19 +323,19 @@
 .fish-card__types li {
   padding: 1px 6px 2px;
   border-radius: 1px;
-  border: 1px solid color-mix(in srgb, var(--chip) 70%, transparent);
-  background: color-mix(in srgb, var(--chip) 26%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chip) 62%, transparent);
+  background: color-mix(in srgb, var(--chip) 16%, transparent);
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: 8px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #eef3f4;
+  color: color-mix(in srgb, var(--chip) 78%, #101416);
 }
 
 .fish-card__line {
   margin: 6px 0 0;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9.5px;
   color: var(--fish-muted);
 }
 
@@ -367,62 +349,62 @@
 .fish-tag {
   padding: 1px 6px 2px;
   border-radius: 2px;
-  border: 1px solid rgba(242, 201, 76, 0.4);
-  background: rgba(242, 201, 76, 0.1);
+  border: 1px solid rgba(179, 137, 26, 0.5);
+  background: rgba(242, 201, 76, 0.16);
   font-family: var(--font-mono);
   font-size: 8px;
   letter-spacing: 0.14em;
-  color: var(--fish-gold);
+  color: #7a5b0b;
 }
 
 .fish-tag--record {
-  border-color: rgba(120, 212, 190, 0.5);
-  background: rgba(120, 212, 190, 0.1);
-  color: #8ee0cc;
+  border-color: rgba(42, 122, 104, 0.5);
+  background: rgba(88, 186, 160, 0.18);
+  color: #23695a;
 }
 
 .fish-tag--shiny {
-  border-color: rgba(226, 156, 255, 0.5);
-  background: rgba(226, 156, 255, 0.12);
-  color: #e2a0ff;
+  border-color: rgba(142, 84, 176, 0.45);
+  background: rgba(196, 150, 226, 0.22);
+  color: #6f3b92;
 }
 
 .fish-tag--boss {
-  border-color: rgba(255, 140, 110, 0.55);
-  background: rgba(255, 140, 110, 0.12);
-  color: #ff9b7c;
+  border-color: rgba(178, 72, 44, 0.45);
+  background: rgba(226, 122, 92, 0.18);
+  color: #8f3a24;
 }
 
 .fish-tag--rarity {
-  border-color: rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--fish-line);
+  background: rgba(255, 255, 255, 0.4);
   color: var(--fish-muted);
 }
 
 .fish-tag--rarity[data-tone="rare"] {
-  color: #9fc6ff;
-  border-color: rgba(159, 198, 255, 0.35);
+  color: #2c5f96;
+  border-color: rgba(44, 95, 150, 0.4);
 }
 
 .fish-tag--rarity[data-tone="epic"] {
-  color: #ffd479;
-  border-color: rgba(255, 212, 121, 0.42);
+  color: #8a6408;
+  border-color: rgba(179, 137, 26, 0.5);
 }
 
 .fish-card__points {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
   gap: 1px;
   margin: 12px 0 0;
-  border: 1px solid var(--fish-line);
+  border: 1px solid var(--fish-line-soft);
   border-radius: 5px;
-  background: var(--fish-line);
+  background: var(--fish-line-soft);
   overflow: hidden;
 }
 
 .fish-card__points div {
   padding: 6px 8px;
-  background: var(--fish-well);
+  background: #f4f6f6;
 }
 
 .fish-card__points dt {
@@ -449,15 +431,15 @@
   margin: 9px 0 0;
   font-family: var(--font-mono);
   font-size: 9px;
-  letter-spacing: 0.04em;
   color: var(--fish-muted);
 }
 
 .fish-stars {
   margin: 8px 0 0;
-  font-size: 20px;
-  letter-spacing: 0.16em;
-  color: var(--fish-gold);
+  font-size: 19px;
+  letter-spacing: 0.18em;
+  color: var(--fish-gold-soft);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .fish-card__actions {
@@ -467,7 +449,7 @@
   margin-top: 12px;
 }
 
-/* ---------- buttons ---------- */
+/* ---------- controls ---------- */
 
 .fish-cta,
 .fish-ghost,
@@ -482,41 +464,44 @@
   transition:
     background-color 140ms ease,
     border-color 140ms ease,
-    color 140ms ease;
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 .fish-cta {
   padding: 9px 14px;
-  border: 1px solid #d8ae2c;
-  background: linear-gradient(180deg, #f7d464, #e3b62f);
+  border: 1px solid #a8801a;
+  background: linear-gradient(180deg, #f6d361, #e0b32c);
   color: #1a1405;
   font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 .fish-cta:hover {
-  background: linear-gradient(180deg, #ffe083, #eec23c);
+  background: linear-gradient(180deg, #ffe083, #ebc03a);
 }
 
 .fish-ghost {
   padding: 9px 12px;
   border: 1px solid var(--fish-line);
-  background: transparent;
+  background: rgba(255, 255, 255, 0.35);
   color: var(--fish-ink);
 }
 
 .fish-ghost:hover {
-  border-color: rgba(242, 201, 76, 0.5);
-  color: var(--fish-gold);
+  border-color: rgba(24, 32, 36, 0.36);
+  background: rgba(255, 255, 255, 0.6);
 }
 
 /* ---------- field kit ---------- */
 
 .fish-kit {
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 8px;
+  margin-top: 14px;
+  padding: 12px 14px 13px;
   border: 1px solid var(--fish-line);
-  background: var(--fish-field);
+  border-radius: 7px;
+  background: linear-gradient(180deg, #eef1f1, #e2e7e7);
+  color: var(--fish-ink);
 }
 
 .fish-kit__head {
@@ -524,14 +509,14 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  padding-bottom: 7px;
-  border-bottom: 1px solid var(--fish-line);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--fish-line-soft);
 }
 
 .fish-kit__eyebrow {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 8.5px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--fish-gold);
@@ -540,15 +525,15 @@
 .fish-kit__coins {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9.5px;
   letter-spacing: 0.12em;
   color: var(--fish-ink);
 }
 
 .fish-kit__cols {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
   margin-top: 10px;
 }
 
@@ -575,20 +560,20 @@
   justify-content: space-between;
   gap: 8px;
   padding: 6px 8px;
-  border: 1px solid var(--fish-line);
+  border: 1px solid var(--fish-line-soft);
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .fish-kit__list li.is-equipped {
-  border-color: rgba(242, 201, 76, 0.45);
-  background: rgba(242, 201, 76, 0.06);
+  border-color: rgba(179, 137, 26, 0.5);
+  background: rgba(242, 201, 76, 0.14);
 }
 
 .fish-kit__list b {
   display: block;
   font-family: var(--font-body);
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--fish-ink);
 }
 
@@ -616,38 +601,110 @@
   padding: 5px 8px;
   flex: 0 0 auto;
   border: 1px solid var(--fish-line);
-  background: transparent;
+  background: rgba(255, 255, 255, 0.4);
   color: var(--fish-ink);
 }
 
 .fish-buy:hover:not(:disabled) {
-  border-color: rgba(242, 201, 76, 0.55);
-  color: var(--fish-gold);
+  border-color: rgba(24, 32, 36, 0.38);
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .fish-buy:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .fish-reset {
   margin-top: 12px;
   padding: 6px 9px;
-  border: 1px solid rgba(255, 120, 96, 0.3);
+  border: 1px solid rgba(150, 58, 40, 0.32);
   background: transparent;
-  color: #e99586;
+  color: #8b3a28;
 }
 
 .fish-reset:hover {
-  border-color: rgba(255, 120, 96, 0.6);
+  border-color: rgba(150, 58, 40, 0.62);
+}
+
+/* ---------- catch log ---------- */
+
+.fish-log {
+  margin-top: 14px;
+  padding-top: 11px;
+  border-top: 1px solid var(--fish-line);
+}
+
+.fish-log__label {
+  margin: 0 0 7px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fish-muted);
+}
+
+.fish-log__empty {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--fish-muted);
+}
+
+.fish-log__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fish-log__item {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid var(--fish-line-soft);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.32);
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease;
+}
+
+.fish-log__item:hover {
+  transform: translateY(-2px);
+  border-color: rgba(24, 32, 36, 0.32);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.fish-log__item img {
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
+.fish-log__item span {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--fish-muted);
 }
 
 /* ---------- foot ---------- */
 
 .fish-foot {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 18px;
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--fish-line);
@@ -659,14 +716,14 @@
   font-size: 8px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--fish-gold);
+  color: var(--fish-muted);
 }
 
 .fish-rules {
   margin: 0;
   font-family: var(--font-mono);
   font-size: 9.5px;
-  line-height: 1.65;
+  line-height: 1.7;
   color: var(--fish-muted);
 }
 
@@ -678,20 +735,17 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--fish-gold, #f2c94c);
-  box-shadow: 0 0 0 2px rgba(12, 18, 20, 0.75);
+  background: var(--fish-gold-soft, #f2c94c);
+  box-shadow:
+    0 0 0 2px rgba(233, 236, 236, 0.9),
+    0 0 6px rgba(179, 137, 26, 0.5);
   pointer-events: none;
 }
 
 /* ---------- narrow ---------- */
 
 @media (max-width: 720px) {
-  .fish-head {
-    flex-direction: column;
-  }
-
   .fish-hud {
-    width: 100%;
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
@@ -700,32 +754,32 @@
   }
 
   .fish-stat:nth-child(n + 4) {
-    border-top: 1px solid var(--fish-line);
+    border-top: 1px solid var(--fish-line-soft);
   }
 
   .fish-foot {
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
   }
+
+  .fish-map {
+    width: 116px;
+  }
 }
 
 @media (max-width: 420px) {
-  .fish-panel {
-    padding: 10px;
-  }
-
   .fish-card__art {
-    width: 72px;
-    height: 72px;
+    width: 68px;
+    height: 68px;
   }
 
   .fish-card__art img {
-    width: 64px;
-    height: 64px;
+    width: 60px;
+    height: 60px;
   }
 
   .fish-card__name {
-    font-size: 17px;
+    font-size: 18px;
   }
 
   .fish-card__actions > * {
@@ -734,10 +788,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fish-level,
+  .fish-map,
   .fish-cta,
   .fish-ghost,
-  .fish-buy {
+  .fish-buy,
+  .fish-log__item {
     transition: none;
+  }
+
+  .fish-card {
+    animation: none;
   }
 }

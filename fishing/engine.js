@@ -145,7 +145,7 @@ const PixelEngine = (() => {
     const camera = {
       ox: W / 2,
       oy: H / 2 + (scene.originY || 0),
-      s: S,
+      s: scene.scale || S,
       shadowX: scene.shadowX == null ? 1.3 : scene.shadowX,
       shadowY: scene.shadowY == null ? -0.12 : scene.shadowY,
     };
@@ -300,6 +300,33 @@ const PixelEngine = (() => {
           ground[i] = 1;
           groundZ[i] = p.d;
           if (kind) kinds[i] = kind;
+        }
+    }
+
+    /* A shaped slab rather than a rectangle: the sample callback decides the
+       height, colour and kind of each world cell, or returns null to leave it
+       empty. Islands and ponds are built with this. */
+    function field(x0, y0, x1, y1, step, sample) {
+      for (let a = x0; a <= x1; a += step)
+        for (let b = y0; b <= y1; b += step) {
+          const cell = sample(a, b);
+          if (!cell) continue;
+          const p = project(a, b, cell.z || 0);
+          const ix = p.sx | 0;
+          const iy = p.sy | 0;
+          if (ix < 0 || iy < 0 || ix >= W || iy >= H) continue;
+          const i = iy * W + ix;
+          if (p.d <= zb[i]) continue;
+          const ramp = rampFor(cell.color[0], cell.color[1], cell.color[2]);
+          const grain =
+            (bayerAt(ix, iy) - 0.5) * 0.55 + (cell.shade || 0);
+          zb[i] = p.d;
+          pix[i] = ramp[clamp(Math.floor(3.2 + grain), 2, 4)];
+          if (cell.kind) {
+            ground[i] = 1;
+            groundZ[i] = p.d;
+            kinds[i] = cell.kind;
+          }
         }
     }
 
@@ -908,6 +935,8 @@ const PixelEngine = (() => {
       capsule,
       box,
       plane,
+      field,
+      canvas,
       plot,
       clear,
       ctx,
