@@ -379,13 +379,7 @@ export class KantoPacksGame {
         return;
       }
       if (this.phase === "reveal") {
-        if (this.flipped[this.revealIndex]) {
-          this.dragging = true;
-          this.tilt.targetX = 0;
-          this.tilt.targetY = 0;
-        } else {
-          this.startFlip();
-        }
+        if (!this.flipped[this.revealIndex]) this.startFlip();
         return;
       }
       if (this.phase === "stack") {
@@ -404,6 +398,13 @@ export class KantoPacksGame {
         this.tearAt(p);
         return;
       }
+      if ((this.phase === "reveal" || this.phase === "stack") && !this.dragging) {
+        const halfW = this.scene.W / 2;
+        const halfH = this.scene.H / 2;
+        this.tilt.targetX = clamp((p.x / halfW) * 0.34, -0.34, 0.34);
+        this.tilt.targetY = clamp((-p.y / halfH) * 0.26, -0.26, 0.26);
+        return;
+      }
       if (this.dragging) {
         const dx = e.clientX - this.lastPointer.x;
         const dy = e.clientY - this.lastPointer.y;
@@ -419,6 +420,13 @@ export class KantoPacksGame {
           this.tilt.targetX = clamp(this.tilt.targetX + dx * 0.012, -0.36, 0.36);
           this.tilt.targetY = clamp(this.tilt.targetY + dy * 0.01, -0.3, 0.3);
         }
+      }
+    });
+
+    canvas.addEventListener("pointerleave", () => {
+      if (this.phase === "reveal" || this.phase === "stack") {
+        this.tilt.targetX = 0;
+        this.tilt.targetY = 0;
       }
     });
 

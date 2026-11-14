@@ -56,7 +56,8 @@ vec3 rainbow(float i) {
 void main() {
   bool backside = uTwoSided > 0.5 && !gl_FrontFacing;
   vec4 frontTex = texture2D(uMap, vUv);
-  vec4 backTex = texture2D(uBack, vUv);
+  vec2 backUv = vec2(1.0 - vUv.x, vUv.y);
+  vec4 backTex = texture2D(uBack, backUv);
   vec4 t = backside ? backTex : frontTex;
   if (t.a < 0.5) discard;
   float light = dot(normalize(vNormal), normalize(vec3(-0.45, 0.65, 0.9))) * 0.5 + 0.5;
