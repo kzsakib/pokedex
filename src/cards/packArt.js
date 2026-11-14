@@ -1,276 +1,296 @@
-/* Procedural booster-pack textures: foil, logo, crimps, mascot, back. */
-import { drawText, textWidth } from "./font.js";
+/* Booster-pack textures at 176x352, drawn on whole pixels with solid fills. */
+import { drawText, textWidth } from "./pixelfont.js";
 
-export const PACK_W = 88;
-export const PACK_H = 176;
-export const TEAR_Y = 15;
+export const PACK_W = 176;
+export const PACK_H = 352;
+export const TEAR_Y = 30;
 
 export const VARIANTS = {
   fire: {
     id: "fire",
     label: "FIRE",
     mascot: 6,
-    base: [196, 86, 40],
-    light: [232, 136, 74],
-    deep: [116, 42, 20],
-    foil: [244, 188, 120],
-    accent: "#f2c230",
+    base: "#cf5a24",
+    light: "#ef8a45",
+    deep: "#8c3315",
+    foil: "#ffd39a",
+    accent: "#ffe07a",
   },
   water: {
     id: "water",
     label: "WATER",
     mascot: 9,
-    base: [46, 108, 178],
-    light: [96, 158, 216],
-    deep: [22, 56, 104],
-    foil: [158, 214, 244],
-    accent: "#a8d9f7",
+    base: "#2f74bd",
+    light: "#5ea6e0",
+    deep: "#123c68",
+    foil: "#bfe6ff",
+    accent: "#cdeeff",
   },
   grass: {
     id: "grass",
     label: "GRASS",
     mascot: 3,
-    base: [58, 132, 66],
-    light: [110, 176, 96],
-    deep: [26, 70, 36],
-    foil: [176, 226, 140],
-    accent: "#b6e29b",
+    base: "#3a8f43",
+    light: "#67b055",
+    deep: "#174d22",
+    foil: "#c8efa0",
+    accent: "#d8f5b4",
   },
 };
 
-const rgba = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
-const mixc = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+function rgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function mix(a, b, t) {
+  const A = rgb(a);
+  const B = rgb(b);
+  return `#${A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, "0")).join("")}`;
+}
+function shade(hex, amount) {
+  return amount < 0 ? mix(hex, "#000000", -amount) : mix(hex, "#ffffff", amount);
+}
 
-const BAYER = [
-  [0, 8, 2, 10],
-  [12, 4, 14, 6],
-  [3, 11, 1, 9],
-  [15, 7, 13, 5],
-];
-const dither = (x, y, t) => BAYER[y & 3][x & 3] / 16 < t;
-
-function foilField(ctx, variant) {
-  for (let y = 0; y < PACK_H; y += 1) {
-    for (let x = 0; x < PACK_W; x += 1) {
-      const diagonal = (x + y * 0.62) % 16;
-      let colour = variant.base;
-      if (diagonal < 3) colour = variant.deep;
-      else if (diagonal < 6) colour = mixc(variant.base, variant.light, 0.55);
-      else if (diagonal < 8) colour = mixc(variant.base, variant.deep, 0.28);
-      else if (diagonal > 14 && dither(x, y, 0.5)) colour = variant.light;
-      /* vertical metal sheen */
-      const sheen = Math.sin((x / PACK_W) * Math.PI);
-      if (sheen > 0.9 && dither(x, y, 0.6)) colour = mixc(colour, variant.foil, 0.4);
-      ctx.fillStyle = rgba(colour);
-      ctx.fillRect(x, y, 1, 1);
+function foil(ctx, v) {
+  ctx.fillStyle = v.base;
+  ctx.fillRect(0, 0, PACK_W, PACK_H);
+  /* diagonal 8px foil bands, two clean tones */
+  for (let d = -PACK_H; d < PACK_W + PACK_H; d += 8) {
+    const band = Math.floor((d + PACK_H) / 8) % 3;
+    ctx.fillStyle = band === 0 ? v.light : band === 1 ? v.base : mix(v.base, v.deep, 0.35);
+    for (let y = 0; y < PACK_H; y += 1) {
+      const x0 = d + y;
+      if (x0 < 0 || x0 >= PACK_W) continue;
+      ctx.fillRect(x0, y, 4, 1);
     }
+  }
+  /* wide, clean sheen down the middle */
+  ctx.fillStyle = mix(v.light, "#ffffff", 0.18);
+  for (let y = 26; y < PACK_H - 26; y += 1) {
+    const x = Math.round(PACK_W * 0.12 + y * 0.18);
+    if (x >= 0 && x + 10 < PACK_W) ctx.fillRect(x, y, 10, 1);
   }
 }
 
-function rayBurst(ctx, variant, cx, cy) {
-  for (let y = 30; y < 150; y += 1) {
-    for (let x = 4; x < PACK_W - 4; x += 1) {
-      const a = Math.atan2(y - cy, x - cx);
-      const band = Math.floor(((a + Math.PI) / Math.PI) * 16) % 2;
-      if (band !== 0) continue;
-      const d = Math.hypot(x - cx, y - cy);
-      if (d > 66) continue;
-      if (!dither(x, y, 0.24)) continue;
-      ctx.fillStyle = rgba(variant.foil, 0.35);
-      ctx.fillRect(x, y, 1, 1);
+function crimp(ctx, v, top) {
+  const h = 24;
+  const y0 = top ? 0 : PACK_H - h;
+  ctx.fillStyle = v.deep;
+  ctx.fillRect(0, y0, PACK_W, h);
+  for (let x = 0; x < PACK_W; x += 4) {
+    ctx.fillStyle = mix(v.deep, v.base, 0.35);
+    ctx.fillRect(x, y0 + 3, 2, h - 6);
+    ctx.fillStyle = mix(v.deep, "#000000", 0.35);
+    ctx.fillRect(x + 2, y0 + 3, 1, h - 6);
+  }
+  ctx.fillStyle = mix(v.deep, "#000000", 0.5);
+  ctx.fillRect(0, top ? 0 : PACK_H - 2, PACK_W, 2);
+  if (top) {
+    ctx.fillStyle = mix(v.deep, "#000000", 0.5);
+    ctx.fillRect(0, h - 1, PACK_W, 1);
+  } else {
+    ctx.fillStyle = mix(v.deep, "#000000", 0.5);
+    ctx.fillRect(0, y0, PACK_W, 1);
+  }
+  /* sawtooth inner edge */
+  for (let x = 0; x < PACK_W; x += 1) {
+    const notch = Math.abs((x % 8) - 4) < 2 ? 2 : 0;
+    if (top) ctx.clearRect(x, h - 1 - notch, 1, 2);
+    else ctx.clearRect(x, PACK_H - h + notch - 1, 1, 2);
+  }
+}
+
+function tearLine(ctx, v) {
+  for (let x = 12; x < PACK_W - 44; x += 1) {
+    if (x % 6 < 3) {
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.fillRect(x, TEAR_Y, 1, 2);
     }
   }
-  /* halo behind the mascot */
-  for (let y = -34; y <= 34; y += 1) {
-    for (let x = -34; x <= 34; x += 1) {
+  /* scissors */
+  const sx = PACK_W - 34;
+  const sy = TEAR_Y - 5;
+  ctx.fillStyle = "#fdfbf4";
+  ctx.fillRect(sx, sy, 6, 2);
+  ctx.fillRect(sx + 6, sy + 2, 5, 2);
+  ctx.fillRect(sx + 2, sy + 4, 3, 2);
+  ctx.fillRect(sx + 7, sy + 6, 6, 2);
+  ctx.fillStyle = v.deep;
+  ctx.fillRect(sx + 11, sy + 2, 2, 2);
+  ctx.fillRect(sx + 12, sy + 6, 2, 2);
+}
+
+function rays(ctx, v, cx, cy, radius) {
+  for (let i = 0; i < 12; i += 1) {
+    const a = (i / 12) * Math.PI * 2;
+    ctx.fillStyle = i % 2 === 0 ? mix(v.foil, v.light, 0.35) : mix(v.base, v.deep, 0.25);
+    for (let r = 26; r < radius; r += 1) {
+      const w = r < radius * 0.7 ? 3 : 5;
+      const x = Math.round(cx + Math.cos(a) * r);
+      const y = Math.round(cy + Math.sin(a) * r);
+      ctx.fillRect(x, y, w, 2);
+    }
+  }
+  ctx.fillStyle = mix(v.foil, "#ffffff", 0.25);
+  for (let y = -radius; y < radius; y += 1) {
+    for (let x = -radius; x < radius; x += 1) {
       const d = Math.hypot(x, y);
-      if (d > 32) continue;
-      if (!dither(cx + x, cy + y, d < 24 ? 0.5 : 0.25)) continue;
-      ctx.fillStyle = rgba(variant.foil, d < 20 ? 0.4 : 0.2);
+      if (d > radius * 0.52 || d < radius * 0.34) continue;
       ctx.fillRect(cx + x, cy + y, 1, 1);
     }
   }
 }
 
-function crimp(ctx, variant, top) {
-  const h = 12;
-  const y0 = top ? 0 : PACK_H - h;
-  for (let y = 0; y < h; y += 1) {
-    for (let x = 0; x < PACK_W; x += 1) {
-      const ridge = x % 2 === 0;
-      const edge = y === 0 || y === h - 1;
-      let colour = ridge ? variant.deep : mixc(variant.deep, variant.base, 0.35);
-      if (edge) colour = mixc(variant.deep, [10, 8, 14], 0.6);
-      if (ridge && dither(x, y0 + y, 0.5)) colour = mixc(colour, variant.light, 0.4);
-      ctx.fillStyle = rgba(colour);
-      ctx.fillRect(x, y0 + y, 1, 1);
-    }
-  }
-  /* sawtooth inner edge */
-  for (let x = 0; x < PACK_W; x += 1) {
-    const notch = Math.abs((x % 6) - 3) < 2 ? 1 : 0;
-    ctx.clearRect(x, top ? h - 1 - notch : PACK_H - h + notch, 1, 1);
-  }
-}
-
-function tearLine(ctx, variant) {
-  for (let x = 5; x < PACK_W - 5; x += 1) {
-    if (x % 4 < 2) {
-      ctx.fillStyle = "rgba(255,255,255,0.75)";
-      ctx.fillRect(x, TEAR_Y, 1, 1);
-    }
-    if (x % 16 === 0) {
-      ctx.fillStyle = "rgba(26,26,46,0.5)";
-      ctx.fillRect(x, TEAR_Y + 2, 1, 1);
-    }
-  }
-  /* scissors glyph */
-  const sx = PACK_W - 22;
-  ctx.fillStyle = "#e8e6f0";
-  ctx.fillRect(sx, TEAR_Y - 2, 3, 1);
-  ctx.fillRect(sx + 3, TEAR_Y - 1, 2, 1);
-  ctx.fillRect(sx + 1, TEAR_Y + 1, 2, 1);
-  ctx.fillRect(sx + 3, TEAR_Y + 2, 2, 1);
-  ctx.fillStyle = variant.deep;
-  ctx.fillRect(sx + 5, TEAR_Y - 1, 1, 1);
-  ctx.fillRect(sx + 5, TEAR_Y + 1, 1, 1);
-}
-
-function logo(ctx, variant) {
+function logo(ctx, v) {
   const title = "KANTO";
-  const scale = 3;
-  const tw = textWidth(title, 5, scale, 0);
+  const size = 42;
+  const tw = textWidth(title, size, 1, 2);
   const x = Math.round((PACK_W - tw) / 2);
-  const y = 26;
-  /* outline pass */
-  for (let dy = -1; dy <= 1; dy += 1) {
-    for (let dx = -1; dx <= 1; dx += 1) {
-      if (!dx && !dy) continue;
-      drawText(ctx, title, x + dx, y + dy, { size: 5, scale, color: "rgba(26,26,46,0.85)", tracking: 0 });
+  const y = 42;
+  for (let dy = -3; dy <= 3; dy += 1) {
+    for (let dx = -3; dx <= 3; dx += 1) {
+      if (Math.abs(dx) < 3 && Math.abs(dy) < 3) continue;
+      drawText(ctx, title, x + dx, y + dy, { size, color: "#20162c", tracking: 2 });
     }
   }
-  drawText(ctx, title, x, y, { size: 5, scale, color: variant.accent, tracking: 0 });
-  /* pixel highlight on the top-left of each letter */
-  for (let i = 0; i < title.length; i += 1) {
-    ctx.fillStyle = "rgba(255,255,255,0.65)";
-    ctx.fillRect(x + i * 15 + 1, y + 1, 3, 1);
-    ctx.fillRect(x + i * 15 + 1, y + 2, 1, 4);
-  }
+  drawText(ctx, title, x + 2, y + 3, { size, color: mix(v.deep, "#000000", 0.3), tracking: 2 });
+  drawText(ctx, title, x, y, { size, color: v.accent, tracking: 2 });
+
   const sub = "BOOSTER PACK";
-  const sw = textWidth(sub, 3, 2, 0);
-  for (let dx = -1; dx <= 1; dx += 1) {
-    for (let dy = -1; dy <= 1; dy += 1) {
-      if (!dx && !dy) continue;
-      drawText(ctx, sub, Math.round((PACK_W - sw) / 2) + dx, y + 26 + dy, { size: 3, scale: 2, color: "rgba(26,26,46,0.7)", tracking: 0 });
+  const ssize = 14;
+  const sw = textWidth(sub, ssize, 1, 2);
+  const sx = Math.round((PACK_W - sw) / 2);
+  const sy = y + 54;
+  for (let dy = -2; dy <= 2; dy += 1) {
+    for (let dx = -2; dx <= 2; dx += 1) {
+      if (Math.abs(dx) < 2 && Math.abs(dy) < 2) continue;
+      drawText(ctx, sub, sx + dx, sy + dy, { size: ssize, color: "#20162c", tracking: 2 });
     }
   }
-  drawText(ctx, sub, Math.round((PACK_W - sw) / 2), y + 26, { size: 3, scale: 2, color: "#f6f2e6", tracking: 0 });
+  drawText(ctx, sub, sx, sy, { size: ssize, color: "#fdfbf4", tracking: 2 });
 }
 
-function bottomBand(ctx, variant) {
-  const y = PACK_H - 34;
-  ctx.fillStyle = "rgba(18,14,24,0.72)";
-  ctx.fillRect(12, y, PACK_W - 24, 12);
-  ctx.fillStyle = rgba(variant.foil, 0.5);
-  ctx.fillRect(12, y, PACK_W - 24, 1);
-  const label = "5 CARDS";
-  const w = textWidth(label, 3, 2, 1);
-  drawText(ctx, label, Math.round((PACK_W - w) / 2), y + 3, { size: 3, scale: 2, color: "#f2ecd8", tracking: 1 });
+function plaque(ctx, v, y, label, textColour) {
+  const w = PACK_W - 48;
+  const x = 24;
+  ctx.fillStyle = "#161022";
+  ctx.fillRect(x, y, w, 28);
+  ctx.fillStyle = mix(v.foil, v.deep, 0.35);
+  ctx.fillRect(x, y, w, 2);
+  ctx.fillRect(x, y + 26, w, 2);
+  const tw = textWidth(label, 12, 1, 1);
+  drawText(ctx, label, Math.round((PACK_W - tw) / 2), y + 8, { size: 12, color: textColour, tracking: 1 });
 }
 
-export function renderPackFront(variant, mascot) {
+export function renderPackFront(v, mascot) {
   const canvas = document.createElement("canvas");
   canvas.width = PACK_W;
   canvas.height = PACK_H;
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
 
-  foilField(ctx, variant);
-  rayBurst(ctx, variant, PACK_W / 2, 104);
-  crimp(ctx, variant, true);
-  crimp(ctx, variant, false);
-  logo(ctx, variant);
+  foil(ctx, v);
+  /* clean plate behind the mascot for contrast */
+  const plateW = 150;
+  const plateH = 128;
+  const px = (PACK_W - plateW) / 2;
+  const py = 268 - plateH;
+  ctx.fillStyle = mix(v.deep, "#000000", 0.18);
+  for (let row = 0; row < plateH; row += 1) {
+    const inset = row < 10 ? 10 - row : row > plateH - 10 ? row - (plateH - 10) : 0;
+    ctx.fillRect(px + inset, py + row, plateW - inset * 2, 1);
+  }
+  ctx.fillStyle = mix(v.light, "#ffffff", 0.12);
+  ctx.fillRect(px + 10, py + 10, plateW - 20, 2);
+  ctx.fillStyle = mix(v.deep, "#000000", 0.4);
+  ctx.fillRect(px + 10, py + plateH - 12, plateW - 20, 2);
+
+  logo(ctx, v);
 
   if (mascot) {
-    const w = mascot.width;
-    const h = mascot.height;
-    const cx = Math.round((PACK_W - w) / 2);
-    const cy = 100 - Math.round(h / 2) + 4;
-    for (let py = 0; py < h; py += 1) {
-      for (let px = 0; px < w; px += 1) {
-        if (!dither(cx + px, cy + py + h - 2, 0.4)) continue;
-        ctx.fillStyle = "rgba(18,14,24,0.35)";
-        ctx.fillRect(cx + px, cy + py + h - 2, 1, 1);
-      }
-    }
-    ctx.drawImage(mascot, cx, cy, w, h);
+    const scale = mascot.width * 2 <= 130 && mascot.height * 2 <= 130 ? 2 : 1;
+    const w = mascot.width * scale;
+    const h = mascot.height * scale;
+    const x = Math.round((PACK_W - w) / 2);
+    const y = 266 - h;
+    ctx.fillStyle = "rgba(20,14,30,0.28)";
+    ctx.fillRect(x + 4, y + h - 4, w - 8, 4);
+    ctx.drawImage(mascot, x, y, w, h);
   }
 
-  tearLine(ctx, variant);
-  bottomBand(ctx, variant);
+  tearLine(ctx, v);
+  plaque(ctx, v, 274, "5 CARDS", "#ffe9a8");
+  crimp(ctx, v, true);
+  crimp(ctx, v, false);
+
+  /* foil edge lighting */
+  ctx.fillStyle = mix(v.foil, v.light, 0.5);
+  ctx.fillRect(0, 24, 2, PACK_H - 48);
+  ctx.fillRect(PACK_W - 2, 24, 2, PACK_H - 48);
   return canvas;
 }
 
-export function renderPackBack(variant) {
+export function renderPackBack(v) {
   const canvas = document.createElement("canvas");
   canvas.width = PACK_W;
   canvas.height = PACK_H;
   const ctx = canvas.getContext("2d");
-  foilField(ctx, variant);
-  crimp(ctx, variant, true);
-  crimp(ctx, variant, false);
+  ctx.imageSmoothingEnabled = false;
+
+  foil(ctx, v);
+  crimp(ctx, v, true);
+  crimp(ctx, v, false);
+
   /* fin seal */
-  for (let y = 14; y < PACK_H - 14; y += 1) {
-    for (let x = PACK_W / 2 - 4; x <= PACK_W / 2 + 4; x += 1) {
-      const t = x % 2 === 0;
-      ctx.fillStyle = t ? rgba(variant.deep) : rgba(mixc(variant.deep, variant.base, 0.4));
-      ctx.fillRect(x, y, 1, 1);
-    }
+  ctx.fillStyle = mix(v.deep, "#000000", 0.25);
+  ctx.fillRect(PACK_W / 2 - 10, 24, 20, PACK_H - 48);
+  for (let y = 26; y < PACK_H - 26; y += 3) {
+    ctx.fillStyle = mix(v.base, v.deep, 0.5);
+    ctx.fillRect(PACK_W / 2 - 8, y, 16, 1);
   }
-  /* barcode */
-  const bx = 14;
-  const by = 42;
-  ctx.fillStyle = "#f6f2e6";
-  ctx.fillRect(bx - 2, by - 2, 34, 18);
-  for (let i = 0; i < 24; i += 1) {
-    const w = i % 3 === 0 ? 2 : 1;
-    ctx.fillStyle = "#14122a";
-    ctx.fillRect(bx + i * 1.25, by, w, 13);
+
+  /* barcode plaque */
+  ctx.fillStyle = "#fdfbf4";
+  ctx.fillRect(20, 70, 78, 42);
+  for (let i = 0; i < 26; i += 1) {
+    const w = i % 4 === 0 ? 3 : i % 3 === 0 ? 2 : 1;
+    ctx.fillStyle = "#161022";
+    ctx.fillRect(24 + i * 2.7, 76, w, 30);
   }
-  drawText(ctx, "KANTO 151", 14, 66, { size: 3, scale: 1, color: "#f6f2e6" });
-  drawText(ctx, "1 RARE OR BETTER", 14, 76, { size: 3, scale: 1, color: "rgba(246,242,230,0.8)" });
-  drawText(ctx, "5 CARDS", 14, 86, { size: 3, scale: 1, color: "rgba(246,242,230,0.8)" });
+  drawText(ctx, "KANTO 151", 20, 120, { size: 11, color: "#fdfbf4", tracking: 1 });
+  drawText(ctx, "5 CARDS - 1 RARE OR BETTER", 20, 140, { size: 9, color: mix(v.foil, "#ffffff", 0.4), tracking: 1 });
+
   const note = "FAN PROJECT. NOT AFFILIATED WITH NINTENDO, GAME FREAK OR THE POKEMON COMPANY.";
-  const words = note.split(" ");
   let line = "";
-  let y = 112;
-  for (const word of words) {
+  let y = 200;
+  for (const word of note.split(" ")) {
     const next = line ? `${line} ${word}` : word;
-    if (textWidth(next, 3, 1, 1) > PACK_W - 22) {
-      drawText(ctx, line, 11, y, { size: 3, scale: 1, color: "rgba(246,242,230,0.62)" });
-      y += 7;
+    if (textWidth(next, 9, 1, 1) > PACK_W - 40) {
+      drawText(ctx, line, 20, y, { size: 9, color: "#fdfbf4", tracking: 1 });
+      y += 13;
       line = word;
     } else {
       line = next;
     }
   }
-  if (line) drawText(ctx, line, 11, y, { size: 3, scale: 1, color: "rgba(246,242,230,0.62)" });
-  drawText(ctx, "OPEN WITH CARE", 11, PACK_H - 52, { size: 3, scale: 1, color: variant.accent });
+  if (line) drawText(ctx, line, 20, y, { size: 9, color: "#fdfbf4", tracking: 1 });
+
+  drawText(ctx, "SEALED IN KANTO", 20, 296, { size: 10, color: v.accent, tracking: 1 });
   return canvas;
 }
 
-export function renderStrip(variant) {
+export function renderStrip(v) {
   const canvas = document.createElement("canvas");
   canvas.width = PACK_W;
   canvas.height = TEAR_Y;
   const ctx = canvas.getContext("2d");
-  foilField(ctx, variant);
-  crimp(ctx, variant, true);
+  foil(ctx, v);
+  crimp(ctx, v, true);
   for (let x = 0; x < PACK_W; x += 1) {
-    const jag = Math.round(Math.sin(x * 0.7) * 1.2 + Math.sin(x * 0.23) * 0.8);
-    ctx.clearRect(x, TEAR_Y - 2 + jag, 1, 3);
-    ctx.fillStyle = "rgba(26,26,46,0.6)";
-    ctx.fillRect(x, TEAR_Y - 3 + jag, 1, 1);
+    const jag = Math.round(Math.sin(x * 0.6) * 1.4 + Math.sin(x * 0.19) * 1);
+    ctx.clearRect(x, TEAR_Y - 3 + jag, 1, 4);
+    ctx.fillStyle = "rgba(22,16,34,0.75)";
+    ctx.fillRect(x, TEAR_Y - 4 + jag, 1, 1);
   }
   return canvas;
 }

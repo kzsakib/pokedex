@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { PixelScene } from "./scene.js";
 import { createPack } from "./pack3d.js";
-import { createCardMesh, createCardBackTexture } from "./cards3d.js";
+import { createCardMesh } from "./cards3d.js";
 import { makeHoloMask } from "./holo.js";
 import { loadGen1, preloadSprites, loadSprite, spriteFor } from "./assets.js";
 import { generatePack, RARITY_LABEL } from "./generate.js";
@@ -45,7 +45,6 @@ export class KantoPacksGame {
     this.holds = { beam: 0 };
 
     this.scene = new PixelScene(container);
-    this.backTexture = createCardBackTexture();
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
 
@@ -250,7 +249,7 @@ export class KantoPacksGame {
     const strip = renderStrip(variant);
     this.pack = createPack({ front, back, strip });
     this.pack.group.position.set(0, 0, 0);
-    this.pack.group.scale.setScalar(1.55);
+    this.pack.group.scale.setScalar(1);
     this.scene.root.add(this.pack.group);
     this.setPhase("idle");
     this.packKick = 0;
@@ -267,9 +266,9 @@ export class KantoPacksGame {
       const sprite = await spriteFor(card);
       const front = renderCard(card, sprite);
       const mask = makeHoloMask(card.rarity);
-      const mesh = createCardMesh({ front, back: this.backTexture, mask, rarity: card.rarity });
-      mesh.group.position.set(0, 24, 40 + this.meshes.length * 0.4);
-      mesh.group.scale.setScalar(1.35);
+      const mesh = createCardMesh({ front, mask, rarity: card.rarity });
+      mesh.group.position.set(0, 40, 60 + this.meshes.length * 0.6);
+      mesh.group.scale.setScalar(1);
       mesh.group.visible = false;
       this.meshes.push(mesh);
       this.scene.root.add(mesh.group);
@@ -302,8 +301,8 @@ export class KantoPacksGame {
         }
       `,
     });
-    const beam = new THREE.Mesh(new THREE.PlaneGeometry(120, 420), beamMat);
-    beam.position.set(0, 90, 30);
+    const beam = new THREE.Mesh(new THREE.PlaneGeometry(220, 760), beamMat);
+    beam.position.set(0, 200, 40);
     beam.visible = false;
     this.beamMesh = beam;
     this.scene.root.add(beam);
@@ -472,7 +471,7 @@ export class KantoPacksGame {
 
   nearTear(e) {
     if (!this.pack) return false;
-    const v = new THREE.Vector3(0, 88 - 15, 0).applyMatrix4(this.pack.group.matrixWorld).project(this.scene.camera);
+    const v = new THREE.Vector3(0, 176 - 30, 0).applyMatrix4(this.pack.group.matrixWorld).project(this.scene.camera);
     const sx = (v.x * 0.5 + 0.5) * this.scene.W;
     const sy = (-v.y * 0.5 + 0.5) * this.scene.H;
     const rect = this.scene.canvas.getBoundingClientRect();
@@ -567,30 +566,30 @@ export class KantoPacksGame {
     if (this.beamMesh) this.beamMesh.visible = false;
     this.audio.stopBeam();
     const count = this.meshes.length;
-    const gap = 8;
-    const totalW = count * 100 + (count - 1) * gap;
+    const gap = 10;
+    const totalW = count * 160 + (count - 1) * gap;
     this.meshes.forEach((mesh, i) => {
       mesh.group.visible = true;
-      mesh.setFlip(1);
+      mesh.setFlipWithTilt(0, 0, 0);
       const portrait = this.scene.portrait;
       if (portrait) {
         const row = i < 3 ? 0 : 1;
         const col = i < 3 ? i : i - 3;
         const rowCount = row === 0 ? 3 : 2;
-        const rowW = rowCount * 100 + (rowCount - 1) * gap;
+        const rowW = rowCount * 160 + (rowCount - 1) * gap;
         mesh.summaryTarget = {
-          x: -rowW / 2 + 50 + col * 108,
-          y: row === 0 ? 78 : -68,
-          scale: 0.94,
+          x: -rowW / 2 + 80 + col * 170,
+          y: row === 0 ? 140 : -140,
+          scale: 1,
         };
       } else {
         mesh.summaryTarget = {
-          x: -totalW / 2 + 50 + i * 108,
-          y: 4,
+          x: -totalW / 2 + 80 + i * 170,
+          y: 0,
           scale: 1,
         };
       }
-      mesh.group.position.set(mesh.summaryTarget.x, mesh.summaryTarget.y, 60);
+      mesh.group.position.set(mesh.summaryTarget.x, mesh.summaryTarget.y, 90);
       mesh.group.scale.setScalar(mesh.summaryTarget.scale);
       mesh.setTilt(0, 0);
       this.el.caption.innerHTML = "";
@@ -673,22 +672,22 @@ export class KantoPacksGame {
       const sway = Math.sin(this.time * 0.7) * 0.05;
       pack.setTilt(this.packTilt.yaw + sway, this.packTilt.pitch);
       pack.group.position.y = bob + (this.packKick ? 6 : 0);
-      pack.group.scale.setScalar(1.55 * (this.packKick ? 1.03 : 1));
+      pack.group.scale.setScalar(1 * (this.packKick ? 1.02 : 1));
       pack.update(dt, this.time);
     }
 
     if (this.phase === "flash") {
       if (this.beamMesh) {
         this.beamMesh.material.uniforms.uTime.value = this.time;
-        this.beamMesh.position.y = 90;
+        this.beamMesh.position.y = 200;
       }
       if (this.phaseTime > 0.45 && meshes.length === 5) {
         this.setPhase("emerge");
         this.emergeStart = this.time;
         meshes.forEach((m, i) => {
           m.group.visible = true;
-          m.group.position.set(0, 18, 40 + i * 1.2);
-          m.group.scale.setScalar(1.2);
+          m.group.position.set(0, 30, 50 + i * 1.5);
+          m.group.scale.setScalar(1);
         });
         if (pack) pack.group.visible = false;
       }
@@ -700,9 +699,9 @@ export class KantoPacksGame {
         const delay = i * 0.07;
         const local = clamp((this.time - this.emergeStart - delay) / 0.55, 0, 1);
         const eased = 1 - Math.pow(1 - local, 3);
-        mesh.group.position.y = lerp(18, -2 + i * 1.5, eased) + Math.sin(local * Math.PI) * 8;
-        mesh.group.position.z = lerp(40, 60 + i * 1.5, eased);
-        mesh.group.scale.setScalar(lerp(1.2, 1.15, eased));
+        mesh.group.position.y = lerp(30, 2 + i * 1.8, eased) + Math.sin(local * Math.PI) * 10;
+        mesh.group.position.z = lerp(50, 70 + i * 1.5, eased);
+        mesh.group.scale.setScalar(lerp(1, 1, eased));
         mesh.group.rotation.y = Math.PI;
         if (local > 0 && local < 0.08) this.audio.whoosh(i);
       });
@@ -720,16 +719,16 @@ export class KantoPacksGame {
       meshes.forEach((mesh, i) => {
         if (i < this.revealIndex) {
           mesh.group.visible = true;
-          mesh.group.position.lerp(new THREE.Vector3(-210 + (i % 2) * 14, -60, 20 + i), 0.12);
-          mesh.group.scale.lerp(new THREE.Vector3(0.5, 0.5, 0.5), 0.12);
+          mesh.group.position.lerp(new THREE.Vector3(-320 + (i % 2) * 18, -90, 20 + i), 0.12);
+          mesh.group.scale.lerp(new THREE.Vector3(0.6, 0.6, 0.6), 0.12);
           mesh.setFlip(1);
           return;
         }
         mesh.group.visible = true;
         const offset = i - this.revealIndex;
-        const targetScale = i === this.revealIndex ? 1.75 : 1.15;
+        const targetScale = i === this.revealIndex ? 2 : 1;
         mesh.group.position.lerp(
-          new THREE.Vector3(offset * 1.6, -offset * 2.4, 60 + offset * -3),
+          new THREE.Vector3(offset * 2, -offset * 3, 70 + offset * -4),
           0.14
         );
         mesh.group.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.16);
@@ -759,7 +758,7 @@ export class KantoPacksGame {
     if (this.phase === "summary") {
       meshes.forEach((mesh, i) => {
         if (!mesh.summaryTarget) return;
-        mesh.group.position.lerp(new THREE.Vector3(mesh.summaryTarget.x, mesh.summaryTarget.y, 60), 0.12);
+        mesh.group.position.lerp(new THREE.Vector3(mesh.summaryTarget.x, mesh.summaryTarget.y, 90), 0.12);
         mesh.group.scale.lerp(new THREE.Vector3(mesh.summaryTarget.scale, mesh.summaryTarget.scale, mesh.summaryTarget.scale), 0.12);
         mesh.setTilt(this.tilt.x * 0.4, this.tilt.y * 0.4);
       });

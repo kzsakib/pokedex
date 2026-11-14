@@ -38,6 +38,7 @@ uniform float uDim;
 uniform float uFade;
 uniform vec3 uTint;
 uniform float uUseTint;
+uniform float uFlat;
 varying vec2 vUv;
 varying vec3 vNormal;
 
@@ -56,24 +57,23 @@ void main() {
   float bayer = bayer4(gl_FragCoord.xy);
   float light = dot(normalize(vNormal), normalize(vec3(-0.45, 0.65, 0.9))) * 0.5 + 0.5;
   float band = floor(light * 4.0) / 4.0;
-  vec3 col = t.rgb * (0.88 + band * 0.26);
+  vec3 col = uFlat > 0.5 ? t.rgb : t.rgb * (0.88 + band * 0.26);
 
   if (uUseTint > 0.5) col *= uTint;
 
   if (uHolo > 0.5) {
     float m = texture2D(uMask, vUv).r;
     if (m > 0.5) {
-      float idx = floor(fract(vUv.x + vUv.y * 0.6 + uTilt.x * 1.5 + uTilt.y * 0.8) * 6.0);
-      if (bayer < uHoloDensity) col = mix(col, rainbow(idx), 0.72);
-      float sparkle = step(0.985, fract(sin(dot(floor(vUv * vec2(64.0, 88.0)), vec2(12.9898, 78.233))) * 43758.5453));
-      if (sparkle > 0.5 && bayer < 0.5) col = vec3(1.0);
+      float sweep = fract(vUv.x * 0.45 + vUv.y * 0.55 + uTilt.x * 0.9 + uTilt.y * 0.4);
+      float idx = floor(sweep * 6.0);
+      float band = step(0.18, fract((vUv.x - vUv.y) * 3.0 + uTilt.x * 2.0));
+      if (bayer < uHoloDensity * band) col = mix(col, rainbow(idx), 0.42);
     }
   }
 
   if (uGlintOn > 0.5) {
-    float g = fract(vUv.x * 0.8 + vUv.y * 0.45 - uGlint);
-    if (g < 0.06 && bayer < 0.65) col = mix(col, vec3(1.0, 0.98, 0.9), 0.55);
-    if (g > 0.06 && g < 0.1 && bayer < 0.3) col = mix(col, vec3(1.0), 0.22);
+    float g = fract(vUv.x * 0.7 + vUv.y * 0.35 - uGlint);
+    if (g < 0.035 && bayer < 0.55) col = mix(col, vec3(1.0, 0.98, 0.92), 0.26);
   }
 
   col *= uDim;
@@ -85,7 +85,7 @@ void main() {
 }
 `;
 
-export function makeMaterial({ map, mask = null, holo = false, holoDensity = 0.33, glint = false, tint = null, dim = 1 }) {
+export function makeMaterial({ map, mask = null, holo = false, holoDensity = 0.33, glint = false, tint = null, dim = 1, flat = false }) {
   return new THREE.ShaderMaterial({
     uniforms: {
       uMap: { value: map },
@@ -100,6 +100,7 @@ export function makeMaterial({ map, mask = null, holo = false, holoDensity = 0.3
       uFade: { value: 1 },
       uTint: { value: new THREE.Color(tint || 0xffffff) },
       uUseTint: { value: tint ? 1 : 0 },
+      uFlat: { value: flat ? 1 : 0 },
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
@@ -152,18 +153,18 @@ export class PixelScene {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(22, 16 / 9, 1, 2000);
-    this.camera.position.set(0, 0, 900);
+    this.camera = new THREE.PerspectiveCamera(22, 16 / 9, 1, 3000);
+    this.camera.position.set(0, 0, 1400);
     this.camera.lookAt(0, 0, 0);
     this.root = new THREE.Group();
     this.scene.add(this.root);
-    this.W = 576;
-    this.H = 324;
+    this.W = 960;
+    this.H = 540;
 
     const bg = new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
       new THREE.ShaderMaterial({
-        uniforms: { uSize: { value: new THREE.Vector2(576, 324) }, uTime: { value: 0 } },
+        uniforms: { uSize: { value: new THREE.Vector2(960, 540) }, uTime: { value: 0 } },
         vertexShader: BG_VERT,
         fragmentShader: BG_FRAG,
         depthWrite: false,
@@ -180,13 +181,14 @@ export class PixelScene {
   resize() {
     const rect = this.container.getBoundingClientRect();
     const portrait = rect.height > rect.width * 1.05;
-    this.W = portrait ? 324 : 576;
-    this.H = portrait ? 576 : 324;
+    this.W = portrait ? 540 : 960;
+    this.H = portrait ? 960 : 540;
     this.renderer.setSize(this.W, this.H, false);
     this.camera.aspect = this.W / this.H;
+    this.camera.position.z = this.H / 2 / Math.tan(THREE.MathUtils.degToRad(11));
     this.camera.updateProjectionMatrix();
     this.bg.material.uniforms.uSize.value.set(this.W, this.H);
-    this.bg.scale.set(this.camera.aspect * 2400, 2400, 1);
+    this.bg.scale.set(this.camera.aspect * (this.camera.position.z * 2.4), this.camera.position.z * 2.4, 1);
     this.portrait = portrait;
     this.fit();
   }

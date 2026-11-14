@@ -2,9 +2,9 @@
 import * as THREE from "three";
 import { makeMaterial } from "./scene.js";
 
-const PACK_W = 88;
-const PACK_H = 176;
-const TEAR_Y = 15;
+const PACK_W = 176;
+const PACK_H = 352;
+const TEAR_Y = 30;
 
 function texture(canvas) {
   const tex = new THREE.CanvasTexture(canvas);
@@ -32,31 +32,31 @@ export function createPack({ front, back, strip }) {
   const group = new THREE.Group();
   const frontMat = makeMaterial({ map: texture(front), glint: true });
   const backMat = makeMaterial({ map: texture(back) });
-  const body = new THREE.Mesh(bulgedPlane(PACK_W, PACK_H, 8, 16, 5), frontMat);
+  const body = new THREE.Mesh(bulgedPlane(PACK_W, PACK_H, 10, 20, 6), frontMat);
   group.add(body);
 
-  const rear = new THREE.Mesh(bulgedPlane(PACK_W, PACK_H, 8, 16, 5), backMat);
+  const rear = new THREE.Mesh(bulgedPlane(PACK_W, PACK_H, 10, 20, 6), backMat);
   rear.rotation.y = Math.PI;
-  rear.position.z = -2;
+  rear.position.z = -3;
   group.add(rear);
 
   const stripTex = texture(strip);
   const stripMat = makeMaterial({ map: stripTex });
   const stripMesh = new THREE.Mesh(new THREE.PlaneGeometry(PACK_W, TEAR_Y), stripMat);
-  stripMesh.position.set(0, PACK_H / 2 - TEAR_Y / 2 + 0.02, 5.6);
+  stripMesh.position.set(0, PACK_H / 2 - TEAR_Y / 2 + 0.02, 6.4);
   group.add(stripMesh);
 
   /* dark interior visible once the strip peels */
   const insideMat = new THREE.MeshBasicMaterial({ color: 0x0b0912 });
   const inside = new THREE.Mesh(new THREE.PlaneGeometry(PACK_W, TEAR_Y), insideMat);
-  inside.position.set(0, PACK_H / 2 - TEAR_Y / 2, 5.2);
+  inside.position.set(0, PACK_H / 2 - TEAR_Y / 2, 6.0);
   inside.visible = false;
   group.add(inside);
 
   /* top edge of the stack peeking out of the opening */
   const peekMat = new THREE.MeshBasicMaterial({ color: 0x2a2a4a });
-  const peek = new THREE.Mesh(new THREE.PlaneGeometry(PACK_W - 12, 4), peekMat);
-  peek.position.set(0, PACK_H / 2 - TEAR_Y - 1, 5.3);
+  const peek = new THREE.Mesh(new THREE.PlaneGeometry(PACK_W - 24, 8), peekMat);
+  peek.position.set(0, PACK_H / 2 - TEAR_Y - 2, 6.1);
   peek.visible = false;
   group.add(peek);
 
@@ -83,8 +83,8 @@ export function createPack({ front, back, strip }) {
         inside.visible = true;
         peek.visible = true;
       }
-      stripMesh.position.y = PACK_H / 2 - TEAR_Y / 2 + p * p * 10;
-      stripMesh.position.z = 5.6 + p * 9;
+      stripMesh.position.y = PACK_H / 2 - TEAR_Y / 2 + p * p * 14;
+      stripMesh.position.z = 6.4 + p * 12;
       stripMesh.rotation.x = -p * 1.1;
       stripMesh.rotation.z = p * 0.25 * Math.sin(p * 9);
       frontMat.uniforms.uFade.value = 1 - p * 0.55;
