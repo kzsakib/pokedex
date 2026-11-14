@@ -1,0 +1,149 @@
+/* Static data + sprite loading. Sprites are trimmed to their alpha box and
+   recoloured for shiny cards, all in the browser at load time. */
+
+const BASE = import.meta.env.BASE_URL || "/";
+const spriteCache = new Map();
+const shinyCache = new Map();
+
+let dataPromise = null;
+
+export function loadGen1() {
+  if (!dataPromise) {
+    dataPromise = fetch(`${BASE}cards/data/gen1.json`).then((res) => {
+      if (!res.ok) throw new Error(`gen1.json ${res.status}`);
+      return res.json();
+    });
+  }
+  return dataPromise;
+}
+
+const spriteUrl = (id) => `${BASE}cards/sprites/${String(id).padStart(3, "0")}.png`;
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`sprite failed: ${url}`));
+    img.src = url;
+  });
+}
+
+function trim(img) {
+  const canvas = document.createElement("canvas");
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, 0, 0);
+  const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (data[(y * width + x) * 4 + 3] < 24) continue;
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (maxX < 0) return canvas;
+  const w = Math.min(56, maxX - minX + 1);
+  const h = Math.min(56, maxY - minY + 1);
+  const out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  const octx = out.getContext("2d");
+  octx.imageSmoothingEnabled = false;
+  octx.drawImage(canvas, minX, minY, w, h, 0, 0, w, h);
+  return out;
+}
+
+/* Rotate the hue of the body tones, leave the dark ink and the near-white
+   highlight alone so the silhouette keeps its outline. */
+function shinyFrom(sprite) {
+  const canvas = document.createElement("canvas");
+  canvas.width = sprite.width;
+  canvas.height = sprite.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(sprite, 0, 0);
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = image.data;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 40) continue;
+    const r = data[i] / 255;
+    const g = data[i + 1] / 255;
+    const b = data[i + 2] / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    if (max < 0.16 || l > 0.93) continue;
+    let h = 0;
+    const d = max - min || 1e-6;
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h = (h * 60 + 140) % 360;
+    if (h < 0) h += 360;
+    const s = d / (1 - Math.abs(2 * l - 1) || 1);
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = l - c / 2;
+    let nr = 0;
+    let ng = 0;
+    let nb = 0;
+    if (h < 60) [nr, ng, nb] = [c, x, 0];
+    else if (h < 120) [nr, ng, nb] = [x, c, 0];
+    else if (h < 180) [nr, ng, nb] = [0, c, x];
+    else if (h < 240) [nr, ng, nb] = [0, x, c];
+    else if (h < 300) [nr, ng, nb] = [x, 0, c];
+    else [nr, ng, nb] = [c, 0, x];
+    data[i] = Math.round((nr + m) * 255);
+    data[i + 1] = Math.round((ng + m) * 255);
+    data[i + 2] = Math.round((nb + m) * 255);
+  }
+  ctx.putImageData(image, 0, 0);
+  return canvas;
+}
+
+export async function loadSprite(id) {
+  if (spriteCache.has(id)) return spriteCache.get(id);
+  const img = await loadImage(spriteUrl(id));
+  const sprite = trim(img);
+  spriteCache.set(id, sprite);
+  return sprite;
+}
+
+export async function loadShiny(id) {
+  if (shinyCache.has(id)) return shinyCache.get(id);
+  const base = await loadSprite(id);
+  const shiny = shinyFrom(base);
+  shinyCache.set(id, shiny);
+  return shiny;
+}
+
+export async function preloadSprites(onProgress) {
+  const ids = Array.from({ length: 151 }, (_, i) => i + 1);
+  let done = 0;
+  const queue = ids.slice();
+  async function worker() {
+    while (queue.length) {
+      const id = queue.shift();
+      try {
+        await loadSprite(id);
+      } catch {
+        /* a missing sprite should not block the pack */
+      }
+      done += 1;
+      if (onProgress) onProgress(done, ids.length);
+    }
+  }
+  await Promise.all(Array.from({ length: 8 }, worker));
+}
+
+export async function spriteFor(card) {
+  return card.shiny ? loadShiny(card.id) : loadSprite(card.id);
+}

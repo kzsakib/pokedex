@@ -1,0 +1,210 @@
+/* Low-res pixel renderer + shared Bayer-dithered material. */
+import * as THREE from "three";
+
+export const BAYER_GLSL = `
+float bayer4(vec2 p) {
+  int x = int(mod(p.x, 4.0));
+  int y = int(mod(p.y, 4.0));
+  float m[16];
+  m[0]=0.0;  m[1]=8.0;  m[2]=2.0;  m[3]=10.0;
+  m[4]=12.0; m[5]=4.0;  m[6]=14.0; m[7]=6.0;
+  m[8]=3.0;  m[9]=11.0; m[10]=1.0; m[11]=9.0;
+  m[12]=15.0;m[13]=7.0; m[14]=13.0;m[15]=5.0;
+  return m[y*4+x] / 16.0;
+}
+`;
+
+const VERT = `
+varying vec2 vUv;
+varying vec3 vNormal;
+void main() {
+  vUv = uv;
+  vNormal = normalize(normalMatrix * normal);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const FRAG = `
+${BAYER_GLSL}
+uniform sampler2D uMap;
+uniform sampler2D uMask;
+uniform float uHolo;
+uniform float uHoloDensity;
+uniform vec2 uTilt;
+uniform float uOpacity;
+uniform float uGlint;
+uniform float uGlintOn;
+uniform float uDim;
+uniform float uFade;
+uniform vec3 uTint;
+uniform float uUseTint;
+varying vec2 vUv;
+varying vec3 vNormal;
+
+vec3 rainbow(float i) {
+  if (i < 1.0) return vec3(1.0, 0.43, 0.78);
+  if (i < 2.0) return vec3(1.0, 0.82, 0.25);
+  if (i < 3.0) return vec3(0.48, 1.0, 0.48);
+  if (i < 4.0) return vec3(0.31, 0.85, 1.0);
+  if (i < 5.0) return vec3(0.54, 0.48, 1.0);
+  return vec3(1.0, 0.60, 0.35);
+}
+
+void main() {
+  vec4 t = texture2D(uMap, vUv);
+  if (t.a < 0.5) discard;
+  float bayer = bayer4(gl_FragCoord.xy);
+  float light = dot(normalize(vNormal), normalize(vec3(-0.45, 0.65, 0.9))) * 0.5 + 0.5;
+  float band = floor(light * 4.0) / 4.0;
+  vec3 col = t.rgb * (0.88 + band * 0.26);
+
+  if (uUseTint > 0.5) col *= uTint;
+
+  if (uHolo > 0.5) {
+    float m = texture2D(uMask, vUv).r;
+    if (m > 0.5) {
+      float idx = floor(fract(vUv.x + vUv.y * 0.6 + uTilt.x * 1.5 + uTilt.y * 0.8) * 6.0);
+      if (bayer < uHoloDensity) col = mix(col, rainbow(idx), 0.72);
+      float sparkle = step(0.985, fract(sin(dot(floor(vUv * vec2(64.0, 88.0)), vec2(12.9898, 78.233))) * 43758.5453));
+      if (sparkle > 0.5 && bayer < 0.5) col = vec3(1.0);
+    }
+  }
+
+  if (uGlintOn > 0.5) {
+    float g = fract(vUv.x * 0.8 + vUv.y * 0.45 - uGlint);
+    if (g < 0.06 && bayer < 0.65) col = mix(col, vec3(1.0, 0.98, 0.9), 0.55);
+    if (g > 0.06 && g < 0.1 && bayer < 0.3) col = mix(col, vec3(1.0), 0.22);
+  }
+
+  col *= uDim;
+  float a = uOpacity;
+  if (uFade < 1.0) {
+    if (bayer < uFade) discard;
+  }
+  gl_FragColor = vec4(col, a);
+}
+`;
+
+export function makeMaterial({ map, mask = null, holo = false, holoDensity = 0.33, glint = false, tint = null, dim = 1 }) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uMap: { value: map },
+      uMask: { value: mask },
+      uHolo: { value: holo ? 1 : 0 },
+      uHoloDensity: { value: holoDensity },
+      uTilt: { value: new THREE.Vector2(0, 0) },
+      uOpacity: { value: 1 },
+      uGlint: { value: 0 },
+      uGlintOn: { value: glint ? 1 : 0 },
+      uDim: { value: dim },
+      uFade: { value: 1 },
+      uTint: { value: new THREE.Color(tint || 0xffffff) },
+      uUseTint: { value: tint ? 1 : 0 },
+    },
+    vertexShader: VERT,
+    fragmentShader: FRAG,
+    transparent: true,
+    side: THREE.DoubleSide,
+  });
+}
+
+const BG_FRAG = `
+${BAYER_GLSL}
+uniform vec2 uSize;
+uniform float uTime;
+varying vec2 vUv;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+void main() {
+  vec2 px = vUv * uSize;
+  vec3 col = vec3(0.078, 0.071, 0.165);
+  float d = distance(vUv, vec2(0.5));
+  float v = step(0.62, d + (bayer4(px) - 0.5) * 0.05);
+  col = mix(col, vec3(0.035, 0.031, 0.09), v * 0.85);
+
+  vec2 cell = floor(px / 6.0);
+  float t = floor(uTime * 8.0);
+  float h = hash(cell + t * 7.13);
+  if (h > 0.9965) {
+    float tw = 0.45 + 0.55 * step(0.5, hash(cell + floor(t * 0.5)));
+    col = mix(col, vec3(0.72, 0.70, 0.9), tw * 0.75);
+  }
+  float beam = 0.0;
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+const BG_VERT = `
+varying vec2 vUv;
+void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+`;
+
+export class PixelScene {
+  constructor(container) {
+    this.container = container;
+    this.canvas = document.createElement("canvas");
+    this.canvas.className = "kp-canvas";
+    this.canvas.setAttribute("aria-hidden", "true");
+    container.appendChild(this.canvas);
+
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, alpha: false });
+    this.renderer.setPixelRatio(1);
+    this.renderer.setClearColor(0x14122a, 1);
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(22, 16 / 9, 1, 2000);
+    this.camera.position.set(0, 0, 900);
+    this.camera.lookAt(0, 0, 0);
+    this.root = new THREE.Group();
+    this.scene.add(this.root);
+    this.W = 576;
+    this.H = 324;
+
+    const bg = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.ShaderMaterial({
+        uniforms: { uSize: { value: new THREE.Vector2(576, 324) }, uTime: { value: 0 } },
+        vertexShader: BG_VERT,
+        fragmentShader: BG_FRAG,
+        depthWrite: false,
+      })
+    );
+    bg.position.z = -500;
+    bg.scale.set(3000, 3000, 1);
+    this.bg = bg;
+    this.scene.add(bg);
+
+    this.resize();
+  }
+
+  resize() {
+    const rect = this.container.getBoundingClientRect();
+    const portrait = rect.height > rect.width * 1.05;
+    this.W = portrait ? 324 : 576;
+    this.H = portrait ? 576 : 324;
+    this.renderer.setSize(this.W, this.H, false);
+    this.camera.aspect = this.W / this.H;
+    this.camera.updateProjectionMatrix();
+    this.bg.material.uniforms.uSize.value.set(this.W, this.H);
+    this.bg.scale.set(this.camera.aspect * 2400, 2400, 1);
+    this.portrait = portrait;
+    this.fit();
+  }
+
+  fit() {
+    const rect = this.container.getBoundingClientRect();
+    const scale = Math.max(1, Math.min(Math.floor(rect.width / this.W), Math.floor(rect.height / this.H)));
+    this.canvas.style.width = `${this.W * scale}px`;
+    this.canvas.style.height = `${this.H * scale}px`;
+  }
+
+  render(time) {
+    this.bg.material.uniforms.uTime.value = time;
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  dispose() {
+    this.renderer.dispose();
+    this.canvas.remove();
+  }
+}
