@@ -251,7 +251,7 @@ export function renderCard(card, sprite) {
     drawTypeBadge(ctx, card.resistance, 86, footY - 4, 12);
     drawText(ctx, "-30", 102, footY, { size: SMALL, color: INK, tracking: 0 });
   } else {
-    drawText(ctx, "--", 86, footY, { size: SMALL, color: INK, tracking: 0 });
+    drawText(ctx, "NONE", 86, footY, { size: 7, color: INK, tracking: 0 });
   }
   drawText(ctx, "RET", 126, footY, { size: SMALL, color: shade(pal.deep, 0.15), tracking: 0 });
   drawText(ctx, String(card.retreat || 0), 150, footY, { size: SMALL, color: INK, tracking: 0 });
