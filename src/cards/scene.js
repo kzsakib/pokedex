@@ -85,8 +85,8 @@ void main() {
   if (!backside && uEffect > 0.5) {
     if (uEffect < 1.5) {
       /* reverse: brushed metal, silver-blue vertical grain */
-      float grain = sin(vUv.x * 90.0 + sin(vUv.y * 12.0) * 2.0) * 0.5 + 0.5;
-      float sweep = fract(vUv.x * 0.55 + vUv.y * 0.9 - uTilt.x * 1.1);
+      float grain = sin(vUv.x * 90.0 + sin(vUv.y * 12.0 + uTime * 0.8) * 2.0 + uTime * 1.1) * 0.5 + 0.5;
+      float sweep = fract(vUv.x * 0.55 + vUv.y * 0.9 - uTilt.x * 1.1 - uTilt.y * 0.5 - uTime * 0.07);
       col = mix(col, vec3(0.80, 0.86, 1.0), grain * 0.06 + (1.0 - sweep) * 0.05);
       col = mix(col, vec3(1.0), smoothstep(0.92, 1.0, grain) * 0.10);
     } else if (uEffect < 2.5) {
