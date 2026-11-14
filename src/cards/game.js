@@ -198,6 +198,7 @@ export class KantoPacksGame {
       summary: this.scene?.portrait ? "drag up and down to browse · open another or check the binder" : "five cards · open another or check the binder",
     };
     this.hint(hints[phase] || "");
+    if (this.beamMesh) this.beamMesh.visible = phase === "flash" || phase === "emerge";
     this.container.classList.toggle("kp-browsing", phase === "summary" && !!this.scene?.portrait);
     this.el.summary.classList.toggle("kp-show", phase === "summary");
     this.el.caption.classList.toggle("kp-show", phase === "reveal" && this.flipped[this.revealIndex]);
@@ -290,15 +291,11 @@ export class KantoPacksGame {
         uniform float uTime;
         uniform vec3 uColour;
         uniform float uFade;
-        float bayer(vec2 p){ int x=int(mod(p.x,4.0)); int y=int(mod(p.y,4.0));
-          float m[16]; m[0]=0.;m[1]=8.;m[2]=2.;m[3]=10.;m[4]=12.;m[5]=4.;m[6]=14.;m[7]=6.;
-          m[8]=3.;m[9]=11.;m[10]=1.;m[11]=9.;m[12]=15.;m[13]=7.;m[14]=13.;m[15]=5.; return m[y*4+x]/16.0; }
         void main(){
           float edge = smoothstep(0.0,0.35,vUv.x) * smoothstep(1.0,0.65,vUv.x);
-          float bands = step(0.45, fract(vUv.y*3.0 - uTime*1.2));
-          float a = edge * (0.35 + bands*0.25) * uFade;
-          if (bayer(gl_FragCoord.xy) > a) discard;
-          gl_FragColor = vec4(uColour, 0.55);
+          float bands = 0.55 + 0.45 * step(0.45, fract(vUv.y*3.0 - uTime*1.2));
+          float a = edge * bands * uFade * 0.5;
+          gl_FragColor = vec4(uColour, a);
         }
       `,
     });

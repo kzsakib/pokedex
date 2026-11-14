@@ -398,3 +398,16 @@
   right: 0;
   bottom: 14px;
 }
+
+@media (max-width: 720px) {
+  .kp-caption {
+    bottom: 6px;
+    padding: 6px 10px;
+    gap: 6px;
+    font-size: 11px;
+  }
+  .kp-caption span:nth-child(2),
+  .kp-caption span:nth-child(5) {
+    display: none;
+  }
+}

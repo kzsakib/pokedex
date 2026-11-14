@@ -54,7 +54,6 @@ vec3 rainbow(float i) {
 void main() {
   vec4 t = texture2D(uMap, vUv);
   if (t.a < 0.5) discard;
-  float bayer = bayer4(gl_FragCoord.xy);
   float light = dot(normalize(vNormal), normalize(vec3(-0.45, 0.65, 0.9))) * 0.5 + 0.5;
   float band = floor(light * 4.0) / 4.0;
   vec3 col = uFlat > 0.5 ? t.rgb : t.rgb * (0.88 + band * 0.26);
@@ -67,7 +66,7 @@ void main() {
       float sweep = fract(vUv.x * 0.45 + vUv.y * 0.55 + uTilt.x * 0.9 + uTilt.y * 0.4);
       float idx = floor(sweep * 6.0);
       float band = step(0.18, fract((vUv.x - vUv.y) * 3.0 + uTilt.x * 2.0));
-      if (bayer < uHoloDensity * band) col = mix(col, rainbow(idx), 0.42);
+      col = mix(col, rainbow(idx), band * uHoloDensity * 1.6);
     }
   }
 
@@ -78,9 +77,7 @@ void main() {
 
   col *= uDim;
   float a = uOpacity;
-  if (uFade < 1.0) {
-    if (bayer < uFade) discard;
-  }
+  a *= clamp(uFade, 0.0, 1.0);
   gl_FragColor = vec4(col, a);
 }
 `;
@@ -119,7 +116,7 @@ void main() {
   vec2 px = vUv * uSize;
   vec3 col = vec3(0.078, 0.071, 0.165);
   float d = distance(vUv, vec2(0.5));
-  float v = step(0.62, d + (bayer4(px) - 0.5) * 0.05);
+  float v = smoothstep(0.62, 0.76, d);
   col = mix(col, vec3(0.035, 0.031, 0.09), v * 0.85);
 
   vec2 cell = floor(px / 6.0);
@@ -153,9 +150,9 @@ export class PixelScene {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(22, 16 / 9, 1, 3000);
-    this.camera.position.set(0, 0, 1400);
-    this.camera.lookAt(0, 0, 0);
+    /* orthographic: texture pixels map 1:1 to canvas pixels at any depth */
+    this.camera = new THREE.OrthographicCamera(-480, 480, 270, -270, -2000, 3000);
+    this.camera.position.set(0, 0, 1000);
     this.root = new THREE.Group();
     this.scene.add(this.root);
     this.W = 960;
@@ -184,11 +181,13 @@ export class PixelScene {
     this.W = portrait ? 360 : 960;
     this.H = portrait ? 700 : 700;
     this.renderer.setSize(this.W, this.H, false);
-    this.camera.aspect = this.W / this.H;
-    this.camera.position.z = this.H / 2 / Math.tan(THREE.MathUtils.degToRad(11));
+    this.camera.left = -this.W / 2;
+    this.camera.right = this.W / 2;
+    this.camera.top = this.H / 2;
+    this.camera.bottom = -this.H / 2;
     this.camera.updateProjectionMatrix();
     this.bg.material.uniforms.uSize.value.set(this.W, this.H);
-    this.bg.scale.set(this.camera.aspect * (this.camera.position.z * 2.4), this.camera.position.z * 2.4, 1);
+    this.bg.scale.set(this.W * 1.4, this.H * 1.4, 1);
     this.portrait = portrait;
     this.fit();
   }
