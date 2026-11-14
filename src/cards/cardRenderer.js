@@ -508,10 +508,11 @@ export function renderCard(card, sprite, options = {}) {
 
   // info strip
   const genus = String(card.genus || "").replace(/\s*POKEMON$/i, "").trim();
-  lintDraw("info", 8, 150, 110, 5, () => fitText(ctx, genus, 110, F3, TEXT_MUTED, 8, 150));
-  lintDraw("info", 96, 150, 44, 5, () =>
-    drawText(ctx, 140, 150, `${String(card.id).padStart(3, "0")}/151`, F3, TEXT_MUTED, 1, "r")
-  );
+  const dex = `${String(card.id).padStart(3, "0")}/151`;
+  const dexW = textWidth(dex, F3, 1);
+  const genusW = 140 - dexW - 4 - 8;
+  lintDraw("info", 8, 150, genusW, 5, () => fitText(ctx, genus, genusW, F3, TEXT_MUTED, 8, 150));
+  lintDraw("info", 140 - dexW, 150, dexW, 5, () => drawText(ctx, 140, 150, dex, F3, TEXT_MUTED, 1, "r"));
   lintDraw("info", 146, 150, 5, 5, () => drawRarity(ctx, card.rarity, 146, 150));
 
   // move slots
