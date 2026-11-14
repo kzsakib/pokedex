@@ -399,13 +399,13 @@ function moveSlot(ctx, card, move, y, zone) {
   cost.forEach((type, i) => lintDraw(zone, 8 + i * 10, y, 9, 9, () => drawIcon(ctx, type, 8 + i * 10, y)));
   const nameX = 8 + cost.length * 10 + 3;
   const dmg = damageText(move);
-  const dmgW = textWidth(dmg, F5, 1) * 2;
-  const maxName = 151 - dmgW - 6 - nameX;
+  const dmgW = textWidth(dmg, F5, 1);
+  const maxName = 149 - dmgW - 6 - nameX;
   lintDraw(zone, nameX, y + 1, Math.max(10, maxName), 7, () => {
     fitText(ctx, move.name, Math.max(10, maxName), F5, TEXT, nameX, y + 1);
   });
-  lintDraw(zone, 151 - dmgW, y, dmgW, 14, () => {
-    drawText(ctx, dmg, 151, y, F5, TEXT, 1, "r", 2);
+  lintDraw(zone, 149 - dmgW, y + 1, dmgW, 7, () => {
+    drawText(ctx, dmg, 149, y + 1, F5, TEXT, 1, "r", 1);
   });
   if (move.effect) {
     lintDraw(zone, 9, y + 11, 140, 5, () => {
