@@ -198,6 +198,7 @@ export class KantoPacksGame {
       summary: this.scene?.portrait ? "drag up and down to browse · open another or check the binder" : "five cards · open another or check the binder",
     };
     this.hint(hints[phase] || "");
+    this.container.classList.toggle("kp-browsing", phase === "summary" && !!this.scene?.portrait);
     this.el.summary.classList.toggle("kp-show", phase === "summary");
     this.el.caption.classList.toggle("kp-show", phase === "reveal" && this.flipped[this.revealIndex]);
   }
@@ -396,7 +397,7 @@ export class KantoPacksGame {
     canvas.addEventListener("pointermove", (e) => {
       if (this.summaryDragging) {
         const dy = e.clientY - this.summaryStartY;
-        this.summaryScroll = clamp(this.summaryStartScroll + dy, -220, 5 * 276 - 640 + 220);
+        this.summaryScroll = clamp(this.summaryStartScroll + dy, -80, 2320);
         return;
       }
       const p = this.toLocal(e);
@@ -581,16 +582,16 @@ export class KantoPacksGame {
     this.audio.stopBeam();
     const count = this.meshes.length;
     const gap = 10;
-    const totalW = count * 160 + (count - 1) * gap;
+    const totalW = count * 180 + (count - 1) * gap;
     this.meshes.forEach((mesh, i) => {
       mesh.group.visible = true;
       mesh.setFlipWithTilt(0, 0, 0);
       const portrait = this.scene.portrait;
       if (portrait) {
-        mesh.summaryTarget = { x: 0, y: 0, scale: 1, portraitIndex: i };
+        mesh.summaryTarget = { x: 0, y: 0, scale: 2, portraitIndex: i };
       } else {
         mesh.summaryTarget = {
-          x: -totalW / 2 + 80 + i * 170,
+          x: -totalW / 2 + 90 + i * 190,
           y: 0,
           scale: 1,
         };
@@ -725,7 +726,7 @@ export class KantoPacksGame {
       meshes.forEach((mesh, i) => {
         if (i < this.revealIndex) {
           mesh.group.visible = true;
-          mesh.group.position.lerp(new THREE.Vector3(-320 + (i % 2) * 18, -90, 20 + i), 0.12);
+          mesh.group.position.lerp(new THREE.Vector3(-this.scene.W * 0.36 + (i % 2) * 18, -90, 20 + i), 0.12);
           mesh.group.scale.lerp(new THREE.Vector3(0.6, 0.6, 0.6), 0.12);
           mesh.setFlip(1);
           return;
@@ -767,9 +768,10 @@ export class KantoPacksGame {
         let tx = mesh.summaryTarget.x;
         let ty = mesh.summaryTarget.y;
         if (this.scene.portrait) {
-          ty = 150 - i * 276 + (this.summaryScroll || 0);
+          ty = 0 - i * 580 + (this.summaryScroll || 0);
           tx = 0;
         }
+        mesh.group.visible = !this.scene.portrait || Math.abs(ty) < 360;
         mesh.group.position.lerp(new THREE.Vector3(tx, ty, 90), 0.12);
         mesh.group.scale.lerp(new THREE.Vector3(mesh.summaryTarget.scale, mesh.summaryTarget.scale, mesh.summaryTarget.scale), 0.12);
         mesh.setTilt(this.tilt.x * 0.4, this.tilt.y * 0.4);

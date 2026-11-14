@@ -363,7 +363,7 @@
 
 @media (max-width: 720px) {
   .kp-stage {
-    height: min(92vh, 700px);
+    height: min(96vh, 780px);
     min-height: 500px;
   }
   .kp-caption {
@@ -385,4 +385,16 @@
   letter-spacing: 0.06em;
   color: var(--muted, #8b87a0);
   max-width: 70ch;
+}
+
+.kp-stage.kp-browsing .kp-top,
+.kp-stage.kp-browsing .kp-hint {
+  display: none;
+}
+
+.kp-stage.kp-browsing .kp-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
 }

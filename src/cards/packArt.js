@@ -258,24 +258,25 @@ export function renderPackBack(v) {
     ctx.fillRect(24 + i * 2.7, 76, w, 30);
   }
   drawText(ctx, "KANTO 151", 20, 120, { size: 11, color: "#fdfbf4", tracking: 1 });
-  drawText(ctx, "5 CARDS - 1 RARE OR BETTER", 20, 140, { size: 9, color: mix(v.foil, "#ffffff", 0.4), tracking: 1 });
+  drawText(ctx, "5 CARDS", 20, 140, { size: 9, color: mix(v.foil, "#ffffff", 0.4), tracking: 0 });
+  drawText(ctx, "1 RARE OR BETTER", 20, 152, { size: 9, color: mix(v.foil, "#ffffff", 0.4), tracking: 0 });
 
   const note = "FAN PROJECT. NOT AFFILIATED WITH NINTENDO, GAME FREAK OR THE POKEMON COMPANY.";
   let line = "";
-  let y = 200;
+  let y = 196;
   for (const word of note.split(" ")) {
     const next = line ? `${line} ${word}` : word;
-    if (textWidth(next, 9, 1, 1) > PACK_W - 40) {
-      drawText(ctx, line, 20, y, { size: 9, color: "#fdfbf4", tracking: 1 });
-      y += 13;
+    if (textWidth(next, 8, 1, 0) > 128) {
+      drawText(ctx, line, 20, y, { size: 8, color: "#fdfbf4", tracking: 0 });
+      y += 11;
       line = word;
     } else {
       line = next;
     }
   }
-  if (line) drawText(ctx, line, 20, y, { size: 9, color: "#fdfbf4", tracking: 1 });
+  if (line) drawText(ctx, line, 20, y, { size: 8, color: "#fdfbf4", tracking: 0 });
 
-  drawText(ctx, "SEALED IN KANTO", 20, 296, { size: 10, color: v.accent, tracking: 1 });
+  drawText(ctx, "SEALED IN KANTO", 20, 300, { size: 9, color: v.accent, tracking: 0 });
   return canvas;
 }
 

@@ -1,6 +1,7 @@
 /* Holo mask textures: art window for Holo Rare, whole card for Legend. */
-export const CARD_W = 160;
-export const CARD_H = 264;
+import { CARD_W, CARD_H } from "./cardRenderer.js";
+
+export { CARD_W, CARD_H };
 
 export function makeHoloMask(rarity) {
   const canvas = document.createElement("canvas");
@@ -12,7 +13,7 @@ export function makeHoloMask(rarity) {
   if (rarity === "legend") {
     for (let y = 8; y < CARD_H - 8; y += 1) ctx.fillRect(8, y, CARD_W - 16, 1);
   } else if (rarity === "holo") {
-    for (let y = 46; y < 150; y += 1) ctx.fillRect(12, y, 136, 1);
+    for (let y = 48; y < 172; y += 1) ctx.fillRect(12, y, 156, 1);
   }
   return canvas;
 }

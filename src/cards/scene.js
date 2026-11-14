@@ -182,7 +182,7 @@ export class PixelScene {
     const rect = this.container.getBoundingClientRect();
     const portrait = rect.height > rect.width * 1.05;
     this.W = portrait ? 360 : 960;
-    this.H = portrait ? 640 : 540;
+    this.H = portrait ? 700 : 700;
     this.renderer.setSize(this.W, this.H, false);
     this.camera.aspect = this.W / this.H;
     this.camera.position.z = this.H / 2 / Math.tan(THREE.MathUtils.degToRad(11));
