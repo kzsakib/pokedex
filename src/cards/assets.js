@@ -1,7 +1,7 @@
 /* Static data + sprite loading. Sprites are trimmed to their alpha box and
    recoloured for shiny cards, all in the browser at load time. */
 
-const BASE = import.meta.env.BASE_URL || "/";
+const BASE = (import.meta.env && import.meta.env.BASE_URL) || "/";
 const spriteCache = new Map();
 const shinyCache = new Map();
 
@@ -50,14 +50,18 @@ function trim(img) {
     }
   }
   if (maxX < 0) return canvas;
-  const w = Math.min(56, maxX - minX + 1);
-  const h = Math.min(56, maxY - minY + 1);
+  const bw = maxX - minX + 1;
+  const bh = maxY - minY + 1;
+  /* shrink oversized sprites proportionally instead of cropping their edges */
+  const s = Math.min(1, 54 / bw, 54 / bh);
+  const w = Math.max(1, Math.round(bw * s));
+  const h = Math.max(1, Math.round(bh * s));
   const out = document.createElement("canvas");
   out.width = w;
   out.height = h;
   const octx = out.getContext("2d");
   octx.imageSmoothingEnabled = false;
-  octx.drawImage(canvas, minX, minY, w, h, 0, 0, w, h);
+  octx.drawImage(canvas, minX, minY, bw, bh, 0, 0, w, h);
   return out;
 }
 

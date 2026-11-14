@@ -30,6 +30,8 @@ export class KantoPacksGame {
     this.seed = this.readSeedFromUrl() || freshSeed();
     this.force = this.readForceFromUrl();
     this.phase = "idle";
+    this.focusIndex = -1;
+    this.suppressPick = false;
     this.phaseTime = 0;
     this.cards = [];
     this.meshes = [];
@@ -379,11 +381,18 @@ export class KantoPacksGame {
         this.packKick = 1;
         return;
       }
-      if (this.phase === "summary" && this.scene.portrait) {
-        this.dragging = false;
-        this.summaryDragging = true;
-        this.summaryStartY = e.clientY;
-        this.summaryStartScroll = this.summaryScroll || 0;
+      if (this.phase === "summary") {
+        if (this.focusIndex >= 0) {
+          this.suppressPick = true;
+          this.unfocusCard();
+          return;
+        }
+        if (this.scene.portrait) {
+          this.dragging = false;
+          this.summaryDragging = true;
+          this.summaryStartY = e.clientY;
+          this.summaryStartScroll = this.summaryScroll || 0;
+        }
         return;
       }
       if (this.phase === "reveal") {
@@ -445,6 +454,12 @@ export class KantoPacksGame {
       if (!this.slicing && moved < 8 && this.phase === "reveal" && this.flipped[this.revealIndex]) {
         this.advanceReveal();
       }
+      if (this.suppressPick) {
+        this.suppressPick = false;
+      } else if (this.phase === "summary" && moved < 8 && this.focusIndex < 0) {
+        const hit = this.pickSummary(e);
+        if (hit >= 0) this.focusCard(hit);
+      }
       if (this.slicing) {
         this.slicing = false;
         if (this.tear < 1 && this.phase === "tearing") {
@@ -471,6 +486,7 @@ export class KantoPacksGame {
       if (e.key === "Escape") {
         this.el.help.hidden = true;
         this.el.binder.hidden = true;
+        if (this.focusIndex >= 0) this.unfocusCard();
       }
       if (e.target && /input|textarea/i.test(e.target.tagName)) return;
       if (e.code === "Space") {
@@ -593,30 +609,75 @@ export class KantoPacksGame {
 
   showSummary() {
     this.summaryScroll = 0;
+    this.focusIndex = -1;
+    this.suppressPick = false;
     this.setPhase("summary");
     this.el.caption.classList.remove("kp-show");
     if (this.beamMesh) this.beamMesh.visible = false;
     this.audio.stopBeam();
-    this.meshes.forEach((mesh, i) => {
-      mesh.group.visible = true;
-      mesh.setFlipWithTilt(0, 0, 0);
-      const portrait = this.scene.portrait;
-      if (portrait) {
-        mesh.summaryTarget = { x: 0, y: 0, scale: 2, portraitIndex: i };
-      } else {
-        const row = i < 3 ? 0 : 1;
-        const col = i < 3 ? i : i - 3;
-        mesh.summaryTarget = {
-          x: (i - 2) * 172,
-          y: 0,
-          scale: 1,
-        };
-      }
+    this.layoutSummary();
+    this.meshes.forEach((mesh) => {
       mesh.group.position.set(mesh.summaryTarget.x, mesh.summaryTarget.y, 90);
       mesh.group.scale.setScalar(mesh.summaryTarget.scale);
       mesh.setTilt(0, 0);
-      this.el.caption.innerHTML = "";
     });
+    this.el.caption.innerHTML = "";
+  }
+
+  layoutSummary() {
+    const portrait = this.scene.portrait;
+    this.meshes.forEach((mesh, i) => {
+      mesh.group.visible = true;
+      mesh.setFlipWithTilt(0, 0, 0);
+      mesh.summaryTarget = portrait
+        ? { x: 0, y: 0, scale: 2, portraitIndex: i }
+        : { x: (i - 2) * 172, y: 0, scale: 1 };
+    });
+  }
+
+  /* which summary card sits under the pointer (landscape layout) */
+  pickSummary(e) {
+    const p = this.toLocal(e);
+    const sx = p.x - this.scene.W / 2;
+    const sy = this.scene.H / 2 - p.y;
+    let hit = -1;
+    let best = Infinity;
+    this.meshes.forEach((mesh, i) => {
+      const target = mesh.summaryTarget;
+      if (!target) return;
+      const s = mesh.group.scale.x || 1;
+      const dx = Math.abs(sx - mesh.group.position.x);
+      const dy = Math.abs(sy - mesh.group.position.y);
+      if (dx < 82 * s && dy < 114 * s && dx + dy < best) {
+        best = dx + dy;
+        hit = i;
+      }
+    });
+    return hit;
+  }
+
+  focusCard(i) {
+    if (i < 0 || !this.meshes[i]) return;
+    this.focusIndex = i;
+    this.audio.click();
+    this.meshes.forEach((mesh, j) => {
+      mesh.group.visible = true;
+      mesh.summaryTarget =
+        j === i
+          ? { x: 0, y: 12, scale: this.scene.portrait ? 1.65 : 1.7 }
+          : { x: 0, y: 0, scale: 0.001 };
+    });
+    this.showCaption(this.cards[i]);
+    this.el.caption.classList.add("kp-show");
+    this.hint("click anywhere to close");
+  }
+
+  unfocusCard() {
+    if (this.focusIndex < 0) return;
+    this.focusIndex = -1;
+    this.el.caption.classList.remove("kp-show");
+    this.layoutSummary();
+    this.hint(this.scene.portrait ? "tap a card to enlarge · drag to browse" : "tap a card to enlarge it");
   }
 
   openBinder() {
@@ -783,11 +844,14 @@ export class KantoPacksGame {
         if (!mesh.summaryTarget) return;
         let tx = mesh.summaryTarget.x;
         let ty = mesh.summaryTarget.y;
-        if (this.scene.portrait) {
+        if (this.scene.portrait && this.focusIndex < 0) {
           ty = 0 - i * 460 + (this.summaryScroll || 0);
           tx = 0;
         }
-        mesh.group.visible = !this.scene.portrait || Math.abs(ty) < 330;
+        mesh.group.visible =
+          this.focusIndex >= 0
+            ? i === this.focusIndex
+            : !this.scene.portrait || Math.abs(ty) < 330;
         mesh.group.position.lerp(new THREE.Vector3(tx, ty, 90), 0.12);
         mesh.group.scale.lerp(new THREE.Vector3(mesh.summaryTarget.scale, mesh.summaryTarget.scale, mesh.summaryTarget.scale), 0.12);
         mesh.setTilt(this.tilt.x * 0.4, this.tilt.y * 0.4);

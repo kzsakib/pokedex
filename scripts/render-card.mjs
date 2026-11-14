@@ -47,14 +47,39 @@ function makeCanvas(w, h) {
         }
       }
     },
-    drawImage() {}, strokeRect() {},
+    drawImage(src, sx, sy, sw, sh, dx, dy, dw, dh) {
+      if (!src || !src.__buf) return;
+      if (arguments.length === 3) { sx = 0; sy = 0; sw = src.width; sh = src.height; dx = arguments[1]; dy = arguments[2]; dw = sw; dh = sh; }
+      else if (arguments.length === 5) { sx = 0; sy = 0; sw = src.width; sh = src.height; dx = arguments[1]; dy = arguments[2]; dw = arguments[3]; dh = arguments[4]; }
+      for (let j = 0; j < dh; j++) {
+        for (let i = 0; i < dw; i++) {
+          const sxp = Math.floor(sx + (i * sw) / dw);
+          const syp = Math.floor(sy + (j * sh) / dh);
+          const so = (syp * src.width + sxp) * 4;
+          if (src.__buf[so + 3] < 8) continue;
+          const px = dx + i, py = dy + j;
+          if (px < 0 || py < 0 || px >= w || py >= h) continue;
+          const o = (py * w + px) * 4;
+          buf[o] = src.__buf[so]; buf[o + 1] = src.__buf[so + 1]; buf[o + 2] = src.__buf[so + 2]; buf[o + 3] = 255;
+        }
+      }
+    },
+    strokeRect() {},
+    getImageData() { return { data: new Uint8ClampedArray(buf) }; },
+    putImageData(img) { buf.set(img.data); },
   };
   return { width: w, height: h, getContext: () => ctx, __buf: buf };
 }
 globalThis.document = { createElement: () => makeCanvas(160, 224) };
 const { renderCard } = await import("../src/cards/cardRenderer.js");
 
-const card = {
+const single = process.argv[2] === "single";
+const card = single ? {
+  id: 54, name: "Psyduck", genus: "Duck Pokémon", tcg: "Water", stage: 0, level: 12, hp: 50,
+  rarity: "common", shiny: false, finish: "reverse",
+  moves: [{ name: "Bubblebeam", cost: ["Water", "Water", "Colorless"], effect: "Recoil: 10 damage", damage: 20, display: "20x" }],
+  weakness: "Lightning", resistance: null, retreat: 1, height: 0.8, weight: 20,
+} : {
   id: 48, name: "Venonat", genus: "Insect Pokémon", tcg: "Grass", stage: 0, level: 16, hp: 50,
   rarity: "legend", shiny: false, finish: "prism",
   moves: [
@@ -63,7 +88,25 @@ const card = {
   ],
   weakness: "Fire", resistance: null, retreat: 1, height: 1.0, weight: 30,
 };
-const c = renderCard(card, null);
+const raw = fs.readFileSync(`artifacts/s${Number(process.argv[3] || 108)}.rgba`);
+let minX = 64, minY = 64, maxX = -1, maxY = -1;
+for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
+  if (raw[(y * 64 + x) * 4 + 3] < 24) continue;
+  if (x < minX) minX = x; if (x > maxX) maxX = x;
+  if (y < minY) minY = y; if (y > maxY) maxY = y;
+}
+const bw = maxX - minX + 1, bh = maxY - minY + 1;
+const sfit = Math.min(1, 54 / bw, 54 / bh);
+const tw = Math.max(1, Math.round(bw * sfit)), th = Math.max(1, Math.round(bh * sfit));
+const spr = makeCanvas(tw, th);
+for (let y = 0; y < th; y++) for (let x = 0; x < tw; x++) {
+  const sx2 = minX + Math.floor((x * bw) / tw), sy2 = minY + Math.floor((y * bh) / th);
+  const so = (sy2 * 64 + sx2) * 4, o = (y * tw + x) * 4;
+  spr.__buf[o] = raw[so]; spr.__buf[o + 1] = raw[so + 1]; spr.__buf[o + 2] = raw[so + 2]; spr.__buf[o + 3] = raw[so + 3];
+}
+console.log("sprite", tw, "x", th, "from", bw, "x", bh);
+
+const c = renderCard(card, spr);
 const k = 3, W = 160 * k, H = 224 * k;
 const out = Buffer.alloc(W * H * 4);
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -75,5 +118,5 @@ for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
   out[d + 2] = Math.round(c.__buf[s + 2] * a + 236 * (1 - a));
   out[d + 3] = 255;
 }
-fs.writeFileSync("artifacts/render-check.png", png(W, H, out));
+fs.writeFileSync(single ? "artifacts/render-single.png" : "artifacts/render-check.png", png(W, H, out));
 console.log("wrote artifacts/render-check.png");

@@ -112,10 +112,10 @@ function fitText(ctx, text, maxW, font, color, x, y, align = "l") {
 const ZONES = {
   A: [5, 18],
   B: [21, 34],
-  art: [37, 142],
-  info: [150, 155],
-  move1: [162, 180],
-  move2: [186, 204],
+  art: [37, 156],
+  info: [158, 163],
+  move1: [165, 182],
+  move2: [186, 202],
   footer: [209, 217],
 };
 
@@ -236,7 +236,7 @@ function drawRarity(ctx, rarity, x, y) {
 
 /* ---------- art window ---------- */
 
-const ART = { x: 8, y: 37, w: 144, h: 106, inner: { x: 10, y: 39, w: 140, h: 102 } };
+const ART = { x: 8, y: 37, w: 144, h: 120, inner: { x: 10, y: 39, w: 140, h: 116 } };
 const BUFFER = { w: 70, h: 58 };
 
 function artBuffer(card, sprite) {
@@ -309,7 +309,7 @@ function artBuffer(card, sprite) {
     const sw = sprite.width * scale;
     const sh = sprite.height * scale;
     const sx = Math.round(w / 2 - sw / 2);
-    const sy = Math.max(1, Math.round(h - 3 - sh));
+    const sy = Math.max(2, Math.round(h - 4 - sh));
     ctx.fillStyle = "rgba(26,26,46,0.2)";
     ctx.fillRect(sx + 3, h - 4, Math.max(4, sw - 6), 1);
     ctx.drawImage(sprite, sx, sy, sw, sh);
@@ -514,14 +514,14 @@ export function renderCard(card, sprite, options = {}) {
   const dex = `${String(card.id).padStart(3, "0")}/151`;
   const dexW = textWidth(dex, F3, 1);
   const genusW = 140 - dexW - 4 - 8;
-  lintDraw("info", 8, 150, genusW, 5, () => fitText(ctx, genus, genusW, F3, TEXT_MUTED, 8, 150));
-  lintDraw("info", 140 - dexW, 150, dexW, 5, () => drawText(ctx, 140, 150, dex, F3, TEXT_MUTED, 1, "r"));
-  lintDraw("info", 146, 150, 5, 5, () => drawRarity(ctx, card.rarity, 146, 150));
+  lintDraw("info", 8, 159, genusW, 5, () => fitText(ctx, genus, genusW, F3, TEXT_MUTED, 8, 159));
+  lintDraw("info", 140 - dexW, 159, dexW, 5, () => drawText(ctx, 140, 159, dex, F3, TEXT_MUTED, 1, "r"));
+  lintDraw("info", 146, 159, 5, 5, () => drawRarity(ctx, card.rarity, 146, 159));
 
   // move slots
-  moveSlot(ctx, card, card.moves[0], 162, "move1");
+  moveSlot(ctx, card, card.moves[0], 166, "move1");
   ctx.fillStyle = mix(rampFor(card.tcg).base, INK, 0.25);
-  for (let x = 8; x < 152; x += 2) ctx.fillRect(x, 181, 1, 1);
+  for (let x = 8; x < 152; x += 2) ctx.fillRect(x, 183, 1, 1);
 
   if (card.moves[1]) {
     moveSlot(ctx, card, card.moves[1], 186, "move2");
