@@ -767,7 +767,7 @@ export class KantoPacksGame {
         let tx = mesh.summaryTarget.x;
         let ty = mesh.summaryTarget.y;
         if (this.scene.portrait) {
-          ty = 236 - i * 276 + (this.summaryScroll || 0);
+          ty = 150 - i * 276 + (this.summaryScroll || 0);
           tx = 0;
         }
         mesh.group.position.lerp(new THREE.Vector3(tx, ty, 90), 0.12);
