@@ -11,9 +11,9 @@ export function makeHoloMask(rarity) {
   ctx.clearRect(0, 0, CARD_W, CARD_H);
   ctx.fillStyle = "#fff";
   if (rarity === "legend") {
-    for (let y = 8; y < CARD_H - 8; y += 1) ctx.fillRect(8, y, CARD_W - 16, 1);
+    for (let y = 6; y < CARD_H - 6; y += 1) ctx.fillRect(6, y, CARD_W - 12, 1);
   } else if (rarity === "holo") {
-    for (let y = 48; y < 172; y += 1) ctx.fillRect(12, y, 156, 1);
+    for (let y = 22; y < 86; y += 1) ctx.fillRect(8, y, 84, 1);
   }
   return canvas;
 }

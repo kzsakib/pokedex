@@ -106,7 +106,6 @@ export class KantoPacksGame {
       </div>
       <div class="kp-flash" aria-hidden="true"></div>
       <div class="kp-sparkles" aria-hidden="true"></div>
-      <div class="kp-caption" aria-live="polite"></div>
       <div class="kp-bottom">
         <div class="kp-hint">loading…</div>
         <div class="kp-summary-actions">
@@ -139,6 +138,10 @@ export class KantoPacksGame {
       </div>
     `;
     this.container.appendChild(hud);
+    this.captionEl = document.createElement("div");
+    this.captionEl.className = "kp-caption kp-caption--flow";
+    this.captionEl.setAttribute("aria-live", "polite");
+    this.container.insertAdjacentElement("afterend", this.captionEl);
     this.hud = hud;
     this.el = {
       packs: hud.querySelector(".kp-packs"),
@@ -146,7 +149,7 @@ export class KantoPacksGame {
       hint: hud.querySelector(".kp-hint"),
       flash: hud.querySelector(".kp-flash"),
       sparkles: hud.querySelector(".kp-sparkles"),
-      caption: hud.querySelector(".kp-caption"),
+      caption: this.captionEl,
       summary: hud.querySelector(".kp-summary-actions"),
       sound: hud.querySelector(".kp-sound"),
       help: hud.querySelector(".kp-help"),
@@ -390,7 +393,7 @@ export class KantoPacksGame {
     canvas.addEventListener("pointermove", (e) => {
       if (this.summaryDragging) {
         const dy = e.clientY - this.summaryStartY;
-        this.summaryScroll = clamp(this.summaryStartScroll + dy, -80, 2320);
+        this.summaryScroll = clamp(this.summaryStartScroll + dy, -80, 1200);
         return;
       }
       const p = this.toLocal(e);
@@ -587,9 +590,6 @@ export class KantoPacksGame {
     this.el.caption.classList.remove("kp-show");
     if (this.beamMesh) this.beamMesh.visible = false;
     this.audio.stopBeam();
-    const count = this.meshes.length;
-    const gap = 10;
-    const totalW = count * 180 + (count - 1) * gap;
     this.meshes.forEach((mesh, i) => {
       mesh.group.visible = true;
       mesh.setFlipWithTilt(0, 0, 0);
@@ -597,10 +597,14 @@ export class KantoPacksGame {
       if (portrait) {
         mesh.summaryTarget = { x: 0, y: 0, scale: 2, portraitIndex: i };
       } else {
+        const row = i < 3 ? 0 : 1;
+        const col = i < 3 ? i : i - 3;
+        const rowCount = row === 0 ? 3 : 2;
+        const rowW = rowCount * 200 + (rowCount - 1) * 12;
         mesh.summaryTarget = {
-          x: -totalW / 2 + 90 + i * 190,
-          y: 0,
-          scale: 1,
+          x: -rowW / 2 + 100 + col * 212,
+          y: row === 0 ? 115 : -125,
+          scale: 2,
         };
       }
       mesh.group.position.set(mesh.summaryTarget.x, mesh.summaryTarget.y, 90);
@@ -740,7 +744,7 @@ export class KantoPacksGame {
         }
         mesh.group.visible = i === this.revealIndex;
         const offset = i - this.revealIndex;
-        const targetScale = i === this.revealIndex ? 2 : 1;
+        const targetScale = i === this.revealIndex ? 3 : 1;
         mesh.group.position.lerp(
           new THREE.Vector3(offset * 2, -offset * 3, 70 + offset * -4),
           0.14
@@ -775,10 +779,10 @@ export class KantoPacksGame {
         let tx = mesh.summaryTarget.x;
         let ty = mesh.summaryTarget.y;
         if (this.scene.portrait) {
-          ty = 0 - i * 580 + (this.summaryScroll || 0);
+          ty = 0 - i * 300 + (this.summaryScroll || 0);
           tx = 0;
         }
-        mesh.group.visible = !this.scene.portrait || Math.abs(ty) < 360;
+        mesh.group.visible = !this.scene.portrait || Math.abs(ty) < 320;
         mesh.group.position.lerp(new THREE.Vector3(tx, ty, 90), 0.12);
         mesh.group.scale.lerp(new THREE.Vector3(mesh.summaryTarget.scale, mesh.summaryTarget.scale, mesh.summaryTarget.scale), 0.12);
         mesh.setTilt(this.tilt.x * 0.4, this.tilt.y * 0.4);
@@ -814,6 +818,7 @@ export class KantoPacksGame {
     this.clearScene();
     this.scene.dispose();
     this.hud.remove();
+    this.captionEl?.remove();
   }
 }
 

@@ -1,19 +1,23 @@
 import { useEffect, useRef } from "react";
 import { KantoPacksGame } from "./game.js";
+import CardTest from "./CardTest.jsx";
 import "./packs.css";
 
 export default function KantoPacks() {
   const stageRef = useRef(null);
+  const testMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("test") === "cards";
 
   useEffect(() => {
-    if (!stageRef.current) return undefined;
+    if (testMode || !stageRef.current) return undefined;
     const game = new KantoPacksGame(stageRef.current);
     window.__kanto = game;
     return () => {
       if (window.__kanto === game) delete window.__kanto;
       game.destroy();
     };
-  }, []);
+  }, [testMode]);
+
+  if (testMode) return <CardTest />;
 
   return (
     <section className="bay kp-section" id="kanto-packs" aria-labelledby="packs-title">

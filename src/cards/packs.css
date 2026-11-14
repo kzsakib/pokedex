@@ -411,3 +411,27 @@
     display: none;
   }
 }
+
+/* caption lives below the card, never over it */
+.kp-caption--flow {
+  position: static;
+  transform: none;
+  margin: 12px auto 0;
+  max-width: min(100%, 720px);
+  flex-wrap: wrap;
+  justify-content: center;
+  background: rgba(11, 9, 18, 0.82);
+  border: 1px solid rgba(232, 230, 240, 0.16);
+  padding: 8px 12px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #cfcadf;
+  text-align: center;
+  display: none;
+}
+
+.kp-caption--flow.kp-show {
+  display: flex;
+  gap: 12px;
+}
