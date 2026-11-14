@@ -73,7 +73,7 @@ void main() {
 
   if (uGlintOn > 0.5) {
     float g = fract(vUv.x * 0.7 + vUv.y * 0.35 - uGlint);
-    if (g < 0.035 && bayer < 0.55) col = mix(col, vec3(1.0, 0.98, 0.92), 0.26);
+    if (g < 0.02) col = mix(col, vec3(1.0, 0.98, 0.92), 0.16);
   }
 
   col *= uDim;
