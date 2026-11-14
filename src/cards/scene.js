@@ -87,7 +87,7 @@ void main() {
       col = mix(col, vec3(1.0), smoothstep(0.92, 1.0, grain) * 0.10);
     } else if (uEffect < 2.5) {
       /* holo: rainbow sheet */
-      float sweep = fract(vUv.x * 0.5 + vUv.y * 0.7 + uTilt.x * 0.9);
+      float sweep = fract(vUv.x * 0.5 + vUv.y * 0.7 + uTilt.x * 0.9 + uTilt.y * 0.5 + uTime * 0.06);
       col = mix(col, rainbow(floor(sweep * 6.0)), 0.34);
     } else if (uEffect < 3.5) {
       /* prism: rainbow plus travelling star sparkles */

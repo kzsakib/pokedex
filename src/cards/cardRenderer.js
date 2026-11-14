@@ -308,7 +308,7 @@ function artBuffer(card, sprite) {
     const sw = sprite.width * scale;
     const sh = sprite.height * scale;
     const sx = Math.round(w / 2 - sw / 2);
-    const sy = Math.round(h - 3 - sh);
+    const sy = Math.max(1, Math.round(h - 3 - sh));
     ctx.fillStyle = "rgba(26,26,46,0.2)";
     ctx.fillRect(sx + 3, h - 4, Math.max(4, sw - 6), 1);
     ctx.drawImage(sprite, sx, sy, sw, sh);
