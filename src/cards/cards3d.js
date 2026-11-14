@@ -21,15 +21,16 @@ export function cardBackTexture() {
 
 export function createCardMesh({ front, mask, rarity, finish = "plain", dim = 1 }) {
   const group = new THREE.Group();
-  const reverse = finish === "reverse";
-  const holo = holoDensityFor(rarity) > 0 || reverse;
-  const density = reverse ? 0.16 : holoDensityFor(rarity);
+  const effect = finish === "reverse" ? 1 : finish === "holo" ? 2 : finish === "prism" ? 3 : finish === "gold" ? 4 : 0;
+  const holo = false;
+  const density = holoDensityFor(rarity);
   const frontMat = makeMaterial({
     map: texture(front),
     back: cardBackTexture(),
     mask: mask ? texture(mask) : null,
     holo,
     holoDensity: density,
+    effect,
     dim,
     flat: true,
     opaque: true,

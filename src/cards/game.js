@@ -344,7 +344,7 @@ export class KantoPacksGame {
     const stats = `HT ${fmtHeight(card.height)}  WT ${card.weight ? `${Math.round(card.weight * 2.2046)} LB` : "??"}`;
     this.el.caption.innerHTML = `
       <strong>${card.name}</strong>
-      <span>${RARITY_LABEL[card.rarity]}${card.shiny ? " · SHINY ✦" : card.finish === "reverse" ? " · REVERSE" : ""}</span>
+      <span>${RARITY_LABEL[card.rarity]}${card.shiny ? " · SHINY ✦" : card.finish === "reverse" ? " · REVERSE" : card.finish === "gold" ? " · GOLD" : card.finish === "prism" ? " · PRISM" : ""}</span>
       <span>${stats}</span>
       <span>seed ${this.seed}</span>
     `;

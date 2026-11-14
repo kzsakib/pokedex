@@ -173,10 +173,10 @@ function makeCard(rng, pokemon, rarity, shiny) {
   const finish = shiny
     ? "shiny"
     : rarity === "legend"
-    ? "prism"
+    ? (rng.chance(0.55) ? "prism" : "gold")
     : rarity === "holo"
     ? "holo"
-    : rng.chance(0.2)
+    : rng.chance(0.25)
     ? "reverse"
     : "plain";
   return {
@@ -224,7 +224,7 @@ export function generatePack(data, seed, options = {}) {
   const upgrade = rng.chance(0.08);
   slots.push({ mon: pickUnique(upgrade ? pools.rare : pools.uncommon), rarity: upgrade ? "rare" : "uncommon" });
   const roll = rng.random();
-  let rareRarity = roll < 0.5 ? "rare" : roll < 0.88 ? "holo" : "legend";
+  let rareRarity = roll < 0.45 ? "rare" : roll < 0.86 ? "holo" : "legend";
   if (force && ["rare", "holo", "legend"].includes(force)) rareRarity = force;
   slots.push({ mon: pickUnique(pools[rareRarity === "legend" ? "legend" : "rare"]), rarity: rareRarity });
 
