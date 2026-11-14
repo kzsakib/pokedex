@@ -405,10 +405,12 @@ export class KantoPacksGame {
         return;
       }
       if ((this.phase === "reveal" || this.phase === "stack" || this.phase === "summary") && !this.dragging) {
-        const halfW = this.scene.W / 2;
-        const halfH = this.scene.H / 2;
-        this.tilt.targetX = clamp((p.x / halfW) * 0.46, -0.46, 0.46);
-        this.tilt.targetY = clamp((-p.y / halfH) * 0.3, -0.3, 0.3);
+        /* lean away from the pointer: the side under the cursor sinks back */
+        const rect = this.scene.canvas.getBoundingClientRect();
+        const nx = clamp((e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2), -1, 1);
+        const ny = clamp((e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2), -1, 1);
+        this.tilt.targetX = -nx * 0.4;
+        this.tilt.targetY = -ny * 0.26;
         return;
       }
       if (this.dragging) {

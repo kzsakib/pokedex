@@ -529,9 +529,7 @@ export function renderCard(card, sprite, options = {}) {
     lintDraw("move2", 9, 188, 140, 5, () =>
       fitText(ctx, `HT ${ft}'${String(inch).padStart(2, "0")}"  WT ${lb} LB`, 140, F3, TEXT, 9, 188)
     );
-    if (card.flavour) {
-      lintDraw("move2", 9, 196, 140, 5, () => fitText(ctx, card.flavour, 140, F3, "#544854", 9, 196));
-    }
+
   }
 
   ctx.fillStyle = mix(rampFor(card.tcg).base, INK, 0.3);
