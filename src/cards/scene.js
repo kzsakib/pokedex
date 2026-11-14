@@ -41,6 +41,7 @@ uniform float uFade;
 uniform vec3 uTint;
 uniform float uUseTint;
 uniform float uFlat;
+uniform float uSheen;
 varying vec2 vUv;
 varying vec3 vNormal;
 
@@ -65,6 +66,15 @@ void main() {
   vec3 col = uFlat > 0.5 ? t.rgb : t.rgb * (0.88 + band * 0.26);
 
   if (uUseTint > 0.5) col *= uTint;
+
+  if (!backside && uSheen > 0.5) {
+    float sweep = fract(vUv.x * 0.85 + vUv.y * 0.45 - uTilt.x * 0.7 - uTilt.y * 0.35);
+    float band = smoothstep(0.0, 0.22, sweep) * (1.0 - smoothstep(0.24, 0.62, sweep));
+    col = mix(col, vec3(1.0, 0.985, 0.94), band * 0.12);
+    float tint = 0.035 * (1.0 - smoothstep(0.0, 0.5, abs(fract(vUv.y * 1.3 + vUv.x * 0.6 + uTilt.x) - 0.5) * 2.0));
+    col = mix(col, rainbow(floor(fract(vUv.x * 0.5 + vUv.y * 0.7 + uTilt.x * 0.4) * 6.0)), tint);
+    col = mix(col, vec3(0.72, 0.62, 0.95), 0.03 * band);
+  }
 
   if (!backside && uHolo > 0.5) {
     float m = texture2D(uMask, vUv).r;
@@ -106,6 +116,7 @@ export function makeMaterial({ map, back = null, mask = null, holo = false, holo
       uTint: { value: new THREE.Color(tint || 0xffffff) },
       uUseTint: { value: tint ? 1 : 0 },
       uFlat: { value: flat ? 1 : 0 },
+      uSheen: { value: 1 },
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
