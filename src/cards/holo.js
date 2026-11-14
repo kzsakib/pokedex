@@ -13,7 +13,7 @@ export function makeHoloMask(rarity) {
   if (rarity === "legend") {
     for (let y = 6; y < CARD_H - 6; y += 1) ctx.fillRect(6, y, CARD_W - 12, 1);
   } else if (rarity === "holo") {
-    for (let y = 22; y < 86; y += 1) ctx.fillRect(8, y, 84, 1);
+    for (let y = 39; y < 155; y += 1) ctx.fillRect(10, y, 140, 1);
   }
   return canvas;
 }

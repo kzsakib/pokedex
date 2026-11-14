@@ -79,7 +79,7 @@ export default function CardTest() {
         } catch {
           sprite = null;
         }
-        out.push({ card, canvas: renderCard(card, sprite) });
+        out.push({ card, canvas: renderCard(card, sprite, { lint: true }) });
         window.__cards = out.map((o) => o.canvas);
       }
       if (alive) setFixtures(out);
@@ -92,7 +92,7 @@ export default function CardTest() {
   useEffect(() => {
     if (!hostRef.current || !fixtures.length) return;
     hostRef.current.innerHTML = "";
-    const k = 4;
+    const k = 3;
     for (const { card, canvas } of fixtures) {
       const fig = document.createElement("figure");
       fig.style.margin = "0";
@@ -106,18 +106,12 @@ export default function CardTest() {
       const ctx = big.getContext("2d");
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(canvas, 0, 0, CARD_W * k, CARD_H * k);
-      if (debug) {
+      if (debug && canvas.__lint) {
         ctx.strokeStyle = "#ff00ff";
         ctx.lineWidth = 1;
-        const boxes = [
-          [5, 4, 88, 7],
-          [7, 13, 78, 7],
-          [9, 87, 78, 5],
-          [8, 94, 84, 15],
-          [8, 111, 84, 15],
-          [6, 126, 88, 9],
-        ];
-        boxes.forEach(([x, y, w, h]) => ctx.strokeRect(x * k + 0.5, y * k + 0.5, w * k, h * k));
+        canvas.__lint.forEach((b) => {
+          ctx.strokeRect(b.x * k + 0.5, b.y * k + 0.5, b.w * k, b.h * k);
+        });
       }
       const cap = document.createElement("figcaption");
       cap.textContent = `${card.name} · ${card.tcg} · ${card.rarity}`;

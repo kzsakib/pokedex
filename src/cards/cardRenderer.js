@@ -1,8 +1,9 @@
-/* Card faces drawn pixel by pixel on a 100x140 native canvas.
-   Only the two hand-authored bitmap fonts and the 7x7 icons are used. */
+/* Card faces drawn pixel by pixel on a 160x224 native canvas.
+   Only the hand-authored bitmap fonts are used. Big pixels (2x2) for the
+   sprite, name, HP and damage; everything else is 1x1. */
 
-export const CARD_W = 100;
-export const CARD_H = 140;
+export const CARD_W = 160;
+export const CARD_H = 224;
 
 const INK = "#1a1a2e";
 const CREAM = "#f6efd4";
@@ -72,40 +73,71 @@ function textWidth(s, font, sp = 1) {
   return Math.max(0, w - sp);
 }
 
-function drawText(ctx, x, y, s, font, color, sp = 1, align = "l") {
-  const txt = upper(s);
-  if (align === "r") x = x - textWidth(txt, font, sp) + 1;
-  if (align === "c") x = x - (textWidth(txt, font, sp) >> 1);
+function glyphs(ctx, text, font, x, y, color, sp, scale = 1) {
   ctx.fillStyle = color;
   let cx = Math.round(x);
   const cy = Math.round(y);
-  for (const ch of txt) {
+  for (const ch of text) {
     const g = font[ch] ?? font[" "];
     for (let r = 0; r < g.length; r += 1) {
       for (let c = 0; c < g[r].length; c += 1) {
-        if (g[r][c] === "X") ctx.fillRect(cx + c, cy + r, 1, 1);
+        if (g[r][c] === "X") ctx.fillRect(cx + c * scale, cy + r * scale, scale, scale);
       }
     }
-    cx += g[0].length + sp;
+    cx += (g[0].length + sp) * scale;
   }
 }
 
-/* Fit chain: spacing 1 -> spacing 0 (3x5 only) -> truncate. */
+function drawText(ctx, x, y, s, font, color, sp = 1, align = "l", scale = 1) {
+  const txt = upper(s);
+  const w = textWidth(txt, font, sp) * scale;
+  if (align === "r") x = x - w + 1;
+  if (align === "c") x = x - (w >> 1);
+  glyphs(ctx, txt, font, x, y, color, sp, scale);
+}
+
 function fitText(ctx, text, maxW, font, color, x, y, align = "l") {
   const raw = upper(text);
   let sp = 1;
   let out = raw;
-  if (textWidth(out, font, sp) > maxW && font === F3) {
-    sp = 0;
-  }
-  while (textWidth(out, font, sp) > maxW && out.length > 0) {
-    out = out.slice(0, -1);
-  }
+  if (textWidth(out, font, sp) > maxW && font === F3) sp = 0;
+  while (textWidth(out, font, sp) > maxW && out.length > 0) out = out.slice(0, -1);
   drawText(ctx, x, y, out, font, color, sp, align);
   return textWidth(out, font, sp);
 }
 
-/* ---------- colours and icons ---------- */
+/* ---------- bounds lint ---------- */
+
+const ZONES = {
+  A: [5, 18],
+  B: [21, 34],
+  art: [37, 156],
+  info: [159, 163],
+  move1: [167, 184],
+  move2: [187, 204],
+  footer: [209, 217],
+};
+
+let lint = null;
+function record(zone, x, y, w, h) {
+  if (!lint) return;
+  const [z0, z1] = ZONES[zone] || ZONES.A;
+  const box = { zone, x, y, w, h };
+  if (x < 0 || y < 0 || x + w > CARD_W || y + h > CARD_H) box.error = "outside card";
+  else if (y < z0 || y + h - 1 > z1) box.error = "outside zone";
+  lint.boxes.push(box);
+}
+
+function lintDraw(zone, x, y, w, h, fn) {
+  record(zone, Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+  fn();
+}
+
+export function lintReport(canvas) {
+  return canvas.__lint || [];
+}
+
+/* ---------- colours ---------- */
 
 const TYPE_BASE = {
   Fire: "#d9562b",
@@ -127,45 +159,52 @@ const mix = (a, b, t) => {
   return `#${A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, "0")).join("")}`;
 };
 
-/* hue-shifted ramp: darks cool toward violet, lights warm */
 export function rampFor(type) {
   const base = TYPE_BASE[type] || TYPE_BASE.Colorless;
   return {
     base,
-    outline: mix(mix(base, "#241a3c", 0.72), "#6a5aa0", 0.18),
+    outline: mix(mix(base, "#241a3c", 0.7), "#6a5aa0", 0.2),
     shade: mix(base, "#4b2e6a", 0.34),
-    light: mix(base, "#f7e7c6", 0.38),
-    white: "#fdfbf4",
-    dark: type === "Lightning" ? "#54380c" : mix(base, "#1a1a2e", 0.78),
+    light: mix(base, "#f7e7c6", 0.4),
+    highlight: mix(base, "#ffffff", 0.55),
   };
 }
 
-const ICON7 = {
-  Fire: ["..OOO..", ".OBBWO.", "OBBWWBO", "OBWWWBO", "OBWWWDO", ".OBWBO.", "..OOO.."],
-  Water: ["..OOO..", ".OBWBO.", "OBBWBBO", "OBWWWBO", "OBWWWDO", ".OWWWO.", "..OOO.."],
-  Grass: ["..OOO..", ".OBBWO.", "OBBWWBO", "OBWWWBO", "OWWWBDO", ".OWBDO.", "..OOO.."],
-  Lightning: ["..OOO..", ".OBBKO.", "OBBKBBO", "OBKKKBO", "OBBKBDO", ".OKDDO.", "..OOO.."],
-  Psychic: ["..OOO..", ".OBBBO.", "OBWWWBO", "OWWKWWO", "OBWWWDO", ".ODDDO.", "..OOO.."],
-  Fighting: ["..OOO..", ".OWBWO.", "OBBWBBO", "OBWWWBO", "OBBWBDO", ".OWDWO.", "..OOO.."],
-  Colorless: ["..OOO..", ".OBWBO.", "OWWWWWO", "OBWWWBO", "OBWBWDO", ".OWBWO.", "..OOO.."],
+/* ---------- icons: 9x9 disc + 5x5 glyph ---------- */
+
+const DISC9 = ["..OOOOO..", ".OLBBBBO.", "OLBBBBBBO", "OBBBBBBBO", "OBBBBBBBO", "OBBBBBBBO", "OBBBBBBDO", ".ODDDDDO.", "..OOOOO.."];
+const GLYPH5 = {
+  Fire: ["..W..", "..WW.", ".WWWW", "WWWWW", ".WWW."],
+  Water: ["..W..", ".WWW.", "WWWWW", "WWWWW", ".WWW."],
+  Grass: ["..WWW", ".WWWW", "WWWW.", ".WW..", "W...."],
+  Lightning: ["...KK", "..KK.", ".KKKK", "..KK.", ".KK.."],
+  Psychic: [".WWW.", "WWKWW", "WKKKW", "WWKWW", ".WWW."],
+  Fighting: ["W.W.W", ".WWW.", "WWWWW", ".WWW.", "W.W.W"],
+  Colorless: ["..W..", "WWWWW", ".WWW.", ".WWW.", "W...W"],
 };
 
 const iconCache = new Map();
 function iconCanvas(type) {
   if (iconCache.has(type)) return iconCache.get(type);
   const ramp = rampFor(type);
-  const rows = ICON7[type] || ICON7.Colorless;
+  const pal = { O: ramp.outline, D: ramp.shade, B: ramp.base, L: ramp.light, W: "#ffffff", K: "#54380c" };
   const canvas = document.createElement("canvas");
-  canvas.width = 7;
-  canvas.height = 7;
+  canvas.width = 9;
+  canvas.height = 9;
   const ctx = canvas.getContext("2d");
+  const rows = GLYPH5[type] || GLYPH5.Colorless;
+  DISC9.forEach((row, y) => {
+    [...row].forEach((ch, x) => {
+      if (ch === "." || !pal[ch]) return;
+      ctx.fillStyle = pal[ch];
+      ctx.fillRect(x, y, 1, 1);
+    });
+  });
   rows.forEach((row, y) => {
     [...row].forEach((ch, x) => {
-      const colour =
-        ch === "O" ? ramp.outline : ch === "B" ? ramp.base : ch === "D" ? ramp.shade : ch === "W" ? ramp.white : ch === "K" ? ramp.dark : null;
-      if (!colour) return;
-      ctx.fillStyle = colour;
-      ctx.fillRect(x, y, 1, 1);
+      if (ch === "." || !pal[ch]) return;
+      ctx.fillStyle = pal[ch];
+      ctx.fillRect(2 + x, 2 + y, 1, 1);
     });
   });
   iconCache.set(type, canvas);
@@ -173,20 +212,8 @@ function iconCanvas(type) {
 }
 
 function drawIcon(ctx, type, x, y) {
+  ctx.imageSmoothingEnabled = false;
   ctx.drawImage(iconCanvas(type), Math.round(x), Math.round(y));
-}
-
-const DISC5 = [".OOO.", "OLBBO", "OBBBO", "OBBDO", ".OOO."];
-function drawRetreat(ctx, x, y) {
-  const ramp = rampFor("Colorless");
-  const map = { O: ramp.outline, B: ramp.base, D: ramp.shade, L: ramp.light };
-  DISC5.forEach((row, ry) => {
-    [...row].forEach((ch, rx) => {
-      if (!map[ch]) return;
-      ctx.fillStyle = map[ch];
-      ctx.fillRect(x + rx, y + ry, 1, 1);
-    });
-  });
 }
 
 const RARITY5 = {
@@ -206,7 +233,118 @@ function drawRarity(ctx, rarity, x, y) {
   });
 }
 
-/* ---------- frame texture helpers ---------- */
+/* ---------- art window ---------- */
+
+const ART = { x: 8, y: 37, w: 144, h: 120, inner: { x: 10, y: 39, w: 140, h: 116 } };
+const BUFFER = { w: 70, h: 58 };
+
+function artBuffer(card, sprite) {
+  const canvas = document.createElement("canvas");
+  canvas.width = BUFFER.w;
+  canvas.height = BUFFER.h;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  const { w, h } = BUFFER;
+  const ramp = rampFor(card.tcg);
+  const sky = mix(ramp.light, "#ffffff", 0.45);
+  const band = mix(ramp.light, ramp.base, 0.32);
+  const ground = mix(ramp.base, ramp.outline, 0.3);
+  const horizon = Math.round(h * 0.66);
+
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, horizon);
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, horizon, w, h - horizon);
+  ctx.fillStyle = band;
+  ctx.fillRect(0, horizon - 3, w, 3);
+  ctx.fillStyle = mix(sky, "#ffffff", 0.6);
+  ctx.fillRect(0, horizon - 4, w, 1);
+
+  ctx.fillStyle = mix(ramp.light, "#ffffff", 0.8);
+  if (card.tcg === "Water") {
+    ctx.fillRect(9, 11, 18, 3);
+    ctx.fillRect(14, 7, 9, 3);
+    ctx.fillRect(w - 26, 19, 14, 3);
+  } else if (card.tcg === "Fire") {
+    ctx.fillStyle = mix(ramp.base, "#ffb347", 0.45);
+    ctx.fillRect(11, horizon - 18, 5, 11);
+    ctx.fillStyle = "#ffd98a";
+    ctx.fillRect(13, horizon - 24, 3, 8);
+    ctx.fillStyle = mix(ramp.outline, "#ff9a5a", 0.5);
+    ctx.fillRect(w - 20, horizon - 12, 4, 8);
+  } else if (card.tcg === "Grass") {
+    ctx.fillStyle = ramp.outline;
+    ctx.fillRect(9, horizon + 4, 2, 8);
+    ctx.fillRect(5, horizon + 4, 5, 2);
+    ctx.fillRect(w - 18, horizon + 6, 2, 7);
+    ctx.fillRect(w - 22, horizon + 6, 5, 2);
+  } else if (card.tcg === "Lightning") {
+    ctx.fillRect(12, 9, 3, 9);
+    ctx.fillRect(10, 15, 3, 4);
+    ctx.fillRect(8, 18, 3, 9);
+    ctx.fillRect(w - 20, 12, 2, 8);
+  } else if (card.tcg === "Psychic") {
+    for (let i = 0; i < 4; i += 1) {
+      const sx = 10 + i * 15;
+      const sy = 9 + (i % 2) * 8;
+      ctx.fillRect(sx + 2, sy, 1, 6);
+      ctx.fillRect(sx, sy + 2, 5, 1);
+    }
+  } else if (card.tcg === "Fighting") {
+    ctx.fillStyle = mix(ramp.outline, "#000000", 0.15);
+    for (let i = 0; i < 4; i += 1) {
+      const sx = 7 + ((i * 19) % (w - 19));
+      const sy = horizon + 4 + ((i * 9) % 14);
+      ctx.fillRect(sx, sy, 8, 3);
+    }
+  } else {
+    ctx.fillRect(10, 10, 18, 3);
+    ctx.fillRect(15, 6, 10, 3);
+    ctx.fillRect(w - 27, 22, 15, 3);
+  }
+
+  if (sprite) {
+    const scale = sprite.width * 2 <= 66 && sprite.height * 2 <= 52 ? 2 : 1;
+    const sw = sprite.width * scale;
+    const sh = sprite.height * scale;
+    const sx = Math.round(w / 2 - sw / 2);
+    const sy = Math.round(h - 3 - sh);
+    ctx.fillStyle = "rgba(26,26,46,0.2)";
+    ctx.fillRect(sx + 3, h - 4, Math.max(4, sw - 6), 1);
+    ctx.drawImage(sprite, sx, sy, sw, sh);
+  }
+  return canvas;
+}
+
+function artWindow(ctx, card, sprite) {
+  const { x, y, w, h } = ART;
+  // explicit border + bevel so every corner pixel is deliberate
+  ctx.fillStyle = INK;
+  for (let i = 0; i < w; i += 1) {
+    ctx.fillRect(x + i, y, 1, 1);
+    ctx.fillRect(x + i, y + h - 1, 1, 1);
+  }
+  for (let i = 0; i < h; i += 1) {
+    ctx.fillRect(x, y + i, 1, 1);
+    ctx.fillRect(x + w - 1, y + i, 1, 1);
+  }
+  const ramp = rampFor(card.tcg);
+  const light = mix(ramp.light, "#ffffff", 0.55);
+  const dark = mix(ramp.outline, "#000000", 0.1);
+  ctx.fillStyle = light;
+  ctx.fillRect(x + 1, y + 1, w - 2, 1);
+  ctx.fillRect(x + 1, y + 1, 1, h - 2);
+  ctx.fillStyle = dark;
+  ctx.fillRect(x + 1, y + h - 2, w - 2, 1);
+  ctx.fillRect(x + w - 2, y + 1, 1, h - 2);
+
+  const buffer = artBuffer(card, sprite);
+  const { inner } = ART;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(buffer, 0, 0, BUFFER.w, BUFFER.h, inner.x, inner.y, inner.w, inner.h);
+}
+
+/* ---------- frame ---------- */
 
 const BAYER = [
   [0, 8, 2, 10],
@@ -215,260 +353,206 @@ const BAYER = [
   [15, 7, 13, 5],
 ];
 
-function bayerFill(ctx, x, y, w, h, a, b, strength = 0.5) {
-  for (let yy = 0; yy < h; yy += 1) {
-    for (let xx = 0; xx < w; xx += 1) {
-      const t = (BAYER[(y + yy) % 4][(x + xx) % 4] + 0.5) / 16;
-      ctx.fillStyle = t < strength ? a : b;
-      ctx.fillRect(x + xx, y + yy, 1, 1);
-    }
-  }
-}
-
 function frame(ctx, card) {
   const ramp = rampFor(card.tcg);
   const gold = card.rarity === "rare" || card.rarity === "holo" || card.rarity === "legend";
-  // ink outline with stair-stepped 3px corners
+
   ctx.fillStyle = INK;
   ctx.fillRect(0, 0, CARD_W, CARD_H);
-  for (let i = 0; i < 3; i += 1) {
-    ctx.clearRect(0 + i, 0 + i, 1, 1);
-    ctx.fillStyle = INK;
-  }
-  ctx.clearRect(0, 0, 3, 3);
-  ctx.clearRect(CARD_W - 3, 0, 3, 3);
-  ctx.clearRect(0, CARD_H - 3, 3, 3);
-  ctx.clearRect(CARD_W - 3, CARD_H - 3, 3, 3);
-  ctx.fillStyle = INK;
-  ctx.fillRect(1, 0, CARD_W - 2, 1);
-  ctx.fillRect(1, CARD_H - 1, CARD_W - 2, 1);
-  ctx.fillRect(0, 1, 1, CARD_H - 2);
-  ctx.fillRect(CARD_W - 1, 1, 1, CARD_H - 2);
+  // stair-stepped 4px corners
+  ctx.clearRect(0, 0, 2, 1);
+  ctx.clearRect(0, 0, 1, 2);
+  ctx.clearRect(CARD_W - 2, 0, 2, 1);
+  ctx.clearRect(CARD_W - 1, 0, 1, 2);
+  ctx.clearRect(0, CARD_H - 1, 2, 1);
+  ctx.clearRect(0, CARD_H - 2, 1, 2);
+  ctx.clearRect(CARD_W - 2, CARD_H - 1, 2, 1);
+  ctx.clearRect(CARD_W - 1, CARD_H - 2, 1, 2);
 
-  // 2px frame band, lightly dithered against a 15% lighter tone
-  bayerFill(ctx, 1, 1, CARD_W - 2, CARD_H - 2, ramp.base, mix(ramp.base, "#ffffff", 0.15), 0.55);
-  // accent line
+  const lighter = mix(ramp.base, "#ffffff", 0.15);
+  for (let yy = 1; yy < CARD_H - 1; yy += 1) {
+    for (let xx = 1; xx < CARD_W - 1; xx += 1) {
+      const t = (BAYER[yy % 4][xx % 4] + 0.5) / 16;
+      ctx.fillStyle = t < 0.55 ? ramp.base : lighter;
+      ctx.fillRect(xx, yy, 1, 1);
+    }
+  }
   ctx.fillStyle = gold ? GOLD : "#c9c9d6";
   ctx.fillRect(3, 3, CARD_W - 6, 1);
   ctx.fillRect(3, CARD_H - 4, CARD_W - 6, 1);
-  // inner panel, cream tinted 10% toward the type colour
-  const panelColour = mix(CREAM, ramp.base, 0.1);
-  ctx.fillStyle = panelColour;
+
+  ctx.fillStyle = mix(CREAM, ramp.base, 0.1);
   ctx.fillRect(4, 4, CARD_W - 8, CARD_H - 8);
 }
 
-/* ---------- art window (backdrop + sprite are kept as-is) ---------- */
-
-const ART = { x: 8, y: 22, w: 84, h: 64 };
-
-function artBackdrop(ctx, type, x, y, w, h) {
-  const ramp = rampFor(type);
-  const sky = mix(ramp.light, "#ffffff", 0.45);
-  const band = mix(ramp.light, ramp.base, 0.35);
-  const ground = mix(ramp.base, ramp.outline, 0.28);
-  const horizon = Math.round(h * 0.66);
-
-  ctx.fillStyle = sky;
-  ctx.fillRect(x, y, w, horizon);
-  ctx.fillStyle = ground;
-  ctx.fillRect(x, y + horizon, w, h - horizon);
-  ctx.fillStyle = band;
-  ctx.fillRect(x, y + horizon - 3, w, 3);
-  ctx.fillStyle = mix(sky, "#ffffff", 0.6);
-  ctx.fillRect(x, y + horizon - 4, w, 1);
-
-  ctx.fillStyle = mix(ramp.light, "#ffffff", 0.8);
-  if (type === "Water") {
-    ctx.fillRect(x + 12, y + 12, 20, 3);
-    ctx.fillRect(x + 17, y + 8, 10, 3);
-    ctx.fillRect(x + w - 30, y + 22, 16, 3);
-  } else if (type === "Fire") {
-    ctx.fillStyle = mix(ramp.base, "#ffb347", 0.45);
-    ctx.fillRect(x + 13, y + horizon - 20, 6, 12);
-    ctx.fillStyle = "#ffd98a";
-    ctx.fillRect(x + 16, y + horizon - 26, 3, 8);
-    ctx.fillStyle = mix(ramp.outline, "#ff9a5a", 0.5);
-    ctx.fillRect(x + w - 24, y + horizon - 14, 5, 9);
-  } else if (type === "Grass") {
-    ctx.fillStyle = ramp.outline;
-    ctx.fillRect(x + 11, y + horizon + 4, 3, 9);
-    ctx.fillRect(x + 6, y + horizon + 4, 6, 3);
-    ctx.fillRect(x + w - 22, y + horizon + 7, 3, 8);
-    ctx.fillRect(x + w - 27, y + horizon + 7, 6, 3);
-  } else if (type === "Lightning") {
-    ctx.fillRect(x + 15, y + 11, 4, 10);
-    ctx.fillRect(x + 12, y + 18, 4, 4);
-    ctx.fillRect(x + 9, y + 21, 4, 10);
-    ctx.fillRect(x + w - 24, y + 14, 3, 9);
-  } else if (type === "Psychic") {
-    for (let i = 0; i < 4; i += 1) {
-      const sx = x + 13 + i * 18;
-      const sy = y + 11 + (i % 2) * 9;
-      ctx.fillRect(sx + 2, sy, 2, 7);
-      ctx.fillRect(sx, sy + 3, 7, 2);
-    }
-  } else if (type === "Fighting") {
-    ctx.fillStyle = mix(ramp.outline, "#000000", 0.15);
-    for (let i = 0; i < 4; i += 1) {
-      const sx = x + 9 + ((i * 23) % (w - 22));
-      const sy = y + horizon + 4 + ((i * 11) % 16);
-      ctx.fillRect(sx, sy, 9, 4);
-    }
-  } else {
-    ctx.fillRect(x + 13, y + 12, 22, 4);
-    ctx.fillRect(x + 19, y + 7, 12, 4);
-    ctx.fillRect(x + w - 32, y + 26, 18, 4);
-  }
-}
-
-function drawSprite(ctx, sprite, cx, bottom) {
-  if (!sprite) return;
-  const scale = sprite.width * 2 <= ART.w - 4 && sprite.height * 2 <= ART.h - 6 ? 2 : 1;
-  const w = sprite.width * scale;
-  const h = sprite.height * scale;
-  const x = Math.round(cx - w / 2);
-  const y = Math.round(bottom - h);
-  ctx.fillStyle = "rgba(26,26,46,0.2)";
-  ctx.fillRect(x + 4, bottom - 1, w - 8, 2);
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(sprite, x, y, w, h);
-}
-
-function artWindow(ctx, card, sprite) {
-  const { x, y, w, h } = ART;
-  ctx.fillStyle = INK;
-  ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
-  artBackdrop(ctx, card.tcg, x, y, w, h);
-  drawSprite(ctx, sprite, x + w / 2, y + h - 3);
-  ctx.restore();
-  const light = mix(rampFor(card.tcg).light, "#ffffff", 0.5);
-  const dark = mix(rampFor(card.tcg).outline, "#000000", 0.1);
-  ctx.fillStyle = light;
-  ctx.fillRect(x, y, w, 1);
-  ctx.fillRect(x, y, 1, h);
-  ctx.fillStyle = dark;
-  ctx.fillRect(x, y + h - 1, w, 1);
-  ctx.fillRect(x + w - 1, y, 1, h);
-}
-
-/* ---------- moves, footer ---------- */
+/* ---------- moves and footer ---------- */
 
 function damageText(move) {
   if (!move) return "-";
-  if (move.display) return String(move.display).replace(/^([0-9]+)$/, "$1");
+  if (move.display) return String(move.display);
   return move.damage ? String(move.damage) : "-";
 }
 
-function moveSlot(ctx, card, move, y) {
+function moveSlot(ctx, card, move, y, zone) {
+  if (!move) return;
   const cost = (move.cost || []).slice(0, 3);
-  cost.forEach((type, i) => drawIcon(ctx, type, 8 + i * 8, y));
-  const nameX = 8 + cost.length * 8 + 2;
+  cost.forEach((type, i) => lintDraw(zone, 8 + i * 10, y, 9, 9, () => drawIcon(ctx, type, 8 + i * 10, y)));
+  const nameX = 8 + cost.length * 10 + 3;
   const dmg = damageText(move);
-  const dmgW = textWidth(dmg, F5, 0);
-  const maxName = 91 - dmgW - 4 - nameX;
-  fitText(ctx, move.name, Math.max(18, maxName), F3, TEXT, nameX, y + 1);
-  drawText(ctx, dmg, 91, y, F5, TEXT, 1, "r");
+  const dmgW = textWidth(dmg, F5, 1) * 2;
+  const maxName = 151 - dmgW - 6 - nameX;
+  lintDraw(zone, nameX, y + 1, Math.max(10, maxName), 7, () => {
+    fitText(ctx, move.name, Math.max(10, maxName), F5, TEXT, nameX, y + 1);
+  });
+  lintDraw(zone, 151 - dmgW, y, dmgW, 14, () => {
+    drawText(ctx, dmg, 151, y, F5, TEXT, 1, "r", 2);
+  });
   if (move.effect) {
-    fitText(ctx, move.effect, 82, F3, "#544854", 9, y + 9);
+    lintDraw(zone, 9, y + 11, 140, 5, () => {
+      fitText(ctx, move.effect, 140, F3, "#544854", 9, y + 11);
+    });
   }
 }
 
 function footer(ctx, card) {
-  const y = 128;
-  const textY = 129;
+  const y = 209;
+  const textY = 211;
+  const groups = [];
+
+  const wk = () => {
+    let w = 0;
+    w += textWidth("WK", F3, 1) + 2;
+    w += 9 + 2;
+    w += textWidth("×2", F3, 1);
+    return w;
+  };
+  const res = () => textWidth("RES", F3, 1) + 2 + 9 + 2 + textWidth(card.resistance ? "-30" : "-", F3, 1);
+  const retreat = Math.min(3, card.retreat || 0);
+  const ret = () => textWidth("RET", F3, 1) + 2 + (retreat === 0 ? textWidth("0", F3, 1) : retreat * 10 - 1);
+
+  const widths = [wk(), res(), ret()];
+  const total = widths.reduce((a, b) => a + b, 0);
+  const gap = Math.max(6, Math.floor((143 - total) / 2));
+
   let x = 8;
-  const label = (t) => {
-    drawText(ctx, x, textY, t, F3, TEXT_MUTED, 1);
-    x += textWidth(t, F3, 1) + 2;
+  const drawGroup = (width, fn) => {
+    const start = x;
+    fn();
+    lintDraw("footer", start, 209, width, 9, () => {});
+    x += width + gap;
   };
 
-  label("WK");
-  drawIcon(ctx, card.weakness || "Colorless", x, y);
-  x += 8;
-  drawText(ctx, "×2", x, textY, F3, TEXT, 1);
-  x += textWidth("×2", F3, 1) + 3;
+  drawGroup(widths[0], () => {
+    drawText(ctx, x, textY, "WK", F3, TEXT_MUTED, 1);
+    x += textWidth("WK", F3, 1) + 2;
+    drawIcon(ctx, card.weakness || "Colorless", x, y);
+    x += 9 + 2;
+    drawText(ctx, x, textY, "×2", F3, TEXT, 1);
+    x = x; // group width reserved below
+  });
+  x = 8 + widths[0] + gap;
 
-  label("RES");
+  drawText(ctx, x, textY, "RES", F3, TEXT_MUTED, 1);
+  x += textWidth("RES", F3, 1) + 2;
   if (card.resistance) {
     drawIcon(ctx, card.resistance, x, y);
-    x += 8;
-    drawText(ctx, "-30", x, textY, F3, TEXT, 1);
-    x += textWidth("-30", F3, 1) + 3;
+    x += 11;
+    drawText(ctx, x, textY, "-30", F3, TEXT, 1);
   } else {
-    drawText(ctx, "-", x, textY, F3, TEXT, 1);
-    x += textWidth("-", F3, 1) + 3;
+    drawText(ctx, x + 9, textY, "-", F3, TEXT, 1);
+  }
+  x = 8 + widths[0] + gap + widths[1] + gap;
+
+  drawText(ctx, x, textY, "RET", F3, TEXT_MUTED, 1);
+  x += textWidth("RET", F3, 1) + 2;
+  if (retreat === 0) {
+    drawText(ctx, x, textY, "0", F3, TEXT, 1);
+  } else {
+    for (let i = 0; i < retreat; i += 1) drawIcon(ctx, "Colorless", x + i * 10, y);
   }
 
-  label("RET");
-  const retreat = Math.min(3, card.retreat || 0);
-  if (retreat === 0) {
-    drawText(ctx, "0", x, textY, F3, TEXT, 1);
-  } else {
-    for (let i = 0; i < retreat; i += 1) drawRetreat(ctx, x + i * 5, 129);
-  }
+  groups.push(total);
 }
 
 /* ---------- card ---------- */
 
-export function renderCard(card, sprite) {
+export function renderCard(card, sprite, options = {}) {
   const canvas = document.createElement("canvas");
   canvas.width = CARD_W;
   canvas.height = CARD_H;
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
 
+  lint = options.lint ? { boxes: [] } : null;
+
   frame(ctx, card);
   artWindow(ctx, card, sprite);
 
-  // header row 1
+  // Row A
   const stageName = card.rarity === "legend" ? "LEGEND" : card.stage === 2 ? "STAGE 2" : card.stage === 1 ? "STAGE 1" : "BASIC";
-  drawText(ctx, 7, 6, `${stageName}  LV.${card.level}`, F3, TEXT, 1);
+  lintDraw("A", 8, 10, 60, 5, () => drawText(ctx, 8, 10, `${stageName}  LV.${card.level}`, F3, TEXT, 1));
   const hp = String(card.hp);
-  drawText(ctx, 92, 5, hp, F5, HP_RED, 0, "r");
-  const hpW = textWidth(hp, F5, 0);
-  drawText(ctx, 92 - hpW - 5, 7, "HP", F3, TEXT, 0, "r");
+  const hpW = textWidth(hp, F5, 1) * 2;
+  lintDraw("A", 151 - hpW, 5, hpW, 14, () => drawText(ctx, 151, 5, hp, F5, HP_RED, 1, "r", 2));
+  lintDraw("A", 151 - hpW - 18, 13, 16, 5, () => drawText(ctx, 151 - hpW - 2, 13, "HP", F3, TEXT, 1, "r"));
 
-  // header row 2: name + type icon
-  const nameMax = 86 - 7 - 4;
-  let nameSp = 1;
-  const rawName = upper(card.name);
-  if (textWidth(rawName, F5, nameSp) > nameMax) nameSp = 1;
-  let name = rawName;
-  while (textWidth(name, F5, nameSp) > nameMax && name.length > 0) name = name.slice(0, -1);
-  drawText(ctx, 7, 13, name, F5, TEXT, nameSp, "l");
-  drawIcon(ctx, card.tcg, 84, 13);
+  // Row B
+  const nameMax = 118;
+  lintDraw("B", 8, 21, nameMax, 14, () => {
+    const raw = upper(card.name);
+    let n = raw;
+    while (textWidth(n, F5, 1) * 2 > nameMax && n.length > 0) n = n.slice(0, -1);
+    drawText(ctx, 8, 21, n, F5, TEXT, 1, "l", 2);
+  });
+  lintDraw("B", 142, 23, 9, 9, () => drawIcon(ctx, card.tcg, 142, 23));
 
   // info strip
   const genus = String(card.genus || "").replace(/\s*POKEMON$/i, "").trim();
-  fitText(ctx, genus, 52, F3, TEXT_MUTED, 9, 88);
-  drawText(ctx, `${String(card.id).padStart(3, "0")}/151`, 86, 88, F3, TEXT_MUTED, 1, "r");
-  drawRarity(ctx, card.rarity, 88, 86);
+  lintDraw("info", 8, 159, 110, 5, () => fitText(ctx, genus, 110, F3, TEXT_MUTED, 8, 159));
+  lintDraw("info", 96, 159, 44, 5, () =>
+    drawText(ctx, 140, 159, `${String(card.id).padStart(3, "0")}/151`, F3, TEXT_MUTED, 1, "r")
+  );
+  lintDraw("info", 146, 159, 5, 5, () => drawRarity(ctx, card.rarity, 146, 159));
 
   // move slots
-  moveSlot(ctx, card, card.moves[0], 94);
+  moveSlot(ctx, card, card.moves[0], 167, "move1");
   ctx.fillStyle = mix(rampFor(card.tcg).base, INK, 0.25);
-  for (let x = 8; x < 92; x += 2) ctx.fillRect(x, 109, 1, 1);
+  for (let x = 8; x < 152; x += 2) ctx.fillRect(x, 185, 1, 1);
 
   if (card.moves[1]) {
-    moveSlot(ctx, card, card.moves[1], 111);
-  }
-  if (!card.moves[1]) {
+    moveSlot(ctx, card, card.moves[1], 187, "move2");
+  } else {
     const total = Math.round((card.height || 0) * 39.3701);
     const ft = Math.floor(total / 12);
     const inch = total % 12;
     const lb = Math.round((card.weight || 0) * 2.2046);
-    fitText(ctx, `HT ${ft}'${String(inch).padStart(2, "0")}"  WT ${lb} LB`, 82, F3, TEXT, 9, 112);
-    if (card.flavour) fitText(ctx, card.flavour, 82, F3, "#544854", 9, 119);
+    lintDraw("move2", 9, 188, 140, 5, () =>
+      fitText(ctx, `HT ${ft}'${String(inch).padStart(2, "0")}"  WT ${lb} LB`, 140, F3, TEXT, 9, 188)
+    );
+    if (card.flavour) {
+      lintDraw("move2", 9, 196, 140, 5, () => fitText(ctx, card.flavour, 140, F3, "#544854", 9, 196));
+    }
   }
 
-  // footer divider + row
   ctx.fillStyle = mix(rampFor(card.tcg).base, INK, 0.3);
-  ctx.fillRect(6, 126, 88, 1);
+  ctx.fillRect(6, 207, 148, 1);
   footer(ctx, card);
+
+  if (lint) {
+    const seen = new Map();
+    for (const b of lint.boxes) {
+      if (b.error) continue;
+      const key = b.zone;
+      const other = seen.get(key);
+      const tiled = b.zone === "info" || b.zone === "move1" || b.zone === "move2";
+      if (!tiled && other && b.x < other.x + other.w && other.x < b.x + b.w && b.y < other.y + other.h && other.y < b.y + b.h) {
+        b.error = "overlap";
+      }
+      seen.set(key, b);
+    }
+    canvas.__lint = lint.boxes;
+    lint = null;
+  }
 
   return canvas;
 }
@@ -482,29 +566,25 @@ export function renderCardBack() {
 
   ctx.fillStyle = INK;
   ctx.fillRect(0, 0, CARD_W, CARD_H);
-  ctx.clearRect(0, 0, 3, 3);
-  ctx.clearRect(CARD_W - 3, 0, 3, 3);
-  ctx.clearRect(0, CARD_H - 3, 3, 3);
-  ctx.clearRect(CARD_W - 3, CARD_H - 3, 3, 3);
   ctx.fillStyle = "#1d2b52";
   ctx.fillRect(3, 3, CARD_W - 6, CARD_H - 6);
   ctx.fillStyle = "#101a31";
   ctx.fillRect(5, 5, CARD_W - 10, CARD_H - 10);
 
   ctx.fillStyle = "#182741";
-  for (let d = -CARD_H; d < CARD_W + CARD_H; d += 12) {
-    for (let y = 7; y < CARD_H - 7; y += 1) {
+  for (let d = -CARD_H; d < CARD_W + CARD_H; d += 14) {
+    for (let y = 8; y < CARD_H - 8; y += 1) {
       const x = d + y;
-      if (x >= 7 && x < CARD_W - 8) ctx.fillRect(x, y, 1, 1);
+      if (x >= 8 && x < CARD_W - 9) ctx.fillRect(x, y, 1, 1);
     }
   }
   ctx.fillStyle = GOLD;
-  ctx.fillRect(7, 8, CARD_W - 14, 1);
-  ctx.fillRect(7, CARD_H - 9, CARD_W - 14, 1);
+  ctx.fillRect(8, 10, CARD_W - 16, 1);
+  ctx.fillRect(8, CARD_H - 11, CARD_W - 16, 1);
 
   const cx = CARD_W / 2;
-  const cy = 62;
-  const r = 24;
+  const cy = 100;
+  const r = 38;
   for (let y = -r; y <= r; y += 1) {
     for (let x = -r; x <= r; x += 1) {
       if (x * x + y * y > r * r) continue;
@@ -513,19 +593,19 @@ export function renderCardBack() {
     }
   }
   ctx.fillStyle = INK;
-  ctx.fillRect(cx - r, cy - 1, r * 2, 2);
-  for (let y = -6; y <= 6; y += 1) {
-    for (let x = -6; x <= 6; x += 1) {
+  ctx.fillRect(cx - r, cy - 2, r * 2, 4);
+  for (let y = -10; y <= 10; y += 1) {
+    for (let x = -10; x <= 10; x += 1) {
       const d = Math.sqrt(x * x + y * y);
-      if (d > 6) continue;
-      ctx.fillStyle = d > 4 ? INK : "#f6efd4";
+      if (d > 10) continue;
+      ctx.fillStyle = d > 7 ? INK : "#f6efd4";
       ctx.fillRect(cx + x, cy + y, 1, 1);
     }
   }
 
-  drawText(ctx, "KANTO 151", cx, 96, F5, "#f6efd4", 0, "c");
-  drawText(ctx, "TRADE - PLAY - COLLECT", cx, 108, F3, "#8fa6d8", 0, "c");
-  drawText(ctx, "FAN PROJECT", cx, CARD_H - 14, F3, "#5d6f9c", 0, "c");
+  drawText(ctx, cx, 156, "KANTO 151", F5, "#f6efd4", 1, "c", 2);
+  drawText(ctx, cx, 176, "TRADE - PLAY - COLLECT", F3, "#8fa6d8", 1, "c");
+  drawText(ctx, cx, CARD_H - 22, "FAN PROJECT", F3, "#5d6f9c", 1, "c");
   return canvas;
 }
 

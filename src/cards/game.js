@@ -262,6 +262,7 @@ export class KantoPacksGame {
   }
 
   async generate() {
+    this.container.classList.add("kp-loading");
     await loadTypeIcons();
     const pack = generatePack(this.data, this.seed, { force: this.force });
     this.packData = pack;
@@ -280,6 +281,8 @@ export class KantoPacksGame {
       this.meshes.push(mesh);
       this.scene.root.add(mesh.group);
     }
+
+    this.container.classList.remove("kp-loading");
 
     /* light beam hints at the best pull */
     const best = this.cards.reduce((acc, card) => (BEST[card.rarity] > BEST[acc] ? card.rarity : acc), "common");
@@ -393,7 +396,7 @@ export class KantoPacksGame {
     canvas.addEventListener("pointermove", (e) => {
       if (this.summaryDragging) {
         const dy = e.clientY - this.summaryStartY;
-        this.summaryScroll = clamp(this.summaryStartScroll + dy, -80, 1200);
+        this.summaryScroll = clamp(this.summaryStartScroll + dy, -80, 1900);
         return;
       }
       const p = this.toLocal(e);
@@ -401,11 +404,11 @@ export class KantoPacksGame {
         this.tearAt(p);
         return;
       }
-      if ((this.phase === "reveal" || this.phase === "stack") && !this.dragging) {
+      if ((this.phase === "reveal" || this.phase === "stack" || this.phase === "summary") && !this.dragging) {
         const halfW = this.scene.W / 2;
         const halfH = this.scene.H / 2;
-        this.tilt.targetX = clamp((p.x / halfW) * 0.34, -0.34, 0.34);
-        this.tilt.targetY = clamp((-p.y / halfH) * 0.26, -0.26, 0.26);
+        this.tilt.targetX = clamp((p.x / halfW) * 0.46, -0.46, 0.46);
+        this.tilt.targetY = clamp((-p.y / halfH) * 0.3, -0.3, 0.3);
         return;
       }
       if (this.dragging) {
@@ -599,12 +602,10 @@ export class KantoPacksGame {
       } else {
         const row = i < 3 ? 0 : 1;
         const col = i < 3 ? i : i - 3;
-        const rowCount = row === 0 ? 3 : 2;
-        const rowW = rowCount * 200 + (rowCount - 1) * 12;
         mesh.summaryTarget = {
-          x: -rowW / 2 + 100 + col * 212,
-          y: row === 0 ? 115 : -125,
-          scale: 2,
+          x: (i - 2) * 172,
+          y: 0,
+          scale: 1,
         };
       }
       mesh.group.position.set(mesh.summaryTarget.x, mesh.summaryTarget.y, 90);
@@ -744,7 +745,7 @@ export class KantoPacksGame {
         }
         mesh.group.visible = i === this.revealIndex;
         const offset = i - this.revealIndex;
-        const targetScale = i === this.revealIndex ? 3 : 1;
+        const targetScale = i === this.revealIndex ? 2 : 1;
         mesh.group.position.lerp(
           new THREE.Vector3(offset * 2, -offset * 3, 70 + offset * -4),
           0.14
@@ -757,8 +758,8 @@ export class KantoPacksGame {
         }
       });
 
-      this.tilt.x = lerp(this.tilt.x, this.tilt.targetX, 0.18);
-      this.tilt.y = lerp(this.tilt.y, this.tilt.targetY, 0.18);
+      this.tilt.x = lerp(this.tilt.x, this.tilt.targetX, 0.12);
+      this.tilt.y = lerp(this.tilt.y, this.tilt.targetY, 0.12);
       if (this.flipping) {
         this.flip = clamp(this.flip + dt / 0.34, 0, 1);
         if (this.flip >= 1) this.finishReveal();
@@ -779,10 +780,10 @@ export class KantoPacksGame {
         let tx = mesh.summaryTarget.x;
         let ty = mesh.summaryTarget.y;
         if (this.scene.portrait) {
-          ty = 0 - i * 300 + (this.summaryScroll || 0);
+          ty = 0 - i * 460 + (this.summaryScroll || 0);
           tx = 0;
         }
-        mesh.group.visible = !this.scene.portrait || Math.abs(ty) < 320;
+        mesh.group.visible = !this.scene.portrait || Math.abs(ty) < 330;
         mesh.group.position.lerp(new THREE.Vector3(tx, ty, 90), 0.12);
         mesh.group.scale.lerp(new THREE.Vector3(mesh.summaryTarget.scale, mesh.summaryTarget.scale, mesh.summaryTarget.scale), 0.12);
         mesh.setTilt(this.tilt.x * 0.4, this.tilt.y * 0.4);
