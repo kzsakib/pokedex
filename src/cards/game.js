@@ -195,7 +195,7 @@ export class KantoPacksGame {
       emerge: "",
       stack: "click to flip",
       reveal: "click to flip · drag to tilt",
-      summary: "five cards · open another or check the binder",
+      summary: this.scene?.portrait ? "drag up and down to browse · open another or check the binder" : "five cards · open another or check the binder",
     };
     this.hint(hints[phase] || "");
     this.el.summary.classList.toggle("kp-show", phase === "summary");
@@ -371,6 +371,13 @@ export class KantoPacksGame {
         this.packKick = 1;
         return;
       }
+      if (this.phase === "summary" && this.scene.portrait) {
+        this.dragging = false;
+        this.summaryDragging = true;
+        this.summaryStartY = e.clientY;
+        this.summaryStartScroll = this.summaryScroll || 0;
+        return;
+      }
       if (this.phase === "reveal") {
         if (this.flipped[this.revealIndex]) {
           this.dragging = true;
@@ -387,6 +394,11 @@ export class KantoPacksGame {
     });
 
     canvas.addEventListener("pointermove", (e) => {
+      if (this.summaryDragging) {
+        const dy = e.clientY - this.summaryStartY;
+        this.summaryScroll = clamp(this.summaryStartScroll + dy, -220, 5 * 276 - 640 + 220);
+        return;
+      }
       const p = this.toLocal(e);
       if (this.slicing) {
         this.tearAt(p);
@@ -423,6 +435,7 @@ export class KantoPacksGame {
         }
       }
       this.dragging = false;
+      this.summaryDragging = false;
       this.packKick = 0;
     };
     canvas.addEventListener("pointerup", release);
@@ -561,6 +574,7 @@ export class KantoPacksGame {
   }
 
   showSummary() {
+    this.summaryScroll = 0;
     this.setPhase("summary");
     this.el.caption.classList.remove("kp-show");
     if (this.beamMesh) this.beamMesh.visible = false;
@@ -573,12 +587,7 @@ export class KantoPacksGame {
       mesh.setFlipWithTilt(0, 0, 0);
       const portrait = this.scene.portrait;
       if (portrait) {
-        /* a fanned hand: every card keeps its native pixels */
-        mesh.summaryTarget = {
-          x: (i - 2) * 74,
-          y: -Math.abs(i - 2) * 10,
-          scale: 1,
-        };
+        mesh.summaryTarget = { x: 0, y: 0, scale: 1, portraitIndex: i };
       } else {
         mesh.summaryTarget = {
           x: -totalW / 2 + 80 + i * 170,
@@ -755,7 +764,13 @@ export class KantoPacksGame {
     if (this.phase === "summary") {
       meshes.forEach((mesh, i) => {
         if (!mesh.summaryTarget) return;
-        mesh.group.position.lerp(new THREE.Vector3(mesh.summaryTarget.x, mesh.summaryTarget.y, 90), 0.12);
+        let tx = mesh.summaryTarget.x;
+        let ty = mesh.summaryTarget.y;
+        if (this.scene.portrait) {
+          ty = 236 - i * 276 + (this.summaryScroll || 0);
+          tx = 0;
+        }
+        mesh.group.position.lerp(new THREE.Vector3(tx, ty, 90), 0.12);
         mesh.group.scale.lerp(new THREE.Vector3(mesh.summaryTarget.scale, mesh.summaryTarget.scale, mesh.summaryTarget.scale), 0.12);
         mesh.setTilt(this.tilt.x * 0.4, this.tilt.y * 0.4);
       });
