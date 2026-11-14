@@ -27,6 +27,8 @@ void main() {
 const FRAG = `
 ${BAYER_GLSL}
 uniform sampler2D uMap;
+uniform sampler2D uBack;
+uniform float uTwoSided;
 uniform sampler2D uMask;
 uniform float uHolo;
 uniform float uHoloDensity;
@@ -52,7 +54,10 @@ vec3 rainbow(float i) {
 }
 
 void main() {
-  vec4 t = texture2D(uMap, vUv);
+  bool backside = uTwoSided > 0.5 && !gl_FrontFacing;
+  vec4 frontTex = texture2D(uMap, vUv);
+  vec4 backTex = texture2D(uBack, vUv);
+  vec4 t = backside ? backTex : frontTex;
   if (t.a < 0.5) discard;
   float light = dot(normalize(vNormal), normalize(vec3(-0.45, 0.65, 0.9))) * 0.5 + 0.5;
   float band = floor(light * 4.0) / 4.0;
@@ -60,7 +65,7 @@ void main() {
 
   if (uUseTint > 0.5) col *= uTint;
 
-  if (uHolo > 0.5) {
+  if (!backside && uHolo > 0.5) {
     float m = texture2D(uMask, vUv).r;
     if (m > 0.5) {
       float sweep = fract(vUv.x * 0.45 + vUv.y * 0.55 + uTilt.x * 0.9 + uTilt.y * 0.4);
@@ -70,22 +75,24 @@ void main() {
     }
   }
 
-  if (uGlintOn > 0.5) {
+  if (!backside && uGlintOn > 0.5) {
     float g = fract(vUv.x * 0.7 + vUv.y * 0.35 - uGlint);
     if (g < 0.02) col = mix(col, vec3(1.0, 0.98, 0.92), 0.16);
   }
 
-  col *= uDim;
+  col *= backside ? 0.94 : uDim;
   float a = uOpacity;
   a *= clamp(uFade, 0.0, 1.0);
   gl_FragColor = vec4(col, a);
 }
 `;
 
-export function makeMaterial({ map, mask = null, holo = false, holoDensity = 0.33, glint = false, tint = null, dim = 1, flat = false }) {
+export function makeMaterial({ map, back = null, mask = null, holo = false, holoDensity = 0.33, glint = false, tint = null, dim = 1, flat = false, opaque = false }) {
   return new THREE.ShaderMaterial({
     uniforms: {
       uMap: { value: map },
+      uBack: { value: back || map },
+      uTwoSided: { value: back ? 1 : 0 },
       uMask: { value: mask },
       uHolo: { value: holo ? 1 : 0 },
       uHoloDensity: { value: holoDensity },
@@ -101,7 +108,8 @@ export function makeMaterial({ map, mask = null, holo = false, holoDensity = 0.3
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
-    transparent: true,
+    transparent: !opaque,
+    depthWrite: opaque,
     side: THREE.DoubleSide,
   });
 }

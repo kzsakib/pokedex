@@ -24,22 +24,18 @@ export function createCardMesh({ front, mask, rarity, dim = 1 }) {
   const holo = holoDensityFor(rarity) > 0;
   const frontMat = makeMaterial({
     map: texture(front),
+    back: cardBackTexture(),
     mask: mask ? texture(mask) : null,
     holo,
     holoDensity: holoDensityFor(rarity),
     dim,
     flat: true,
+    opaque: true,
   });
-  const backMat = makeMaterial({ map: cardBackTexture(), flat: true, dim: 0.96 });
 
   const face = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W, CARD_H), frontMat);
-  face.position.z = 1;
+  face.position.z = 0;
   group.add(face);
-
-  const rear = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W, CARD_H), backMat);
-  rear.rotation.y = Math.PI;
-  rear.position.z = -1;
-  group.add(rear);
 
   return {
     group,

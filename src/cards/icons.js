@@ -1,4 +1,4 @@
-/* Type badges drawn on a 12x12 grid, scaled only by whole numbers. */
+/* Type badges: real Pokémon type symbols (vendored SVGs) on crisp square chips. */
 
 export const TYPE_COLOURS = {
   Fire: { frame: "#e0572a", deep: "#8f2c17", light: "#ffc07a", ink: "#2a1208" },
@@ -146,11 +146,81 @@ function glyphCanvas(type) {
 }
 
 /** size is 12 or 24 (whole multiples of the grid). */
+const ICON_FILES = {
+  Fire: "Fire",
+  Water: "Water",
+  Grass: "Grass",
+  Lightning: "Lightning",
+  Psychic: "Psychic",
+  Fighting: "Fighting",
+  Colorless: "Colorless",
+};
+
+const ICONS = {};
+let iconsReady = false;
+
+export async function loadTypeIcons() {
+  if (iconsReady) return;
+  await Promise.all(
+    Object.entries(ICON_FILES).map(
+      ([type, file]) =>
+        new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            ICONS[type] = img;
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = `${import.meta.env.BASE_URL}cards/types/${file}.svg`;
+        })
+    )
+  );
+  iconsReady = true;
+}
+
+const TINTED = {};
+function tintedIcon(type, px) {
+  const key = `${type}:${px}`;
+  if (TINTED[key]) return TINTED[key];
+  const img = ICONS[type];
+  if (!img) return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = px;
+  canvas.height = px;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, px, px);
+  ctx.drawImage(img, 0, 0, px, px);
+  ctx.globalCompositeOperation = "source-in";
+  ctx.fillStyle = "#fdfbf4";
+  ctx.fillRect(0, 0, px, px);
+  TINTED[key] = canvas;
+  return canvas;
+}
+
+function pixelDisc(ctx, cx, cy, r, colour) {
+  ctx.fillStyle = colour;
+  for (let yy = -r; yy <= r; yy += 1) {
+    const half = Math.floor(Math.sqrt(r * r - yy * yy));
+    ctx.fillRect(cx - half, cy + yy, half * 2 + 1, 1);
+  }
+}
+
 export function drawTypeBadge(ctx, type, x, y, size = 12) {
   const scale = size >= 24 ? 2 : 1;
-  const src = glyphCanvas(type);
+  const px = 12 * scale;
+  const icon = tintedIcon(type, px - 2 * scale);
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(src, x, y, 12 * scale, 12 * scale);
+  if (!icon) {
+    ctx.drawImage(glyphCanvas(type), x, y, px, px);
+    return;
+  }
+  const pal = TYPE_COLOURS[type] || TYPE_COLOURS.Colorless;
+  const r = px / 2 - 0.5;
+  const cx = Math.round(x + px / 2 - 0.5);
+  const cy = Math.round(y + px / 2 - 0.5);
+  pixelDisc(ctx, cx, cy, r + 1, pal.deep);
+  pixelDisc(ctx, cx, cy, r, pal.frame);
+  ctx.drawImage(icon, x + 1 * scale, y + 1 * scale, px - 2 * scale, px - 2 * scale);
 }
 
 export function drawEnergyRow(ctx, types, x, y, size = 10, pitch = 12) {

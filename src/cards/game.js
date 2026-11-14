@@ -7,6 +7,7 @@ import { makeHoloMask } from "./holo.js";
 import { loadGen1, preloadSprites, loadSprite, spriteFor } from "./assets.js";
 import { generatePack, RARITY_LABEL } from "./generate.js";
 import { renderCard } from "./cardRenderer.js";
+import { loadTypeIcons } from "./icons.js";
 import { renderPackFront, renderPackBack, renderStrip, VARIANTS } from "./packArt.js";
 import { freshSeed } from "./rng.js";
 import { KantoAudio } from "./audio.js";
@@ -258,6 +259,7 @@ export class KantoPacksGame {
   }
 
   async generate() {
+    await loadTypeIcons();
     const pack = generatePack(this.data, this.seed, { force: this.force });
     this.packData = pack;
     this.cards = pack.cards;
@@ -722,13 +724,13 @@ export class KantoPacksGame {
       const active = meshes[this.revealIndex];
       meshes.forEach((mesh, i) => {
         if (i < this.revealIndex) {
-          mesh.group.visible = true;
+          mesh.group.visible = false;
           mesh.group.position.lerp(new THREE.Vector3(-this.scene.W * 0.36 + (i % 2) * 18, -90, 20 + i), 0.12);
           mesh.group.scale.lerp(new THREE.Vector3(0.6, 0.6, 0.6), 0.12);
           mesh.setFlip(1);
           return;
         }
-        mesh.group.visible = true;
+        mesh.group.visible = i === this.revealIndex;
         const offset = i - this.revealIndex;
         const targetScale = i === this.revealIndex ? 2 : 1;
         mesh.group.position.lerp(
