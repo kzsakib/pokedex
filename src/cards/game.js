@@ -273,8 +273,8 @@ export class KantoPacksGame {
     for (const card of this.cards) {
       const sprite = await spriteFor(card);
       const front = renderCard(card, sprite);
-      const mask = makeHoloMask(card.rarity);
-      const mesh = createCardMesh({ front, mask, rarity: card.rarity });
+      const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
+      const mesh = createCardMesh({ front, mask, rarity: card.rarity, finish: card.finish });
       mesh.group.position.set(0, 40, 60 + this.meshes.length * 0.6);
       mesh.group.scale.setScalar(1);
       mesh.group.visible = false;
@@ -344,7 +344,7 @@ export class KantoPacksGame {
     const stats = `HT ${fmtHeight(card.height)}  WT ${card.weight ? `${Math.round(card.weight * 2.2046)} LB` : "??"}`;
     this.el.caption.innerHTML = `
       <strong>${card.name}</strong>
-      <span>${RARITY_LABEL[card.rarity]}${card.shiny ? " · SHINY ✦" : ""}</span>
+      <span>${RARITY_LABEL[card.rarity]}${card.shiny ? " · SHINY ✦" : card.finish === "reverse" ? " · REVERSE" : ""}</span>
       <span>${stats}</span>
       <span>seed ${this.seed}</span>
     `;

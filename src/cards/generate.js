@@ -170,6 +170,15 @@ function makeCard(rng, pokemon, rarity, shiny) {
   const weakness = rollWeakness(rng, tcg);
   const resistance = rollResistance(rng, tcg, weakness);
   const retreat = retreatFor(pokemon, rarity, rng);
+  const finish = shiny
+    ? "shiny"
+    : rarity === "legend"
+    ? "prism"
+    : rarity === "holo"
+    ? "holo"
+    : rng.chance(0.2)
+    ? "reverse"
+    : "plain";
   return {
     ...pokemon,
     tcg,
@@ -182,6 +191,7 @@ function makeCard(rng, pokemon, rarity, shiny) {
     weakness,
     resistance,
     retreat,
+    finish,
     seed: rng.seedCode || "",
   };
 }
@@ -214,14 +224,14 @@ export function generatePack(data, seed, options = {}) {
   const upgrade = rng.chance(0.08);
   slots.push({ mon: pickUnique(upgrade ? pools.rare : pools.uncommon), rarity: upgrade ? "rare" : "uncommon" });
   const roll = rng.random();
-  let rareRarity = roll < 0.66 ? "rare" : roll < 0.94 ? "holo" : "legend";
+  let rareRarity = roll < 0.5 ? "rare" : roll < 0.88 ? "holo" : "legend";
   if (force && ["rare", "holo", "legend"].includes(force)) rareRarity = force;
   slots.push({ mon: pickUnique(pools[rareRarity === "legend" ? "legend" : "rare"]), rarity: rareRarity });
 
   if (force === "shiny") slots[slots.length - 1].forceShiny = true;
 
   const cards = slots.map((slot, index) => {
-    const shiny = slot.forceShiny || rng.chance(1 / 64);
+    const shiny = slot.forceShiny || rng.chance(1 / 20);
     const card = makeCard(rng, slot.mon, slot.rarity, shiny);
     card.slot = index;
     return card;
