@@ -573,13 +573,10 @@ export class KantoPacksGame {
       mesh.setFlipWithTilt(0, 0, 0);
       const portrait = this.scene.portrait;
       if (portrait) {
-        const row = i < 3 ? 0 : 1;
-        const col = i < 3 ? i : i - 3;
-        const rowCount = row === 0 ? 3 : 2;
-        const rowW = rowCount * 160 + (rowCount - 1) * gap;
+        /* a fanned hand: every card keeps its native pixels */
         mesh.summaryTarget = {
-          x: -rowW / 2 + 80 + col * 170,
-          y: row === 0 ? 140 : -140,
+          x: (i - 2) * 74,
+          y: -Math.abs(i - 2) * 10,
           scale: 1,
         };
       } else {

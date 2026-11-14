@@ -363,8 +363,8 @@
 
 @media (max-width: 720px) {
   .kp-stage {
-    height: min(84vh, 620px);
-    min-height: 460px;
+    height: min(92vh, 700px);
+    min-height: 500px;
   }
   .kp-caption {
     bottom: 94px;
