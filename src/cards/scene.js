@@ -70,9 +70,13 @@ void main() {
   if (uUseTint > 0.5) col *= uTint;
 
   if (!backside && uSheen > 0.5) {
-    float sweep = fract(vUv.x * 0.85 + vUv.y * 0.45 - uTilt.x * 0.7 - uTilt.y * 0.35);
-    float band = smoothstep(0.0, 0.22, sweep) * (1.0 - smoothstep(0.24, 0.62, sweep));
-    col = mix(col, vec3(1.0, 0.985, 0.94), band * 0.12);
+    float a = uTime * 0.05 + uTilt.x * 0.6;
+    float dir = cos(a), dy = sin(a);
+    float sweep = fract((vUv.x * dir + vUv.y * dy) * 1.15 + uTilt.y * 0.4);
+    float band = smoothstep(0.0, 0.18, sweep) * (1.0 - smoothstep(0.2, 0.5, sweep));
+    float sweep2 = fract((vUv.x * -dy + vUv.y * dir) * 2.1 - uTime * 0.03);
+    float band2 = smoothstep(0.0, 0.1, sweep2) * (1.0 - smoothstep(0.12, 0.3, sweep2));
+    col = mix(col, vec3(1.0, 0.985, 0.94), band * 0.14 + band2 * 0.05);
     float tint = 0.035 * (1.0 - smoothstep(0.0, 0.5, abs(fract(vUv.y * 1.3 + vUv.x * 0.6 + uTilt.x) - 0.5) * 2.0));
     col = mix(col, rainbow(floor(fract(vUv.x * 0.5 + vUv.y * 0.7 + uTilt.x * 0.4) * 6.0)), tint);
     col = mix(col, vec3(0.72, 0.62, 0.95), 0.03 * band);
