@@ -83,30 +83,46 @@ void main() {
   }
 
   if (!backside && uEffect > 0.5) {
+    float t = uTime;
     if (uEffect < 1.5) {
-      /* reverse: brushed metal, silver-blue vertical grain */
-      float grain = sin(vUv.x * 90.0 + sin(vUv.y * 12.0 + uTime * 0.8) * 2.0 + uTime * 1.1) * 0.5 + 0.5;
-      float sweep = fract(vUv.x * 0.55 + vUv.y * 0.9 - uTilt.x * 1.1 - uTilt.y * 0.5 - uTime * 0.07);
-      col = mix(col, vec3(0.80, 0.86, 1.0), grain * 0.06 + (1.0 - sweep) * 0.05);
-      col = mix(col, vec3(1.0), smoothstep(0.92, 1.0, grain) * 0.10);
+      /* 1 reverse: cold silver brushed metal, diagonal grain drifting left */
+      float grain = sin((vUv.x * 1.4 + vUv.y * 0.2) * 70.0 - t * 1.6 + sin(vUv.y * 9.0 + t * 0.7) * 2.0) * 0.5 + 0.5;
+      float sweep = fract(vUv.x * 0.55 + vUv.y * 0.9 - uTilt.x * 1.1 - t * 0.09);
+      col = mix(col, vec3(0.76, 0.84, 1.0), grain * 0.07 + (1.0 - sweep) * 0.07);
+      col = mix(col, vec3(1.0), smoothstep(0.93, 1.0, grain) * 0.12);
     } else if (uEffect < 2.5) {
-      /* holo: rainbow sheet */
-      float sweep = fract(vUv.x * 0.5 + vUv.y * 0.7 + uTilt.x * 0.9 + uTilt.y * 0.5 + uTime * 0.06);
-      col = mix(col, rainbow(floor(sweep * 6.0)), 0.19);
+      /* 2 holo: cyan-into-magenta bands, tilted 30 degrees, always travelling */
+      float s = fract((vUv.x * 0.62 + vUv.y * 0.78) * 1.35 - uTilt.x * 0.9 + t * 0.055);
+      vec3 duo = mix(vec3(0.16, 0.88, 0.94), vec3(0.96, 0.24, 0.78), smoothstep(0.0, 1.0, s));
+      col = mix(col, duo, 0.10 + 0.10 * (0.5 + 0.5 * sin(s * 6.2832 + t * 0.9)));
     } else if (uEffect < 3.5) {
-      /* prism: rainbow plus travelling star sparkles */
-      float sweep = fract(vUv.x * 0.5 + vUv.y * 0.7 + uTilt.x * 0.9 - uTime * 0.04);
-      col = mix(col, rainbow(floor(sweep * 6.0)), 0.25);
+      /* 3 prism: full spectrum plus twinkling stars */
+      float s = fract(vUv.x * 0.5 + vUv.y * 0.7 + uTilt.x * 0.9 - t * 0.04);
+      col = mix(col, rainbow(floor(s * 6.0)), 0.22);
       vec2 cell = floor(vUv * vec2(46.0, 64.0));
-      float h = fract(sin(dot(cell, vec2(12.9898, 78.233)) + floor(uTime * 2.5)) * 43758.5453);
-      if (h > 0.988) col = mix(col, vec3(1.0), 0.9);
-      col = mix(col, vec3(1.0, 0.86, 0.4), 0.05);
+      float h = fract(sin(dot(cell, vec2(12.9898, 78.233)) + floor(t * 2.5)) * 43758.5453);
+      if (h > 0.988) col = mix(col, vec3(1.0), 0.85);
+    } else if (uEffect < 4.5) {
+      /* 4 gold: amber with a wide embossed band rolling upwards */
+      col = mix(col, vec3(1.0, 0.80, 0.36), 0.11);
+      float band = smoothstep(0.38, 0.5, abs(fract(vUv.y * 1.5 - t * 0.06 + uTilt.x * 0.4) - 0.5));
+      col = mix(col, vec3(1.0, 0.96, 0.78), band * 0.16);
+      col = mix(col, vec3(0.55, 0.36, 0.08), 0.05);
+    } else if (uEffect < 5.5) {
+      /* 5 foil: stamped silver laminate, crosshatch with a rotating glint */
+      float hatch = sin((vUv.x + vUv.y) * 150.0) * 0.5 + 0.5;
+      float cross = sin((vUv.x - vUv.y) * 150.0) * 0.5 + 0.5;
+      float sweep = fract((vUv.x - vUv.y) * 0.35 + t * 0.05 + uTilt.y * 0.6);
+      col = mix(col, vec3(0.90, 0.93, 1.0), (hatch * 0.5 + cross * 0.5) * 0.06);
+      col = mix(col, vec3(1.0), smoothstep(0.82, 1.0, sweep) * 0.16);
     } else {
-      /* gold: warm metal with an embossed band */
-      col = mix(col, vec3(1.0, 0.84, 0.42), 0.13);
-      float band = smoothstep(0.42, 0.5, abs(fract(vUv.y * 2.6 + vUv.x * 1.1 + uTilt.x * 0.8) - 0.5));
-      col = mix(col, vec3(1.0, 0.95, 0.72), band * 0.14);
-      col = mix(col, vec3(0.62, 0.42, 0.10), 0.05);
+      /* 6 star: deep violet night with twinkling stars and a slow sweep */
+      col = mix(col, vec3(0.30, 0.22, 0.58), 0.12);
+      vec2 cell = floor(vUv * vec2(38.0, 54.0));
+      float h = fract(sin(dot(cell, vec2(35.13, 91.7)) + floor(t * 1.7)) * 24634.6345);
+      if (h > 0.978) col = mix(col, vec3(1.0, 0.98, 0.86), 0.8);
+      float s = fract(vUv.x * 0.4 - vUv.y * 0.6 + t * 0.035 + uTilt.x * 0.5);
+      col = mix(col, vec3(0.58, 0.76, 1.0), smoothstep(0.78, 1.0, s) * 0.12);
     }
   }
 

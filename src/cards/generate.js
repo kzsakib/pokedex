@@ -159,6 +159,15 @@ function retreatFor(pokemon, rarity, rng) {
   return cost;
 }
 
+function rollFinish(rng, table) {
+  let r = rng.random();
+  for (const [name, w] of table) {
+    if (r < w) return name;
+    r -= w;
+  }
+  return table[table.length - 1][0];
+}
+
 function makeCard(rng, pokemon, rarity, shiny) {
   const tcg = tcgType(pokemon);
   const stage = Math.min(2, pokemon.stage || 0);
@@ -173,9 +182,11 @@ function makeCard(rng, pokemon, rarity, shiny) {
   const finish = shiny
     ? "shiny"
     : rarity === "legend"
-    ? (rng.chance(0.55) ? "prism" : "gold")
+    ? rollFinish(rng, [["prism", 0.4], ["gold", 0.3], ["star", 0.3]])
     : rarity === "holo"
     ? "holo"
+    : rarity === "rare"
+    ? (rng.chance(0.45) ? "foil" : "plain")
     : rng.chance(0.25)
     ? "reverse"
     : "plain";
@@ -231,7 +242,7 @@ export function generatePack(data, seed, options = {}) {
   if (force === "shiny") slots[slots.length - 1].forceShiny = true;
 
   const cards = slots.map((slot, index) => {
-    const shiny = slot.forceShiny || rng.chance(1 / 20);
+    const shiny = slot.forceShiny || rng.chance(1 / 40);
     const card = makeCard(rng, slot.mon, slot.rarity, shiny);
     card.slot = index;
     return card;

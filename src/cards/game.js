@@ -9,6 +9,8 @@ import { generatePack, RARITY_LABEL } from "./generate.js";
 import { renderCard } from "./cardRenderer.js";
 import { loadTypeIcons } from "./icons.js";
 import { renderPackFront, renderPackBack, renderStrip, VARIANTS } from "./packArt.js";
+
+const FINISH_TAG = { reverse: " · REVERSE", holo: "", prism: " · PRISM", gold: " · GOLD", foil: " · FOIL", star: " · STARLIGHT", shiny: "" };
 import { freshSeed } from "./rng.js";
 import { KantoAudio } from "./audio.js";
 import { loadBinder, recordPack, resetBinder } from "./storage.js";
@@ -344,7 +346,7 @@ export class KantoPacksGame {
     const stats = `HT ${fmtHeight(card.height)}  WT ${card.weight ? `${Math.round(card.weight * 2.2046)} LB` : "??"}`;
     this.el.caption.innerHTML = `
       <strong>${card.name}</strong>
-      <span>${RARITY_LABEL[card.rarity]}${card.shiny ? " · SHINY ✦" : card.finish === "reverse" ? " · REVERSE" : card.finish === "gold" ? " · GOLD" : card.finish === "prism" ? " · PRISM" : ""}</span>
+      <span>${RARITY_LABEL[card.rarity]}${card.shiny ? " · SHINY ✦" : FINISH_TAG[card.finish] || ""}</span>
       <span>${stats}</span>
       <span>seed ${this.seed}</span>
     `;

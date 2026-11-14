@@ -21,7 +21,14 @@ export function cardBackTexture() {
 
 export function createCardMesh({ front, mask, rarity, finish = "plain", dim = 1 }) {
   const group = new THREE.Group();
-  const effect = finish === "reverse" ? 1 : finish === "holo" ? 2 : finish === "prism" ? 3 : finish === "gold" ? 4 : finish === "shiny" ? 2 : 0;
+  const effect =
+    finish === "reverse" ? 1 :
+    finish === "holo" ? 2 :
+    finish === "prism" ? 3 :
+    finish === "gold" ? 4 :
+    finish === "foil" ? 5 :
+    finish === "star" ? 6 :
+    finish === "shiny" ? 3 : 0;
   const holo = false;
   const density = holoDensityFor(rarity);
   const frontMat = makeMaterial({

@@ -74,6 +74,7 @@ function textWidth(s, font, sp = 1) {
 }
 
 function glyphs(ctx, text, font, x, y, color, sp, scale = 1) {
+  if (globalThis.__textLog) globalThis.__textLog.push({ text, x: Math.round(x), y: Math.round(y), color, scale });
   ctx.fillStyle = color;
   let cx = Math.round(x);
   const cy = Math.round(y);
@@ -389,8 +390,10 @@ function frame(ctx, card) {
 
 function damageText(move) {
   if (!move) return "-";
-  if (move.display) return String(move.display);
-  return move.damage ? String(move.damage) : "-";
+  const d = move.display ?? move.damage;
+  if (d === null || d === undefined) return "-";
+  if (typeof d === "object") return String(d.display ?? "-");
+  return String(d);
 }
 
 function moveSlot(ctx, card, move, y, zone) {
@@ -405,11 +408,11 @@ function moveSlot(ctx, card, move, y, zone) {
     fitText(ctx, move.name, Math.max(10, maxName), F5, TEXT, nameX, y + 1);
   });
   lintDraw(zone, 149 - dmgW, y + 1, dmgW, 7, () => {
-    drawText(ctx, dmg, 149, y + 1, F5, TEXT, 1, "r", 1);
+    drawText(ctx, 149, y + 1, dmg, F5, TEXT, 1, "r", 1);
   });
   if (move.effect) {
     lintDraw(zone, 9, y + 11, 140, 5, () => {
-      fitText(ctx, move.effect, 140, F3, "#544854", 9, y + 11);
+      fitText(ctx, move.effect, 149 - 9, F3, "#544854", 9, y + 11);
     });
   }
 }
@@ -507,7 +510,7 @@ export function renderCard(card, sprite, options = {}) {
   lintDraw("B", 142, 23, 9, 9, () => drawIcon(ctx, card.tcg, 142, 23));
 
   // info strip
-  const genus = String(card.genus || "").replace(/\s*POKEMON$/i, "").trim();
+  const genus = upper(String(card.genus || "")).replace(/\s*POKEMON$/i, "").trim();
   const dex = `${String(card.id).padStart(3, "0")}/151`;
   const dexW = textWidth(dex, F3, 1);
   const genusW = 140 - dexW - 4 - 8;
