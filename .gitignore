@@ -12,3 +12,6 @@ artifacts/
 .env
 .env.local
 .env.*.local
+
+.secrets/
+lore-proxy/.groq.key

@@ -2,6 +2,11 @@
    Uses Groq when a key is present at build time, otherwise a local writer so
    the feature never silently disappears. */
 
+/* The deployed site never holds a key: it asks the worker in lore-proxy/,
+   which keeps the Groq key as a secret and returns only the finished line. */
+const PROXY =
+  (import.meta.env && import.meta.env.VITE_LORE_PROXY) ||
+  "https://site-9ab0858b3eb2458ba4fa0615c5c508b8.freebuff.page/lore";
 const KEY = (import.meta.env && import.meta.env.VITE_GROQ_KEY) || "";
 
 const HUE_FAMILIES = [
@@ -38,9 +43,32 @@ export function fallbackLore(card, seed = 0) {
   return TEMPLATES[pick](card, (card.variant && card.variant.label) || "UNUSUAL");
 }
 
-export async function chromaLore(card, timeoutMs = 6000) {
-  const seed = (card.id * 2654435761 + (card.variant?.label || "").length) >>> 0;
-  if (!KEY) return fallbackLore(card, seed);
+async function fromProxy(card, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(PROXY, {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: card.name,
+        label: card.variant?.label || "REPAINTED",
+        tcg: card.tcg,
+      }),
+    });
+    if (!res.ok) throw new Error(`proxy ${res.status}`);
+    const json = await res.json();
+    const line = String(json?.line || "").trim();
+    if (!line) throw new Error("proxy empty");
+    return line;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fromKey(card, timeoutMs) {
+  if (!KEY) return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -69,10 +97,25 @@ export async function chromaLore(card, timeoutMs = 6000) {
     if (!res.ok) throw new Error(`groq ${res.status}`);
     const json = await res.json();
     const line = json?.choices?.[0]?.message?.content?.trim().replace(/^["'“]|["'”]$/g, "");
-    return line || fallbackLore(card, seed);
-  } catch {
-    return fallbackLore(card, seed);
+    return line || null;
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function chromaLore(card, timeoutMs = 7000) {
+  const seed = (card.id * 2654435761 + (card.variant?.label || "").length) >>> 0;
+  try {
+    const viaProxy = await fromProxy(card, timeoutMs);
+    if (viaProxy) return viaProxy;
+  } catch {
+    /* fall through to the local writer */
+  }
+  try {
+    const viaKey = await fromKey(card, timeoutMs);
+    if (viaKey) return viaKey;
+  } catch {
+    /* fall through */
+  }
+  return fallbackLore(card, seed);
 }
