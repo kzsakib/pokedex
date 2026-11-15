@@ -76,6 +76,10 @@ void main() {
     float band = smoothstep(0.0, 0.18, sweep) * (1.0 - smoothstep(0.2, 0.5, sweep));
     float sweep2 = fract((vUv.x * -dy + vUv.y * dir) * 2.1 - uTime * 0.03);
     float band2 = smoothstep(0.0, 0.1, sweep2) * (1.0 - smoothstep(0.12, 0.3, sweep2));
+    /* step the glare into three hard tones with a per-pixel dither */
+    float dith = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233))) * 43758.5453);
+    band = floor(band * 3.0 + dith) / 3.0;
+    band2 = floor(band2 * 2.0 + dith) / 2.0;
     col = mix(col, vec3(1.0, 0.985, 0.94), band * 0.14 + band2 * 0.05);
     float tint = 0.035 * (1.0 - smoothstep(0.0, 0.5, abs(fract(vUv.y * 1.3 + vUv.x * 0.6 + uTilt.x) - 0.5) * 2.0));
     col = mix(col, rainbow(floor(fract(vUv.x * 0.5 + vUv.y * 0.7 + uTilt.x * 0.4) * 6.0)), tint);

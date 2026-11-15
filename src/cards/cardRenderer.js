@@ -325,7 +325,7 @@ function artBuffer(card, sprite) {
   return canvas;
 }
 
-function artWindow(ctx, card, sprite, omitSprite = false) {
+function artWindow(ctx, card, sprite, omitSprite = false, omitArt = false) {
   const { x, y, w, h } = ART;
   // explicit border + bevel so every corner pixel is deliberate
   ctx.fillStyle = INK;
@@ -348,8 +348,12 @@ function artWindow(ctx, card, sprite, omitSprite = false) {
   ctx.fillRect(x + 1, y + h - 2, w - 2, 1);
   ctx.fillRect(x + w - 2, y + 1, 1, h - 2);
 
-  const buffer = artBuffer(card, omitSprite ? null : sprite);
   const { inner } = ART;
+  if (omitArt) {
+    ctx.clearRect(inner.x, inner.y, inner.w, inner.h);
+    return;
+  }
+  const buffer = artBuffer(card, omitSprite ? null : sprite);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(buffer, 0, 0, BUFFER.w, BUFFER.h, inner.x, inner.y, inner.w, inner.h);
 }
@@ -510,7 +514,7 @@ export function renderCard(card, sprite, options = {}) {
   lint = options.lint ? { boxes: [] } : null;
 
   frame(ctx, card);
-  artWindow(ctx, card, sprite, !!options.omitSprite);
+  artWindow(ctx, card, sprite, !!options.omitSprite, !!options.omitArt);
 
   // Row A
   const stageName = card.rarity === "legend" ? "LEGEND" : card.stage === 2 ? "STAGE 2" : card.stage === 1 ? "STAGE 1" : "BASIC";
@@ -651,6 +655,43 @@ export function renderSpriteLayer(card, sprite) {
   const sx = Math.round((BUFFER.w / 2 - sw / 2) * 2);
   const sy = Math.max(2, Math.round(BUFFER.h - 4 - sh)) * 2;
   ctx.drawImage(sprite, sx, sy, sw * 2, sh * 2);
+  return canvas;
+}
+
+/* Backdrop only, sized to the art window (used as a layer behind the frame). */
+export function renderBackdropLayer(card) {
+  const canvas = document.createElement("canvas");
+  canvas.width = ART.inner.w;
+  canvas.height = ART.inner.h;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  const buffer = artBuffer(card, null);
+  ctx.drawImage(buffer, 0, 0, BUFFER.w, BUFFER.h, 0, 0, ART.inner.w, ART.inner.h);
+  return canvas;
+}
+
+/* Dithered ellipse contact shadow, drawn once and reused. */
+const shadowCache = new Map();
+export function renderContactShadow(w = 132, h = 26) {
+  const key = `${w}x${h}`;
+  if (shadowCache.has(key)) return shadowCache.get(key);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  ctx.fillStyle = "#0d0b1e";
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const nx = (x - w / 2) / (w / 2);
+      const ny = (y - h / 2) / (h / 2);
+      const d = nx * nx + ny * ny;
+      if (d > 1) continue;
+      const t = (BAYER4[(y % 4) * 4 + (x % 4)] + 0.5) / 16;
+      if (t < 0.75 * (1 - d * 0.85)) ctx.fillRect(x, y, 1, 1);
+    }
+  }
+  shadowCache.set(key, canvas);
   return canvas;
 }
 

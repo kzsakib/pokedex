@@ -6,7 +6,7 @@ import { createCardMesh } from "./cards3d.js";
 import { makeHoloMask } from "./holo.js";
 import { loadGen1, preloadSprites, loadSprite, spriteFor } from "./assets.js";
 import { generatePack, RARITY_LABEL } from "./generate.js";
-import { renderCard } from "./cardRenderer.js";
+import { renderCard, renderBackdropLayer } from "./cardRenderer.js";
 import { loadTypeIcons } from "./icons.js";
 import { renderPackFront, renderPackBack, renderStrip, VARIANTS } from "./packArt.js";
 
@@ -32,6 +32,7 @@ export class KantoPacksGame {
     this.phase = "idle";
     this.focusIndex = -1;
     this.suppressPick = false;
+    this.reduceMotion = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.phaseTime = 0;
     this.cards = [];
     this.meshes = [];
@@ -276,9 +277,10 @@ export class KantoPacksGame {
 
     for (const card of this.cards) {
       const sprite = await spriteFor(card);
-      const front = renderCard(card, sprite, { omitSprite: true });
+      const front = renderCard(card, sprite, { omitArt: true });
+      const backdrop = renderBackdropLayer(card);
       const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
-      const mesh = createCardMesh({ front, sprite, mask, rarity: card.rarity, finish: card.finish });
+      const mesh = createCardMesh({ front, sprite, backdrop, mask, rarity: card.rarity, finish: card.finish });
       mesh.group.position.set(0, 40, 60 + this.meshes.length * 0.6);
       mesh.group.scale.setScalar(1);
       mesh.group.visible = false;
@@ -415,6 +417,7 @@ export class KantoPacksGame {
         this.tearAt(p);
         return;
       }
+      if (this.reduceMotion) return;
       if ((this.phase === "reveal" || this.phase === "stack" || this.phase === "summary") && !this.dragging) {
         /* lean away from the pointer: the side under the cursor sinks back */
         const rect = this.scene.canvas.getBoundingClientRect();
@@ -611,6 +614,7 @@ export class KantoPacksGame {
     this.summaryScroll = 0;
     this.focusIndex = -1;
     this.suppressPick = false;
+    this.reduceMotion = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.setPhase("summary");
     this.el.caption.classList.remove("kp-show");
     if (this.beamMesh) this.beamMesh.visible = false;
