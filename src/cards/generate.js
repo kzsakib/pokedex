@@ -182,14 +182,12 @@ function makeCard(rng, pokemon, rarity, shiny) {
   const finish = shiny
     ? "shiny"
     : rarity === "legend"
-    ? rollFinish(rng, [["prism", 0.4], ["gold", 0.3], ["star", 0.3]])
+    ? rollFinish(rng, [["prism", 0.28], ["gold", 0.22], ["star", 0.2], ["ember", 0.15], ["crystal", 0.15]])
     : rarity === "holo"
-    ? "holo"
+    ? (rng.chance(0.3) ? "crystal" : "holo")
     : rarity === "rare"
-    ? (rng.chance(0.45) ? "foil" : "plain")
-    : rng.chance(0.25)
-    ? "reverse"
-    : "plain";
+    ? rollFinish(rng, [["foil", 0.38], ["ember", 0.12], ["plain", 0.5]])
+    : rollFinish(rng, [["reverse", 0.2], ["crystal", 0.05], ["ember", 0.05], ["plain", 0.7]]);
   return {
     ...pokemon,
     tcg,

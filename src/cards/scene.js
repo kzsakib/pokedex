@@ -115,11 +115,11 @@ void main() {
     } else if (uEffect < 5.5) {
       /* 5 foil: stamped silver laminate, crosshatch with a rotating glint */
       float hatch = sin((vUv.x + vUv.y) * 150.0) * 0.5 + 0.5;
-      float cross = sin((vUv.x - vUv.y) * 150.0) * 0.5 + 0.5;
+      float weft = sin((vUv.x - vUv.y) * 150.0) * 0.5 + 0.5;
       float sweep = fract((vUv.x - vUv.y) * 0.35 + t * 0.05 + uTilt.y * 0.6);
-      col = mix(col, vec3(0.90, 0.93, 1.0), (hatch * 0.5 + cross * 0.5) * 0.06);
+      col = mix(col, vec3(0.90, 0.93, 1.0), (hatch * 0.5 + weft * 0.5) * 0.06);
       col = mix(col, vec3(1.0), smoothstep(0.82, 1.0, sweep) * 0.16);
-    } else {
+    } else if (uEffect < 6.5) {
       /* 6 star: deep violet night with twinkling stars and a slow sweep */
       col = mix(col, vec3(0.30, 0.22, 0.58), 0.12);
       vec2 cell = floor(vUv * vec2(38.0, 54.0));
@@ -127,6 +127,23 @@ void main() {
       if (h > 0.978) col = mix(col, vec3(1.0, 0.98, 0.86), 0.8);
       float s = fract(vUv.x * 0.4 - vUv.y * 0.6 + t * 0.035 + uTilt.x * 0.5);
       col = mix(col, vec3(0.58, 0.76, 1.0), smoothstep(0.78, 1.0, s) * 0.12);
+    } else if (uEffect < 7.5) {
+      /* 7 ember: heat rising from the bottom with drifting cinders */
+      float heat = fract(vUv.y * 1.3 - t * 0.13 + uTilt.x * 0.3);
+      col = mix(col, vec3(1.0, 0.45, 0.14), smoothstep(0.82, 1.0, heat) * 0.18);
+      float cool = fract(vUv.y * 1.3 - t * 0.13 + 0.5 + uTilt.x * 0.3);
+      col = mix(col, vec3(0.42, 0.10, 0.05), smoothstep(0.86, 1.0, cool) * 0.14);
+      vec2 cell = floor(vUv * vec2(30.0, 44.0));
+      float h = fract(sin(dot(cell, vec2(78.233, 12.9898)) + floor(t * 3.0)) * 43758.5453);
+      if (h > 0.972) col = mix(col, vec3(1.0, 0.86, 0.38), 0.8);
+    } else {
+      /* 8 crystal: angular facets with a cool seam and a violet sweep */
+      float f = abs(fract((vUv.x + vUv.y * 0.7) * 3.0 + uTilt.x * 0.5 - t * 0.02) - 0.5);
+      col = mix(col, vec3(0.62, 0.88, 1.0), smoothstep(0.42, 0.5, f) * 0.22);
+      float g2 = abs(fract((vUv.x - vUv.y * 0.9) * 5.0 + uTilt.y * 0.4) - 0.5);
+      col = mix(col, vec3(0.86, 0.96, 1.0), smoothstep(0.46, 0.5, g2) * 0.12);
+      float s = fract((vUv.x - vUv.y) * 0.5 + t * 0.05 + uTilt.x * 0.3);
+      col = mix(col, vec3(0.72, 0.52, 1.0), smoothstep(0.8, 1.0, s) * 0.14);
     }
   }
 

@@ -28,6 +28,8 @@ export function createCardMesh({ front, sprite, mask, rarity, finish = "plain", 
     finish === "gold" ? 4 :
     finish === "foil" ? 5 :
     finish === "star" ? 6 :
+    finish === "ember" ? 7 :
+    finish === "crystal" ? 8 :
     finish === "shiny" ? 3 : 0;
   const density = holoDensityFor(rarity);
 

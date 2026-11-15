@@ -10,7 +10,7 @@ import { renderCard } from "./cardRenderer.js";
 import { loadTypeIcons } from "./icons.js";
 import { renderPackFront, renderPackBack, renderStrip, VARIANTS } from "./packArt.js";
 
-const FINISH_TAG = { reverse: " · REVERSE", holo: "", prism: " · PRISM", gold: " · GOLD", foil: " · FOIL", star: " · STARLIGHT", shiny: "" };
+const FINISH_TAG = { reverse: " · REVERSE", holo: "", prism: " · PRISM", gold: " · GOLD", foil: " · FOIL", star: " · STARLIGHT", ember: " · EMBER", crystal: " · CRYSTAL", shiny: "" };
 import { freshSeed } from "./rng.js";
 import { KantoAudio } from "./audio.js";
 import { loadBinder, recordPack, resetBinder } from "./storage.js";
@@ -32,7 +32,6 @@ export class KantoPacksGame {
     this.phase = "idle";
     this.focusIndex = -1;
     this.suppressPick = false;
-    this.reduceMotion = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.phaseTime = 0;
     this.cards = [];
     this.meshes = [];
@@ -418,7 +417,6 @@ export class KantoPacksGame {
         this.tearAt(p);
         return;
       }
-      if (this.reduceMotion) return;
       if ((this.phase === "reveal" || this.phase === "stack" || this.phase === "summary") && !this.dragging) {
         /* lean away from the pointer: the side under the cursor sinks back */
         const rect = this.scene.canvas.getBoundingClientRect();
@@ -615,7 +613,6 @@ export class KantoPacksGame {
     this.summaryScroll = 0;
     this.focusIndex = -1;
     this.suppressPick = false;
-    this.reduceMotion = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.setPhase("summary");
     this.el.caption.classList.remove("kp-show");
     if (this.beamMesh) this.beamMesh.visible = false;
