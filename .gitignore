@@ -7,3 +7,8 @@ artifacts/
 
 # local tooling (staged apt lists for the headless browser)
 .apt/
+
+# local secrets (never commit)
+.env
+.env.local
+.env.*.local

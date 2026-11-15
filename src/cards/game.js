@@ -6,6 +6,7 @@ import { createCardMesh } from "./cards3d.js";
 import { makeHoloMask } from "./holo.js";
 import { loadGen1, preloadSprites, loadSprite, spriteFor } from "./assets.js";
 import { generatePack, RARITY_LABEL } from "./generate.js";
+import { chromaLore } from "./lore.js";
 import { renderCard } from "./cardRenderer.js";
 import { loadTypeIcons } from "./icons.js";
 import { renderPackFront, renderPackBack, renderStrip, VARIANTS } from "./packArt.js";
@@ -163,10 +164,15 @@ export class KantoPacksGame {
       </div>
     `;
     this.container.appendChild(hud);
+    this.entryEl = document.createElement("p");
+    this.entryEl.className = "kp-entry";
+    this.entryEl.setAttribute("aria-live", "polite");
+    this.container.insertAdjacentElement("afterend", this.entryEl);
+
     this.captionEl = document.createElement("div");
     this.captionEl.className = "kp-caption kp-caption--flow";
     this.captionEl.setAttribute("aria-live", "polite");
-    this.container.insertAdjacentElement("afterend", this.captionEl);
+    this.entryEl.insertAdjacentElement("afterend", this.captionEl);
     this.hud = hud;
     this.el = {
       packs: hud.querySelector(".kp-packs"),
@@ -370,6 +376,16 @@ export class KantoPacksGame {
       this.scene.root.add(mesh.group);
     }
 
+    /* one line per chroma card, written while the loader is up */
+    await Promise.all(
+      this.cards
+        .filter((card) => card.variant)
+        .map(async (card) => {
+          const line = await chromaLore(card);
+          if (line) card.variant.note = line;
+        })
+    );
+
     /* the pack has served its purpose once the cards exist */
     if (this.pack) this.pack.group.visible = false;
     await minShow;
@@ -431,6 +447,24 @@ export class KantoPacksGame {
     }, 1600);
   }
 
+  typeEntry(text, card) {
+    if (!this.entryEl) return;
+    if (this.typeTimer) clearInterval(this.typeTimer);
+    const full = String(text || "").replace(/\s+/g, " ").trim();
+    this.entryEl.textContent = "";
+    this.entryEl.classList.toggle("kp-entry--chroma", !!(card && card.variant));
+    if (!full) return;
+    let i = 0;
+    this.typeTimer = setInterval(() => {
+      i += 1;
+      this.entryEl.textContent = full.slice(0, i);
+      if (i >= full.length) {
+        clearInterval(this.typeTimer);
+        this.typeTimer = null;
+      }
+    }, 16);
+  }
+
   showCaption(card) {
     const stats = `HT ${fmtHeight(card.height)}  WT ${card.weight ? `${Math.round(card.weight * 2.2046)} LB` : "??"}`;
     this.el.caption.innerHTML = `
@@ -440,6 +474,8 @@ export class KantoPacksGame {
       <span>${stats}</span>
       <span>seed ${this.seed}</span>
     `;
+    const entry = card.variant && card.variant.note ? card.variant.note : card.flavour || "";
+    this.typeEntry(entry, card);
     this.el.caption.classList.add("kp-show");
   }
 
@@ -572,6 +608,10 @@ export class KantoPacksGame {
     this.spaceHeld = false;
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
+        if (this.pullView) {
+          this.closePullView();
+          return;
+        }
         this.el.help.hidden = true;
         this.el.binder.hidden = true;
         if (this.focusIndex >= 0) this.unfocusCard();
@@ -802,6 +842,16 @@ export class KantoPacksGame {
       canvas.className = "kp-pull";
       const cell = document.createElement("figure");
       cell.className = `kp-pull-cell kp-${card.rarity}`;
+      cell.tabIndex = 0;
+      cell.setAttribute("role", "button");
+      cell.setAttribute("aria-label", `view ${card.name || ""}`);
+      cell.addEventListener("click", () => this.openPullView(card));
+      cell.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          this.openPullView(card);
+        }
+      });
       cell.appendChild(canvas);
       const cap = document.createElement("figcaption");
       cap.textContent = card.variant
@@ -812,6 +862,40 @@ export class KantoPacksGame {
     }
     if (!wrap.isConnected) return;
     wrap.replaceChildren(...cells);
+  }
+
+  async openPullView(card) {
+    this.closePullView();
+    const sprite = await spriteFor(card).catch(() => null);
+    const canvas = renderCard(card, sprite, { omitSprite: !sprite });
+    canvas.className = "kp-pull-big";
+    const wrap = document.createElement("div");
+    wrap.className = "kp-pull-view";
+    wrap.innerHTML = `
+      <div class="kp-pull-view-inner">
+        <button type="button" class="kp-pull-view-close" aria-label="close">×</button>
+        <div class="kp-pull-view-card"></div>
+        <div class="kp-pull-view-meta">
+          <strong>${card.name || ""}</strong>
+          <span>${RARITY_LABEL[card.rarity] || ""}${card.variant ? ` · ${card.variant.label} FORM` : ""}${card.shiny ? " · SHINY ✦" : ""}</span>
+          ${card.variant ? `<span class="kp-pull-view-note">${card.variant.note}</span>` : ""}
+          <span>${(FINISH_TAG[card.finish] || "").replace(/^ · /, "").toLowerCase() || "standard"} finish</span>
+        </div>
+      </div>
+    `;
+    wrap.querySelector(".kp-pull-view-card").appendChild(canvas);
+    wrap.addEventListener("click", (e) => {
+      if (e.target === wrap || e.target.closest(".kp-pull-view-close")) this.closePullView();
+    });
+    this.container.appendChild(wrap);
+    this.pullView = wrap;
+  }
+
+  closePullView() {
+    if (this.pullView) {
+      this.pullView.remove();
+      this.pullView = null;
+    }
   }
 
   renderBinder() {

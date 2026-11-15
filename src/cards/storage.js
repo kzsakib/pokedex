@@ -14,7 +14,7 @@ function snapshot(card) {
     level: card.level, hp: card.hp, rarity: card.rarity, shiny: card.shiny,
     moves: card.moves, weakness: card.weakness, resistance: card.resistance,
     retreat: card.retreat, height: card.height, weight: card.weight, finish: card.finish,
-    variant: card.variant ? { key: card.variant.key, label: card.variant.label, tcg: card.variant.tcg, note: card.variant.note } : null,
+    variant: card.variant ? { key: card.variant.key, label: card.variant.label, tcg: card.variant.tcg, note: card.variant.note, hueMap: card.variant.hueMap } : null,
   };
 }
 

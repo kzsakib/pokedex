@@ -664,3 +664,112 @@
 .kp-caption-chroma {
   color: #c9a6ff;
 }
+
+/* ---------- enlarged pull view ---------- */
+.kp-pull-view {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 8, 24, 0.94);
+  padding: 18px;
+}
+
+.kp-pull-view-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.kp-pull-big {
+  width: min(62vw, 300px);
+  height: auto;
+  image-rendering: pixelated;
+  border: 3px solid #3a3350;
+  background: #0d0b1e;
+  box-shadow: 10px 12px 0 rgba(0, 0, 0, 0.45);
+}
+
+.kp-pull-view-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  color: #cfc7b4;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  max-width: 300px;
+}
+
+.kp-pull-view-meta strong {
+  color: #ffd76a;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+}
+
+.kp-pull-view-note {
+  color: #c9a6ff;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 11px;
+}
+
+.kp-pull-view-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  line-height: 1;
+  font-size: 18px;
+  color: #efe6cf;
+  background: #17142c;
+  border: 2px solid #3a3350;
+  cursor: pointer;
+}
+
+.kp-pull-cell {
+  cursor: pointer;
+}
+
+.kp-pull-cell:focus-visible {
+  outline: 3px solid #ffd76a;
+  outline-offset: 2px;
+}
+
+/* ---------- typed pokédex entry ---------- */
+.kp-entry {
+  min-height: 2.6em;
+  max-width: 46ch;
+  margin: 10px auto 0;
+  padding: 0 12px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: #b9b09a;
+  text-align: center;
+}
+
+.kp-entry::after {
+  content: "▌";
+  color: #ffd76a;
+  animation: kp-caret 0.8s steps(2, end) infinite;
+}
+
+.kp-entry--chroma {
+  color: #c9a6ff;
+}
+
+@keyframes kp-caret {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}

@@ -21,6 +21,8 @@ const TYPE_MAP = {
   rock: "Fighting",
 };
 
+import { hueLabel } from "./lore.js";
+
 export const RARITY_ORDER = { common: 0, uncommon: 1, rare: 2, holo: 3, chroma: 4, legend: 5 };
 export const RARITY_LABEL = { common: "COMMON", uncommon: "UNCOMMON", rare: "RARE", holo: "HOLO RARE", legend: "LEGEND", chroma: "CHROMA" };
 export const RARITY_MARK = { common: "●", uncommon: "◆", rare: "★", holo: "★", legend: "★" };
@@ -40,26 +42,21 @@ const ALL_TYPES = ["Fire", "Water", "Grass", "Lightning", "Psychic", "Fighting",
 
 const STATUS = ["HEADS: PARALYZED", "HEADS: ASLEEP", "HEADS: CONFUSED", "POISONED"];
 
-/* Chroma forms: the same pokemon painted with a different palette, and a typing
-   to match. Every pack carries two of them. */
-const CHROMA = [
-  { key: "ashen", label: "ASHEN", tcg: "Psychic", sat: 0.12, light: 1.2,
-    note: "storage accident: every pigment bleached to grey" },
-  { key: "ember", label: "EMBER", tcg: "Fire", targetHue: 18, hueMix: 0.72, sat: 1.2,
-    note: "the colours never cooled after hatching" },
-  { key: "glacial", label: "GLACIAL", tcg: "Water", targetHue: 200, hueMix: 0.78, sat: 0.95, light: 1.12,
-    note: "frozen mid-shift, blue right through the shell" },
-  { key: "toxic", label: "TOXIC", tcg: "Grass", targetHue: 96, hueMix: 0.7, sat: 1.35,
-    note: "a lab spill soaked into every plate" },
-  { key: "charged", label: "CHARGED", tcg: "Lightning", targetHue: 50, hueMix: 0.62, sat: 1.45, light: 1.14,
-    note: "static clings to the palette and will not let go" },
-  { key: "void", label: "VOID", tcg: "Psychic", invert: true,
-    note: "light falls through it the wrong way round" },
-  { key: "gilded", label: "GILDED", tcg: "Colorless", targetHue: 44, hueMix: 0.85, sat: 1.25, light: 1.06,
-    note: "plated in something that is not quite gold" },
-  { key: "neon", label: "NEON", tcg: "Colorless", sat: 2.2, light: 1.16,
-    note: "overexposed until only the brightest colours survive" },
-];
+/* Chroma forms get a palette invented at pack time: the twelve hue sectors are
+   shuffled and re-pointed, while saturation and lightness stay exactly as they
+   were, so only the colours move. */
+function randomHueMap(rng) {
+  const targets = [...Array(12).keys()];
+  for (let i = targets.length - 1; i > 0; i -= 1) {
+    const j = rng.int(0, i);
+    [targets[i], targets[j]] = [targets[j], targets[i]];
+  }
+  const map = {};
+  targets.forEach((target, source) => {
+    map[source] = (target * 30 + rng.int(0, 15)) % 360;
+  });
+  return map;
+}
 
 export function tcgType(pokemon) {
   const slots = pokemon.types.map((t) => TYPE_MAP[t]).filter(Boolean);
@@ -84,11 +81,11 @@ export function buildPools(data) {
 const snap10 = (n) => Math.max(10, Math.round(n / 10) * 10);
 const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
 
-function chromaFor(rng, used) {
-  const pool = CHROMA.filter((v) => !used.has(v.key));
-  const pick = pool.length ? rng.pick(pool) : rng.pick(CHROMA);
-  used.add(pick.key);
-  return pick;
+function randomVariant(rng) {
+  const hueMap = randomHueMap(rng);
+  const tcg = rng.pick(ALL_TYPES);
+  const labelSource = rng.int(0, 11);
+  return { key: `hue-${rng.int(1000, 9999)}`, hueMap, tcg, labelSource, label: hueLabel(hueMap, labelSource), note: "" };
 }
 
 function rarityBonus(rarity) {
@@ -309,13 +306,12 @@ export function generatePack(data, seed, options = {}) {
   if (force === "shiny") slots[slots.length - 1].forceShiny = true;
 
   /* two of the five slots are chroma forms: same pokemon, re-rolled palette */
-  const chromaUsed = new Set();
   const cards = slots.map((slot, index) => {
     const shiny = slot.forceShiny || rng.chance(1 / 40);
-    const chroma = index < 2 ? chromaFor(rng, chromaUsed) : null;
+    const chroma = index < 2 ? randomVariant(rng) : null;
     const card = makeCard(rng, slot.mon, chroma ? "chroma" : slot.rarity, shiny, chroma ? { tcg: chroma.tcg } : {});
     if (chroma) {
-      card.variant = { ...chroma }; /* keep the palette params: the renderer needs them */
+      card.variant = { ...chroma }; /* the hue map rides along: the sprite needs it */
       card.finish = rollFinish(rng, PREMIUM);
     }
     card.slot = index;

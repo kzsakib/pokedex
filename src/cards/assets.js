@@ -162,6 +162,31 @@ function hslToRgb(h, s, l) {
   return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
 }
 
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/* Multi-stop colour ramp: one sprite can carry several distinct colours at once. */
+function rampColor(stops, t) {
+  const x = Math.min(1, Math.max(0, t));
+  for (let i = 0; i < stops.length - 1; i += 1) {
+    const [t0, c0] = stops[i];
+    const [t1, c1] = stops[i + 1];
+    if (x <= t1 || i === stops.length - 2) {
+      const k = t1 === t0 ? 0 : (x - t0) / (t1 - t0);
+      const a = hexToRgb(c0);
+      const b = hexToRgb(c1);
+      return [
+        Math.round(a[0] + (b[0] - a[0]) * k),
+        Math.round(a[1] + (b[1] - a[1]) * k),
+        Math.round(a[2] + (b[2] - a[2]) * k),
+      ];
+    }
+  }
+  return hexToRgb(stops[stops.length - 1][1]);
+}
+
 /* Repaint a sprite with a shifted palette. Every pixel keeps its own lightness,
    so the pokemon's shapes survive while its colours are replaced wholesale. */
 function recolorSprite(base, variant) {
@@ -190,6 +215,11 @@ function recolorSprite(base, variant) {
       else h = (r - g) / diff + 4;
       h *= 60;
     }
+    if (variant.hueMap) {
+      const sector = Math.floor(h / 30) % 12;
+      const target = variant.hueMap[sector];
+      if (typeof target === "number") h = (target + (h % 30)) % 360;
+    }
     if (typeof variant.targetHue === "number") {
       const delta = ((variant.targetHue - h + 540) % 360) - 180;
       h = (h + delta * (variant.hueMix ?? 0.7) + 360) % 360;
@@ -197,10 +227,15 @@ function recolorSprite(base, variant) {
     sat = Math.min(1, sat * (variant.sat ?? 1));
     let nl = variant.invert ? 1 - l : l;
     nl = Math.min(1, Math.max(0, nl * (variant.light ?? 1)));
-    const [nr, ng, nb] = hslToRgb(h, sat, nl);
-    data[i] = nr;
-    data[i + 1] = ng;
-    data[i + 2] = nb;
+    let out = hslToRgb(h, sat, nl);
+    if (variant.ramp) out = rampColor(variant.ramp, nl);
+    if (variant.swap) {
+      const v = [out[0], out[1], out[2]];
+      out = [v[variant.swap[0]], v[variant.swap[1]], v[variant.swap[2]]];
+    }
+    data[i] = out[0];
+    data[i + 1] = out[1];
+    data[i + 2] = out[2];
   }
   ctx.putImageData(image, 0, 0);
   return canvas;
