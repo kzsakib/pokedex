@@ -136,7 +136,7 @@ void main() {
       vec2 cell = floor(vUv * vec2(30.0, 44.0));
       float h = fract(sin(dot(cell, vec2(78.233, 12.9898)) + floor(t * 3.0)) * 43758.5453);
       if (h > 0.972) col = mix(col, vec3(1.0, 0.86, 0.38), 0.8);
-    } else {
+    } else if (uEffect < 8.5) {
       /* 8 crystal: angular facets with a cool seam and a violet sweep */
       float f = abs(fract((vUv.x + vUv.y * 0.7) * 3.0 + uTilt.x * 0.5 - t * 0.02) - 0.5);
       col = mix(col, vec3(0.62, 0.88, 1.0), smoothstep(0.42, 0.5, f) * 0.22);
@@ -144,6 +144,47 @@ void main() {
       col = mix(col, vec3(0.86, 0.96, 1.0), smoothstep(0.46, 0.5, g2) * 0.12);
       float s = fract((vUv.x - vUv.y) * 0.5 + t * 0.05 + uTilt.x * 0.3);
       col = mix(col, vec3(0.72, 0.52, 1.0), smoothstep(0.8, 1.0, s) * 0.14);
+    } else if (uEffect < 9.5) {
+      /* 9 lightning: forked bolts cracking down the card */
+      float bolt = fract(vUv.x * 2.0 + sin(vUv.y * 18.0 + t * 1.6) * 0.12 + uTilt.x * 0.3);
+      float core = smoothstep(0.02, 0.0, abs(bolt - 0.5));
+      col = mix(col, vec3(0.86, 0.94, 1.0), core * 0.75);
+      col = mix(col, vec3(0.55, 0.72, 1.0), smoothstep(0.1, 0.0, abs(bolt - 0.5)) * 0.22);
+      float flash = step(0.72, fract(t * 0.7 + uTilt.y * 0.4));
+      col = mix(col, vec3(1.0), flash * core * 0.5);
+    } else if (uEffect < 10.5) {
+      /* 10 bubble: soft rings drifting up over a cool wash */
+      col = mix(col, vec3(0.42, 0.78, 0.92), 0.10);
+      vec2 g = fract(vUv * vec2(9.0, 13.0)) - 0.5;
+      vec2 cell = floor(vUv * vec2(9.0, 13.0));
+      float h = fract(sin(dot(cell, vec2(41.7, 17.3)) + floor(t * 0.8)) * 3847.31);
+      float r = length(g) + (h - 0.5) * 0.1;
+      float ring = smoothstep(0.34, 0.3, r) * smoothstep(0.18, 0.24, r);
+      col = mix(col, vec3(0.82, 0.96, 1.0), ring * 0.45);
+      float glint = smoothstep(0.09, 0.03, length(g - vec2(-0.12, -0.14)));
+      col = mix(col, vec3(1.0), glint * 0.5);
+    } else if (uEffect < 11.5) {
+      /* 11 grid: wireframe lattice that slides against the tilt */
+      float gx = abs(fract(vUv.x * 11.0 + uTilt.x * 0.6) - 0.5);
+      float gy = abs(fract(vUv.y * 15.0 - uTilt.y * 0.5) - 0.5);
+      float line = max(smoothstep(0.44, 0.5, gx), smoothstep(0.44, 0.5, gy));
+      col = mix(col, vec3(0.30, 0.92, 0.84), line * 0.30);
+      float scan = smoothstep(0.90, 1.0, fract(vUv.y * 1.4 - t * 0.22));
+      col = mix(col, vec3(0.72, 1.0, 0.96), scan * 0.18);
+    } else {
+      /* 12 confetti: coloured flecks tumbling across the face */
+      vec2 cell = floor(vUv * vec2(34.0, 48.0));
+      float h = fract(sin(dot(cell, vec2(23.1, 71.7))) * 9137.13);
+      float life = fract(h * 7.0 + t * 0.22);
+      if (h > 0.90 && life > 0.15 && life < 0.85) {
+        vec3 c1 = vec3(1.0, 0.42, 0.52);
+        vec3 c2 = vec3(1.0, 0.86, 0.34);
+        vec3 c3 = vec3(0.46, 0.72, 1.0);
+        vec3 c4 = vec3(0.58, 1.0, 0.62);
+        vec3 pick = h > 0.975 ? c1 : h > 0.95 ? c2 : h > 0.925 ? c3 : c4;
+        col = mix(col, pick, 0.6);
+      }
+      col = mix(col, vec3(1.0, 0.95, 0.92), 0.03);
     }
   }
 

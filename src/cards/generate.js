@@ -168,6 +168,12 @@ function rollFinish(rng, table) {
   return table[table.length - 1][0];
 }
 
+/* every premium finish, so legend cards never repeat the same look twice in a row */
+const PREMIUM = [
+  ["prism", 0.16], ["gold", 0.14], ["star", 0.13], ["ember", 0.1], ["crystal", 0.1],
+  ["lightning", 0.1], ["bubble", 0.06], ["grid", 0.1], ["confetti", 0.11],
+];
+
 function weightedInt(rng, table) {
   let r = rng.random();
   for (const [n, w] of table) {
@@ -179,10 +185,10 @@ function weightedInt(rng, table) {
 
 /* a pack can carry several foil cards; the better the top pull, the more of them */
 function promoFinish(rng, rarity) {
-  if (rarity === "legend") return rollFinish(rng, [["prism", 0.3], ["gold", 0.3], ["star", 0.4]]);
-  if (rarity === "holo") return rollFinish(rng, [["holo", 0.4], ["crystal", 0.6]]);
-  if (rarity === "rare") return rollFinish(rng, [["foil", 0.4], ["ember", 0.3], ["crystal", 0.3]]);
-  return rollFinish(rng, [["reverse", 0.5], ["ember", 0.25], ["crystal", 0.25]]);
+  if (rarity === "legend") return rollFinish(rng, PREMIUM);
+  if (rarity === "holo") return rollFinish(rng, [["holo", 0.35], ["crystal", 0.25], ["lightning", 0.2], ["grid", 0.2]]);
+  if (rarity === "rare") return rollFinish(rng, [["foil", 0.3], ["ember", 0.2], ["confetti", 0.2], ["grid", 0.3]]);
+  return rollFinish(rng, [["reverse", 0.35], ["ember", 0.15], ["crystal", 0.2], ["bubble", 0.15], ["confetti", 0.15]]);
 }
 
 function spreadFoils(rng, cards) {
@@ -216,12 +222,12 @@ function makeCard(rng, pokemon, rarity, shiny) {
   const finish = shiny
     ? "shiny"
     : rarity === "legend"
-    ? rollFinish(rng, [["prism", 0.28], ["gold", 0.22], ["star", 0.2], ["ember", 0.15], ["crystal", 0.15]])
+    ? rollFinish(rng, PREMIUM)
     : rarity === "holo"
-    ? (rng.chance(0.3) ? "crystal" : "holo")
+    ? rollFinish(rng, [["holo", 0.45], ["crystal", 0.2], ["lightning", 0.15], ["grid", 0.2]])
     : rarity === "rare"
-    ? rollFinish(rng, [["foil", 0.38], ["ember", 0.12], ["plain", 0.5]])
-    : rollFinish(rng, [["reverse", 0.2], ["crystal", 0.05], ["ember", 0.05], ["plain", 0.7]]);
+    ? rollFinish(rng, [["foil", 0.3], ["ember", 0.1], ["confetti", 0.08], ["grid", 0.08], ["plain", 0.44]])
+    : rollFinish(rng, [["reverse", 0.16], ["crystal", 0.04], ["ember", 0.05], ["bubble", 0.05], ["plain", 0.7]]);
   return {
     ...pokemon,
     tcg,

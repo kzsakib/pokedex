@@ -10,7 +10,7 @@ import { renderCard } from "./cardRenderer.js";
 import { loadTypeIcons } from "./icons.js";
 import { renderPackFront, renderPackBack, renderStrip, VARIANTS } from "./packArt.js";
 
-const FINISH_TAG = { reverse: " · REVERSE", holo: "", prism: " · PRISM", gold: " · GOLD", foil: " · FOIL", star: " · STARLIGHT", ember: " · EMBER", crystal: " · CRYSTAL", shiny: "" };
+const FINISH_TAG = { reverse: " · REVERSE", holo: "", prism: " · PRISM", gold: " · GOLD", foil: " · FOIL", star: " · STARLIGHT", ember: " · EMBER", crystal: " · CRYSTAL", lightning: " · STORM", bubble: " · AQUA", grid: " · CIRCUIT", confetti: " · FESTIVAL", shiny: "" };
 import { freshSeed } from "./rng.js";
 import { KantoAudio } from "./audio.js";
 import { loadBinder, recordPack, resetBinder } from "./storage.js";
@@ -81,10 +81,19 @@ export class KantoPacksGame {
 
   async boot() {
     this.hint("loading card data…");
+    this.container.classList.add("kp-loading");
+    this.loaderText("BOOTING THE REGISTRY");
+    const minBoot = new Promise((resolve) => setTimeout(resolve, 900));
     this.data = await loadGen1();
+    this.loaderText("LOADING SPRITES");
     await preloadSprites((done) => {
-      if (done % 25 === 0) this.hint(`loading sprites… ${Math.round((done / 151) * 100)}%`);
+      const pct = Math.min(100, Math.round((done / 151) * 100));
+      this.loaderProgress(pct);
+      if (done % 25 === 0) this.hint(`loading sprites… ${pct}%`);
     });
+    await minBoot;
+    this.container.classList.remove("kp-loading");
+    this.resetLoader();
     this.ready = true;
     this.hint("drag to rotate · swipe the dotted line to slice");
     this.newPack();
@@ -210,6 +219,27 @@ export class KantoPacksGame {
     });
   }
 
+  loaderText(text) {
+    const el = this.container.querySelector(".kp-loader-text");
+    if (el) el.textContent = text;
+  }
+
+  loaderProgress(pct) {
+    const bar = this.container.querySelector(".kp-loader-bar i");
+    if (!bar) return;
+    bar.style.animation = "none";
+    bar.style.width = `${pct}%`;
+  }
+
+  resetLoader() {
+    const bar = this.container.querySelector(".kp-loader-bar i");
+    if (bar) {
+      bar.style.animation = "";
+      bar.style.width = "";
+    }
+    this.loaderText("SEALING THE PACK");
+  }
+
   hint(text) {
     if (this.el) this.el.hint.textContent = text;
   }
@@ -288,6 +318,7 @@ export class KantoPacksGame {
 
   async generate() {
     this.container.classList.add("kp-loading");
+    this.resetLoader();
     const minShow = new Promise((resolve) => setTimeout(resolve, 1100));
     await loadTypeIcons();
     const pack = generatePack(this.data, this.seed, { force: this.force });

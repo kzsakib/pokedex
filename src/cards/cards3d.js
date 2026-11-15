@@ -1,5 +1,5 @@
 /* Card meshes: crisp front/back planes, stepped flip, tilt and holo shimmer. */
-const THICK = 18;   /* real thickness so the card reads as an object, not a decal */
+const THICK = 7;    /* real thickness so the card reads as an object, not a decal */
 const SPRITE_Z = 6;  /* how far the art floats above the face */
 import * as THREE from "three";
 import { makeMaterial } from "./scene.js";
@@ -32,6 +32,10 @@ export function createCardMesh({ front, sprite, mask, rarity, finish = "plain", 
     finish === "star" ? 6 :
     finish === "ember" ? 7 :
     finish === "crystal" ? 8 :
+    finish === "lightning" ? 9 :
+    finish === "bubble" ? 10 :
+    finish === "grid" ? 11 :
+    finish === "confetti" ? 12 :
     finish === "shiny" ? 3 : 0;
   const density = holoDensityFor(rarity);
 
@@ -82,6 +86,13 @@ export function createCardMesh({ front, sprite, mask, rarity, finish = "plain", 
   ]);
   slab.position.z = -THICK / 2 - 1; /* keep the box behind the face: no z-fighting */
   group.add(slab);
+
+  /* the card's back: its own plane, just proud of the box's rear face */
+  const backMat = new THREE.MeshBasicMaterial({ map: cardBackTexture(), transparent: false });
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W - 1, CARD_H - 1), backMat);
+  back.rotation.y = Math.PI;
+  back.position.z = -THICK - 1.5; /* clear of the box rear face */
+  group.add(back);
 
   /* dithered contact shadow under the card */
   const shadowMat = new THREE.MeshBasicMaterial({
