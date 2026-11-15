@@ -7,8 +7,8 @@
   position: relative;
   width: 100%;
   overflow: hidden;
-  min-height: 360px;
-  height: clamp(360px, 56vw, 720px);
+  min-height: 430px;
+  height: clamp(430px, 66vw, 820px);
   background: #14122a;
   overflow: hidden;
   display: grid;
@@ -688,7 +688,7 @@
 }
 
 .kp-pull-big {
-  width: min(62vw, 300px);
+  width: min(74vw, 380px);
   height: auto;
   image-rendering: pixelated;
   border: 3px solid #3a3350;
@@ -719,7 +719,20 @@
   color: #c9a6ff;
   text-transform: none;
   letter-spacing: 0.02em;
-  font-size: 11px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.kp-pull-view-entry {
+  color: #efe6cf;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-size: 13px;
+  line-height: 1.55;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 2px solid #3a3350;
 }
 
 .kp-pull-view-close {
@@ -753,13 +766,13 @@
   bottom: 68px;
   z-index: 5;
   min-height: 2.6em;
-  max-width: 44ch;
+  max-width: 52ch;
   margin: 0 auto;
   padding: 8px 10px;
   background: rgba(8, 6, 20, 0.82);
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: 13.5px;
+  line-height: 1.55;
   letter-spacing: 0.02em;
   color: #efe6cf;
   text-align: center;

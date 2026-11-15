@@ -877,8 +877,12 @@ export class KantoPacksGame {
         <div class="kp-pull-view-meta">
           <strong>${card.name || ""}</strong>
           <span>${RARITY_LABEL[card.rarity] || ""}${card.variant ? ` · ${card.variant.label} FORM` : ""}${card.shiny ? " · SHINY ✦" : ""}</span>
-          ${card.variant ? `<span class="kp-pull-view-note">${card.variant.note}</span>` : ""}
+          ${card.variant ? `<span class="kp-pull-view-note">${card.variant.label} FORM</span>` : ""}
           <span>${(FINISH_TAG[card.finish] || "").replace(/^ · /, "").toLowerCase() || "standard"} finish</span>
+          ${(() => {
+            const line = (card.variant && card.variant.note) || card.flavour || "";
+            return line ? `<span class="kp-pull-view-entry">${line}</span>` : "";
+          })()}
         </div>
       </div>
     `;
