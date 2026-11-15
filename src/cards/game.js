@@ -6,7 +6,7 @@ import { createCardMesh } from "./cards3d.js";
 import { makeHoloMask } from "./holo.js";
 import { loadGen1, preloadSprites, loadSprite, spriteFor } from "./assets.js";
 import { generatePack, RARITY_LABEL } from "./generate.js";
-import { renderCard, renderBackdropLayer } from "./cardRenderer.js";
+import { renderCard } from "./cardRenderer.js";
 import { loadTypeIcons } from "./icons.js";
 import { renderPackFront, renderPackBack, renderStrip, VARIANTS } from "./packArt.js";
 
@@ -277,17 +277,18 @@ export class KantoPacksGame {
 
     for (const card of this.cards) {
       const sprite = await spriteFor(card);
-      const front = renderCard(card, sprite, { omitArt: true });
-      const backdrop = renderBackdropLayer(card);
+      const front = renderCard(card, sprite, { omitSprite: true });
       const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
-      const mesh = createCardMesh({ front, sprite, backdrop, mask, rarity: card.rarity, finish: card.finish });
-      mesh.group.position.set(0, 40, 60 + this.meshes.length * 0.6);
+      const mesh = createCardMesh({ front, sprite, mask, rarity: card.rarity, finish: card.finish });
+      mesh.group.position.set(0, 40, 70 + this.meshes.length * 0.6);
       mesh.group.scale.setScalar(1);
       mesh.group.visible = false;
       this.meshes.push(mesh);
       this.scene.root.add(mesh.group);
     }
 
+    /* the pack has served its purpose once the cards exist */
+    if (this.pack) this.pack.group.visible = false;
     this.container.classList.remove("kp-loading");
 
     /* light beam hints at the best pull */
@@ -827,8 +828,6 @@ export class KantoPacksGame {
         }
       });
 
-      this.tilt.x = lerp(this.tilt.x, this.tilt.targetX, 0.12);
-      this.tilt.y = lerp(this.tilt.y, this.tilt.targetY, 0.12);
       if (this.flipping) {
         this.flip = clamp(this.flip + dt / 0.34, 0, 1);
         if (this.flip >= 1) this.finishReveal();
@@ -837,6 +836,10 @@ export class KantoPacksGame {
         meshes[this.revealIndex].setFlipWithTilt(0, this.tilt.x, this.tilt.y);
       }
     }
+
+    /* tilt eases every frame so hover works in the summary too */
+    this.tilt.x = lerp(this.tilt.x, this.tilt.targetX, 0.12);
+    this.tilt.y = lerp(this.tilt.y, this.tilt.targetY, 0.12);
 
     if (this.holdBeforeSummary && this.time > this.holdBeforeSummary) {
       this.holdBeforeSummary = 0;

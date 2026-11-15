@@ -19,7 +19,7 @@ export function cardBackTexture() {
   return sharedBack;
 }
 
-export function createCardMesh({ front, sprite, backdrop, mask, rarity, finish = "plain", dim = 1 }) {
+export function createCardMesh({ front, sprite, mask, rarity, finish = "plain", dim = 1 }) {
   const group = new THREE.Group();
   const effect =
     finish === "reverse" ? 1 :
@@ -31,7 +31,7 @@ export function createCardMesh({ front, sprite, backdrop, mask, rarity, finish =
     finish === "shiny" ? 3 : 0;
   const density = holoDensityFor(rarity);
 
-  /* frame: opaque card face with a transparent hole over the art window */
+  /* opaque card face: frame, panel, text and the baked backdrop */
   const frontMat = makeMaterial({
     map: texture(front),
     back: cardBackTexture(),
@@ -41,43 +41,19 @@ export function createCardMesh({ front, sprite, backdrop, mask, rarity, finish =
     effect,
     dim,
     flat: true,
-    opaque: false,
+    opaque: true,
   });
-  frontMat.transparent = true;
-  frontMat.depthWrite = false;
 
   const face = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W, CARD_H), frontMat);
   face.position.z = 0;
-  face.renderOrder = 2;
   group.add(face);
 
-  /* backdrop sits behind the hole */
-  let backdropMesh = null;
-  if (backdrop) {
-    const backMat = makeMaterial({
-      map: texture(backdrop),
-      dim,
-      flat: true,
-      opaque: true,
-    });
-    backdropMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(ART.inner.w, ART.inner.h),
-      backMat
-    );
-    backdropMesh.position.set(
-      ART.inner.x + ART.inner.w / 2 - CARD_W / 2,
-      CARD_H / 2 - (ART.inner.y + ART.inner.h / 2),
-      -2
-    );
-    backdropMesh.renderOrder = 1;
-    group.add(backdropMesh);
-  }
-
-  /* sprite floats in front of the frame */
+  /* sprite floats in front so tilting separates it from the card */
   let spriteMesh = null;
   if (sprite) {
     const spriteMat = makeMaterial({ map: texture(renderSpriteLayer(null, sprite)), dim, flat: true, opaque: false });
     spriteMat.transparent = true;
+    spriteMat.depthWrite = false;
     spriteMesh = new THREE.Mesh(new THREE.PlaneGeometry(ART.inner.w, ART.inner.h), spriteMat);
     spriteMesh.position.set(
       ART.inner.x + ART.inner.w / 2 - CARD_W / 2,
@@ -89,10 +65,9 @@ export function createCardMesh({ front, sprite, backdrop, mask, rarity, finish =
   }
 
   /* hard slab for the card's thickness */
-  const slabMat = new THREE.MeshBasicMaterial({ color: 0x0d0b1e, side: THREE.DoubleSide });
-  const slab = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W - 2, CARD_H - 2), slabMat);
+  const slabMat = new THREE.MeshBasicMaterial({ color: 0x0d0b1e });
+  const slab = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W - 1.5, CARD_H - 1.5), slabMat);
   slab.position.z = -5;
-  slab.renderOrder = 0;
   group.add(slab);
 
   /* dithered contact shadow under the card */
@@ -100,27 +75,12 @@ export function createCardMesh({ front, sprite, backdrop, mask, rarity, finish =
     map: texture(renderContactShadow()),
     transparent: true,
     depthWrite: false,
+    depthTest: false,
   });
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(140, 28), shadowMat);
   shadow.position.set(0, -CARD_H / 2 - 8, -8);
   shadow.renderOrder = -1;
   group.add(shadow);
-
-  /* card back, shown once the flip passes halfway */
-  const backPlane = new THREE.Mesh(
-    new THREE.PlaneGeometry(CARD_W, CARD_H),
-    new THREE.MeshBasicMaterial({ map: cardBackTexture() })
-  );
-  backPlane.position.z = -1;
-  backPlane.visible = false;
-  group.add(backPlane);
-
-  const frontLayers = [face, backdropMesh, spriteMesh, slab, shadow].filter(Boolean);
-
-  function showFront(on) {
-    frontLayers.forEach((m) => { m.visible = on; });
-    backPlane.visible = !on;
-  }
 
   return {
     group,
@@ -130,13 +90,12 @@ export function createCardMesh({ front, sprite, backdrop, mask, rarity, finish =
     setFlip(t) {
       group.rotation.y = Math.PI * t;
       group.position.z = Math.sin(Math.PI * t) * 8;
-      showFront(t < 0.5);
+      if (spriteMesh) spriteMesh.visible = t < 0.5;
     },
     setTilt(x, y) {
       group.rotation.y = x;
       group.rotation.x = y;
       frontMat.uniforms.uTilt.value.set(x, y);
-      /* contact shadow slides opposite the lean and tightens as the card lifts */
       shadow.position.x = -x * 90;
       shadow.position.y = -CARD_H / 2 - 8 + y * 40;
       const k = 1 - Math.min(0.16, (Math.abs(x) + Math.abs(y)) * 0.5);
@@ -148,7 +107,7 @@ export function createCardMesh({ front, sprite, backdrop, mask, rarity, finish =
       group.rotation.x = y;
       group.position.z = Math.sin(Math.PI * flip) * 8;
       frontMat.uniforms.uTilt.value.set(x, y);
-      showFront(flip < 0.5);
+      if (spriteMesh) spriteMesh.visible = flip < 0.5;
     },
     setDim(value) {
       frontMat.uniforms.uDim.value = value;
