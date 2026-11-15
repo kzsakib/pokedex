@@ -168,6 +168,40 @@ function rollFinish(rng, table) {
   return table[table.length - 1][0];
 }
 
+function weightedInt(rng, table) {
+  let r = rng.random();
+  for (const [n, w] of table) {
+    if (r < w) return n;
+    r -= w;
+  }
+  return table[table.length - 1][0];
+}
+
+/* a pack can carry several foil cards; the better the top pull, the more of them */
+function promoFinish(rng, rarity) {
+  if (rarity === "legend") return rollFinish(rng, [["prism", 0.3], ["gold", 0.3], ["star", 0.4]]);
+  if (rarity === "holo") return rollFinish(rng, [["holo", 0.4], ["crystal", 0.6]]);
+  if (rarity === "rare") return rollFinish(rng, [["foil", 0.4], ["ember", 0.3], ["crystal", 0.3]]);
+  return rollFinish(rng, [["reverse", 0.5], ["ember", 0.25], ["crystal", 0.25]]);
+}
+
+function spreadFoils(rng, cards) {
+  const best = cards.reduce((acc, c) => (RARITY_ORDER[c.rarity] > RARITY_ORDER[acc] ? c.rarity : acc), "common");
+  const target =
+    best === "legend" ? weightedInt(rng, [[3, 0.3], [4, 0.4], [5, 0.3]])
+    : best === "holo" ? weightedInt(rng, [[2, 0.45], [3, 0.35], [4, 0.2]])
+    : weightedInt(rng, [[1, 0.35], [2, 0.45], [3, 0.2]]);
+  let have = cards.filter((c) => c.finish !== "plain").length;
+  const order = [...cards].sort((a, b) => RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity]);
+  for (const card of order) {
+    if (have >= target) break;
+    if (card.finish !== "plain") continue;
+    card.finish = promoFinish(rng, card.rarity);
+    have += 1;
+  }
+  return cards;
+}
+
 function makeCard(rng, pokemon, rarity, shiny) {
   const tcg = tcgType(pokemon);
   const stage = Math.min(2, pokemon.stage || 0);
@@ -246,6 +280,7 @@ export function generatePack(data, seed, options = {}) {
     return card;
   });
 
+  spreadFoils(rng, cards);
   cards.sort((a, b) => {
     const r = RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity];
     if (r !== 0) return r;

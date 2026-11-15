@@ -129,11 +129,24 @@ export class KantoPacksGame {
           <button type="button" class="kp-btn kp-close-help">close</button>
         </div>
       </div>
+      <div class="kp-loader" aria-hidden="true">
+        <div class="kp-loader-pack">
+          <span class="kp-loader-band"></span>
+          <span class="kp-loader-pip"></span>
+        </div>
+        <div class="kp-loader-bar"><i></i></div>
+        <p class="kp-loader-text">SEALING THE PACK</p>
+      </div>
       <div class="kp-dialog kp-binder" role="dialog" aria-modal="true" aria-labelledby="kp-binder-title" hidden>
         <div class="kp-dialog-inner kp-binder-inner">
           <h2 id="kp-binder-title">BINDER</h2>
           <div class="kp-binder-stats"></div>
+          <nav class="kp-binder-tabs" role="tablist">
+            <button type="button" class="kp-tab is-on" data-tab="species" role="tab">species</button>
+            <button type="button" class="kp-tab" data-tab="cards" role="tab">my cards</button>
+          </nav>
           <div class="kp-binder-grid"></div>
+          <div class="kp-binder-pulls" hidden></div>
           <div class="kp-binder-foot">
             <button type="button" class="kp-btn kp-close-binder">close</button>
             <button type="button" class="kp-btn kp-reset">reset binder</button>
@@ -160,6 +173,8 @@ export class KantoPacksGame {
       binder: hud.querySelector(".kp-binder"),
       binderStats: hud.querySelector(".kp-binder-stats"),
       binderGrid: hud.querySelector(".kp-binder-grid"),
+      binderPulls: hud.querySelector(".kp-binder-pulls"),
+      binderTabs: [...hud.querySelectorAll(".kp-tab")],
     };
     this.el.packs.textContent = this.binder.packs;
     this.el.sound.textContent = this.audio.muted ? "sound off" : "sound on";
@@ -179,6 +194,12 @@ export class KantoPacksGame {
     });
     hud.querySelector(".kp-again").addEventListener("click", () => this.newPack());
     hud.querySelector(".kp-binder-btn").addEventListener("click", () => this.openBinder());
+    for (const tab of this.el.binderTabs) {
+      tab.addEventListener("click", () => {
+        this.binderTab = tab.dataset.tab;
+        this.renderBinder();
+      });
+    }
     hud.querySelector(".kp-close-binder").addEventListener("click", () => {
       this.el.binder.hidden = true;
     });
@@ -267,6 +288,7 @@ export class KantoPacksGame {
 
   async generate() {
     this.container.classList.add("kp-loading");
+    const minShow = new Promise((resolve) => setTimeout(resolve, 1100));
     await loadTypeIcons();
     const pack = generatePack(this.data, this.seed, { force: this.force });
     this.packData = pack;
@@ -288,6 +310,7 @@ export class KantoPacksGame {
 
     /* the pack has served its purpose once the cards exist */
     if (this.pack) this.pack.group.visible = false;
+    await minShow;
     this.container.classList.remove("kp-loading");
 
     /* light beam hints at the best pull */
@@ -422,8 +445,8 @@ export class KantoPacksGame {
         const rect = this.scene.canvas.getBoundingClientRect();
         const nx = clamp((e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2), -1, 1);
         const ny = clamp((e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2), -1, 1);
-        this.tilt.targetX = -nx * 0.4;
-        this.tilt.targetY = -ny * 0.26;
+        this.tilt.targetX = -nx * 0.44;
+        this.tilt.targetY = -ny * 0.3;
         return;
       }
       if (this.dragging) {
@@ -688,6 +711,44 @@ export class KantoPacksGame {
     this.audio.click();
   }
 
+  async renderBinderCards() {
+    const wrap = this.el.binderPulls;
+    if (!wrap) return;
+    const pulls = this.binder.pulls || [];
+    if (!pulls.length) {
+      wrap.innerHTML = `<p class="kp-binder-empty">nothing pulled yet — open a pack</p>`;
+      return;
+    }
+    const seen = new Set();
+    const list = [];
+    for (const entry of pulls) {
+      const card = entry.card || entry;
+      if (!card || !card.moves) continue;
+      const key = `${card.id}:${card.finish}:${card.shiny ? 1 : 0}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      list.push(card);
+      if (list.length >= 60) break;
+    }
+    wrap.innerHTML = `<p class="kp-binder-empty">developing film…</p>`;
+    const cells = [];
+    for (const card of list) {
+      const sprite = await spriteFor(card).catch(() => null);
+      if (!wrap.isConnected) return;
+      const canvas = renderCard(card, sprite, { omitSprite: !sprite });
+      canvas.className = "kp-pull";
+      const cell = document.createElement("figure");
+      cell.className = `kp-pull-cell kp-${card.rarity}`;
+      cell.appendChild(canvas);
+      const cap = document.createElement("figcaption");
+      cap.textContent = `${card.name || ""}${FINISH_TAG[card.finish] || ""}`;
+      cell.appendChild(cap);
+      cells.push(cell);
+    }
+    if (!wrap.isConnected) return;
+    wrap.replaceChildren(...cells);
+  }
+
   renderBinder() {
     const owned = this.binder.owned;
     const ownedCount = Object.keys(owned).length;
@@ -698,6 +759,14 @@ export class KantoPacksGame {
       <span><strong>${this.binder.shinies || 0}</strong> shiny pulls</span>
       <span>rarest <strong>${rarest ? `${rarest.name}${rarest.shiny ? " ✦" : ""}` : "—"}</strong></span>
     `;
+    const tab = this.binderTab || "species";
+    for (const button of this.el.binderTabs || []) button.classList.toggle("is-on", button.dataset.tab === tab);
+    if (this.el.binderGrid) this.el.binderGrid.hidden = tab !== "species";
+    if (this.el.binderPulls) this.el.binderPulls.hidden = tab !== "cards";
+    if (tab === "cards") {
+      this.renderBinderCards();
+      return;
+    }
     const base = import.meta.env.BASE_URL || "/";
     const cells = [];
     for (let id = 1; id <= 151; id += 1) {

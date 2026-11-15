@@ -4,7 +4,17 @@ const KEY = "kanto-packs-v1";
 export const RARITY_RANK = { common: 0, uncommon: 1, rare: 2, holo: 3, legend: 4 };
 
 function empty() {
-  return { packs: 0, owned: {}, rarest: null, shinies: 0 };
+  return { packs: 0, owned: {}, rarest: null, shinies: 0, pulls: [] };
+}
+
+/* just the fields the card renderer needs, so the binder stays small */
+function snapshot(card) {
+  return {
+    id: card.id, name: card.name, genus: card.genus, tcg: card.tcg, stage: card.stage,
+    level: card.level, hp: card.hp, rarity: card.rarity, shiny: card.shiny,
+    moves: card.moves, weakness: card.weakness, resistance: card.resistance,
+    retreat: card.retreat, height: card.height, weight: card.weight, finish: card.finish,
+  };
 }
 
 export function loadBinder() {
@@ -18,6 +28,7 @@ export function loadBinder() {
       owned: parsed.owned && typeof parsed.owned === "object" ? parsed.owned : {},
       rarest: parsed.rarest || null,
       shinies: parsed.shinies || 0,
+      pulls: Array.isArray(parsed.pulls) ? parsed.pulls : [],
     };
   } catch {
     return empty();
@@ -34,6 +45,7 @@ export function saveBinder(binder) {
 
 export function recordPack(binder, cards) {
   binder.packs += 1;
+  binder.pulls = binder.pulls || [];
   for (const card of cards) {
     const id = String(card.id);
     const current = binder.owned[id];
@@ -51,11 +63,13 @@ export function recordPack(binder, cards) {
     } else {
       current.count = (current.count || 0) + 1;
     }
+    binder.pulls.unshift({ card: snapshot(card), at: Date.now() });
     if (card.shiny) binder.shinies += 1;
     if (!binder.rarest || RARITY_RANK[card.rarity] > RARITY_RANK[binder.rarest.rarity]) {
       binder.rarest = { id, name: card.name, rarity: card.rarity, shiny: card.shiny };
     }
   }
+  binder.pulls = binder.pulls.slice(0, 80);
   saveBinder(binder);
   return binder;
 }

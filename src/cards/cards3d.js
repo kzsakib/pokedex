@@ -1,4 +1,6 @@
 /* Card meshes: crisp front/back planes, stepped flip, tilt and holo shimmer. */
+const THICK = 18;   /* real thickness so the card reads as an object, not a decal */
+const SPRITE_Z = 6;  /* how far the art floats above the face */
 import * as THREE from "three";
 import { makeMaterial } from "./scene.js";
 import { holoDensityFor } from "./holo.js";
@@ -56,7 +58,7 @@ export function createCardMesh({ front, sprite, mask, rarity, finish = "plain", 
     const spriteMat = makeMaterial({ map: texture(renderSpriteLayer(null, sprite)), dim, flat: true, opaque: false });
     spriteMat.transparent = true;
     spriteMat.depthWrite = false;
-    spriteMesh = new THREE.Mesh(new THREE.PlaneGeometry(ART.inner.w, ART.inner.h), spriteMat);
+    spriteMesh = new THREE.Mesh(new THREE.PlaneGeometry(ART.inner.w - 6, ART.inner.h - 6), spriteMat);
     spriteMesh.position.set(
       ART.inner.x + ART.inner.w / 2 - CARD_W / 2,
       CARD_H / 2 - (ART.inner.y + ART.inner.h / 2),
@@ -66,10 +68,19 @@ export function createCardMesh({ front, sprite, mask, rarity, finish = "plain", 
     group.add(spriteMesh);
   }
 
-  /* hard slab for the card's thickness */
-  const slabMat = new THREE.MeshBasicMaterial({ color: 0x0d0b1e });
-  const slab = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W - 1.5, CARD_H - 1.5), slabMat);
-  slab.position.z = -5;
+  /* a real box core: cream paper edges lit top-left, dark rim bottom-right */
+  const coreMat = new THREE.MeshBasicMaterial({ color: 0x0d0b1e });
+  const edgeMat = new THREE.MeshBasicMaterial({ color: 0xd9cfb4 });
+  const rimMat = new THREE.MeshBasicMaterial({ color: 0x8c8471 });
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(CARD_W - 1, CARD_H - 1, THICK), [
+    edgeMat,  /* +x */
+    rimMat,   /* -x */
+    edgeMat,  /* +y */
+    rimMat,   /* -y */
+    coreMat,  /* +z, hidden behind the face */
+    coreMat,  /* -z */
+  ]);
+  slab.position.z = -THICK / 2 - 1; /* keep the box behind the face: no z-fighting */
   group.add(slab);
 
   /* dithered contact shadow under the card */
@@ -79,8 +90,8 @@ export function createCardMesh({ front, sprite, mask, rarity, finish = "plain", 
     depthWrite: false,
     depthTest: false,
   });
-  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(140, 28), shadowMat);
-  shadow.position.set(0, -CARD_H / 2 - 8, -8);
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(152, 32), shadowMat);
+  shadow.position.set(0, -CARD_H / 2 - 10, -THICK - 4);
   shadow.renderOrder = -1;
   group.add(shadow);
 
@@ -98,8 +109,8 @@ export function createCardMesh({ front, sprite, mask, rarity, finish = "plain", 
       group.rotation.y = x;
       group.rotation.x = y;
       frontMat.uniforms.uTilt.value.set(x, y);
-      shadow.position.x = -x * 90;
-      shadow.position.y = -CARD_H / 2 - 8 + y * 40;
+      shadow.position.x = -x * 110;
+      shadow.position.y = -CARD_H / 2 - 10 + y * 46;
       const k = 1 - Math.min(0.16, (Math.abs(x) + Math.abs(y)) * 0.5);
       shadow.scale.set(k, k, 1);
       shadowMat.opacity = 0.55 + Math.min(0.2, (Math.abs(x) + Math.abs(y)) * 0.5);

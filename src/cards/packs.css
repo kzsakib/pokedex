@@ -461,3 +461,169 @@
   0% { background-position: 160% 0; }
   100% { background-position: -60% 0; }
 }
+
+/* ---------- pack loader ---------- */
+.kp-loader {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  background: rgba(12, 10, 30, 0.88);
+}
+
+.kp-loading .kp-loader {
+  display: flex;
+}
+
+.kp-loader-pack {
+  position: relative;
+  width: 108px;
+  height: 148px;
+  background: #efe6cf;
+  border: 3px solid #2a1d12;
+  box-shadow: 0 0 0 3px #efe6cf, 12px 14px 0 rgba(0, 0, 0, 0.42);
+  animation: kp-pack-bob 0.9s steps(3, end) infinite;
+}
+
+.kp-loader-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 24px;
+  height: 36px;
+  background: #c8342a;
+}
+
+.kp-loader-pip {
+  position: absolute;
+  left: 50%;
+  top: 64px;
+  width: 30px;
+  height: 30px;
+  margin-left: -15px;
+  background: #efe6cf;
+  border: 3px solid #2a1d12;
+}
+
+.kp-loader-pack::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.5) 46%, transparent 62%);
+  background-size: 240% 100%;
+  animation: kp-foil 1s linear infinite;
+}
+
+.kp-loader-bar {
+  width: 176px;
+  height: 10px;
+  border: 2px solid #efe6cf;
+  background: #17142c;
+}
+
+.kp-loader-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #ffd76a;
+  animation: kp-load-fill 1.1s steps(11, end) forwards;
+}
+
+.kp-loader-text {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: #efe6cf;
+  animation: kp-load-blink 1.1s steps(2, end) infinite;
+}
+
+@keyframes kp-pack-bob {
+  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+  50% { transform: translateY(-8px) rotate(1.5deg); }
+}
+
+@keyframes kp-load-fill {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes kp-load-blink {
+  0%, 60% { opacity: 1; }
+  61%, 100% { opacity: 0.45; }
+}
+
+/* ---------- binder tabs and pulled cards ---------- */
+.kp-binder-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.kp-tab {
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  color: #cfc7b4;
+  background: #17142c;
+  border: 2px solid #3a3350;
+  cursor: pointer;
+}
+
+.kp-tab.is-on {
+  color: #17142c;
+  background: #ffd76a;
+  border-color: #ffd76a;
+}
+
+.kp-binder-pulls {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 10px;
+  max-height: 52vh;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.kp-pull-cell {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.kp-pull {
+  width: 100%;
+  height: auto;
+  display: block;
+  image-rendering: pixelated;
+  border: 2px solid #3a3350;
+  background: #0d0b1e;
+}
+
+.kp-pull-cell figcaption {
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  color: #cfc7b4;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.kp-binder-empty {
+  color: #cfc7b4;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* the hidden attribute loses to display:grid, so make it explicit */
+.kp-binder-grid[hidden],
+.kp-binder-pulls[hidden] {
+  display: none;
+}
