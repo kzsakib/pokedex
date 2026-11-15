@@ -148,6 +148,76 @@ export async function preloadSprites(onProgress) {
   await Promise.all(Array.from({ length: 8 }, worker));
 }
 
+function hslToRgb(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+}
+
+/* Repaint a sprite with a shifted palette. Every pixel keeps its own lightness,
+   so the pokemon's shapes survive while its colours are replaced wholesale. */
+function recolorSprite(base, variant) {
+  const canvas = document.createElement("canvas");
+  canvas.width = base.width;
+  canvas.height = base.height;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(base, 0, 0);
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = image.data;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue;
+    const r = data[i] / 255;
+    const g = data[i + 1] / 255;
+    const b = data[i + 2] / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const diff = max - min;
+    const l = (max + min) / 2;
+    let h = 0;
+    let sat = 0;
+    if (diff > 0.0001) {
+      sat = l > 0.5 ? diff / (2 - max - min) : diff / (max + min);
+      if (max === r) h = (g - b) / diff + (g < b ? 6 : 0);
+      else if (max === g) h = (b - r) / diff + 2;
+      else h = (r - g) / diff + 4;
+      h *= 60;
+    }
+    if (typeof variant.targetHue === "number") {
+      const delta = ((variant.targetHue - h + 540) % 360) - 180;
+      h = (h + delta * (variant.hueMix ?? 0.7) + 360) % 360;
+    }
+    sat = Math.min(1, sat * (variant.sat ?? 1));
+    let nl = variant.invert ? 1 - l : l;
+    nl = Math.min(1, Math.max(0, nl * (variant.light ?? 1)));
+    const [nr, ng, nb] = hslToRgb(h, sat, nl);
+    data[i] = nr;
+    data[i + 1] = ng;
+    data[i + 2] = nb;
+  }
+  ctx.putImageData(image, 0, 0);
+  return canvas;
+}
+
+const chromaCache = new Map();
+
+export async function chromaSprite(id, variant) {
+  const key = `${id}:${variant.key}`;
+  if (chromaCache.has(key)) return chromaCache.get(key);
+  const base = await loadSprite(id);
+  const out = recolorSprite(base, variant);
+  chromaCache.set(key, out);
+  return out;
+}
+
 export async function spriteFor(card) {
+  if (card.variant) return chromaSprite(card.id, card.variant);
   return card.shiny ? loadShiny(card.id) : loadSprite(card.id);
 }

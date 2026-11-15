@@ -1,7 +1,7 @@
 /* Binder persistence. */
 const KEY = "kanto-packs-v1";
 
-export const RARITY_RANK = { common: 0, uncommon: 1, rare: 2, holo: 3, legend: 4 };
+export const RARITY_RANK = { common: 0, uncommon: 1, rare: 2, holo: 3, chroma: 4, legend: 5 };
 
 function empty() {
   return { packs: 0, owned: {}, rarest: null, shinies: 0, pulls: [] };
@@ -14,6 +14,7 @@ function snapshot(card) {
     level: card.level, hp: card.hp, rarity: card.rarity, shiny: card.shiny,
     moves: card.moves, weakness: card.weakness, resistance: card.resistance,
     retreat: card.retreat, height: card.height, weight: card.weight, finish: card.finish,
+    variant: card.variant ? { key: card.variant.key, label: card.variant.label, tcg: card.variant.tcg, note: card.variant.note } : null,
   };
 }
 

@@ -82,6 +82,7 @@ export class KantoPacksGame {
   async boot() {
     this.hint("loading card data…");
     this.container.classList.add("kp-loading");
+    this.drawLoaderBall();
     this.loaderText("BOOTING THE REGISTRY");
     const minBoot = new Promise((resolve) => setTimeout(resolve, 900));
     this.data = await loadGen1();
@@ -139,10 +140,8 @@ export class KantoPacksGame {
         </div>
       </div>
       <div class="kp-loader" aria-hidden="true">
-        <div class="kp-loader-pack">
-          <span class="kp-loader-band"></span>
-          <span class="kp-loader-pip"></span>
-        </div>
+        <div class="kp-loader-ring" aria-hidden="true"></div>
+        <canvas class="kp-loader-ball" width="32" height="32" aria-hidden="true"></canvas>
         <div class="kp-loader-bar"><i></i></div>
         <p class="kp-loader-text">SEALING THE PACK</p>
       </div>
@@ -217,6 +216,37 @@ export class KantoPacksGame {
       this.el.packs.textContent = "0";
       this.renderBinder();
     });
+  }
+
+  drawLoaderBall() {
+    const canvas = this.container.querySelector(".kp-loader-ball");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const px = (x, y, w, h, colour) => {
+      ctx.fillStyle = colour;
+      ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+    };
+    ctx.clearRect(0, 0, 32, 32);
+    for (let y = 0; y < 32; y += 1) {
+      for (let x = 0; x < 32; x += 1) {
+        const dx = x - 15.5;
+        const dy = y - 15.5;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        if (r > 15.2) continue;
+        if (r > 13.4) {
+          px(x, y, 1, 1, "#1a1220");
+        } else if (dy < -1.6) {
+          px(x, y, 1, 1, dx + dy < -12 ? "#ff6a4d" : "#d8321f");
+        } else if (dy > 1.6) {
+          px(x, y, 1, 1, dx > 6 ? "#efe6cf" : "#d9cfb4");
+        } else {
+          px(x, y, 1, 1, "#1a1220");
+        }
+      }
+    }
+    px(12, 12, 8, 8, "#1a1220");
+    px(13, 13, 6, 6, "#efe6cf");
+    px(14, 14, 3, 3, "#c9c0a8");
   }
 
   loaderText(text) {
@@ -318,6 +348,7 @@ export class KantoPacksGame {
 
   async generate() {
     this.container.classList.add("kp-loading");
+    this.drawLoaderBall();
     this.resetLoader();
     const minShow = new Promise((resolve) => setTimeout(resolve, 1100));
     await loadTypeIcons();
@@ -405,6 +436,7 @@ export class KantoPacksGame {
     this.el.caption.innerHTML = `
       <strong>${card.name}</strong>
       <span>${RARITY_LABEL[card.rarity]}${card.shiny ? " · SHINY ✦" : FINISH_TAG[card.finish] || ""}</span>
+      ${card.variant ? `<span class="kp-caption-chroma">${card.variant.label} FORM — ${card.variant.note}</span>` : ""}
       <span>${stats}</span>
       <span>seed ${this.seed}</span>
     `;
@@ -772,7 +804,9 @@ export class KantoPacksGame {
       cell.className = `kp-pull-cell kp-${card.rarity}`;
       cell.appendChild(canvas);
       const cap = document.createElement("figcaption");
-      cap.textContent = `${card.name || ""}${FINISH_TAG[card.finish] || ""}`;
+      cap.textContent = card.variant
+        ? `${card.name || ""} · ${card.variant.label}`
+        : `${card.name || ""}${FINISH_TAG[card.finish] || ""}`;
       cell.appendChild(cap);
       cells.push(cell);
     }
@@ -809,7 +843,7 @@ export class KantoPacksGame {
         <div class="${cls}" title="${mon ? mon.name : key}">
           <img src="${base}cards/sprites/${String(id).padStart(3, "0")}.png" alt="" loading="lazy" />
           <span class="kp-cell-no">${String(id).padStart(3, "0")}</span>
-          ${entry ? `<span class="kp-cell-mark">${entry.shiny ? "✦" : entry.rarity === "legend" ? "★" : entry.rarity === "holo" ? "★" : entry.rarity === "rare" ? "★" : ""}</span>` : ""}
+          ${entry ? `<span class="kp-cell-mark">${entry.shiny ? "✦" : entry.rarity === "chroma" ? "◇" : entry.rarity === "legend" ? "★" : entry.rarity === "holo" ? "★" : entry.rarity === "rare" ? "★" : ""}</span>` : ""}
         </div>
       `);
     }

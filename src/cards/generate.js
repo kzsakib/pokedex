@@ -21,8 +21,8 @@ const TYPE_MAP = {
   rock: "Fighting",
 };
 
-export const RARITY_ORDER = { common: 0, uncommon: 1, rare: 2, holo: 3, legend: 4 };
-export const RARITY_LABEL = { common: "COMMON", uncommon: "UNCOMMON", rare: "RARE", holo: "HOLO RARE", legend: "LEGEND" };
+export const RARITY_ORDER = { common: 0, uncommon: 1, rare: 2, holo: 3, chroma: 4, legend: 5 };
+export const RARITY_LABEL = { common: "COMMON", uncommon: "UNCOMMON", rare: "RARE", holo: "HOLO RARE", legend: "LEGEND", chroma: "CHROMA" };
 export const RARITY_MARK = { common: "●", uncommon: "◆", rare: "★", holo: "★", legend: "★" };
 
 const MOVES = {
@@ -39,6 +39,27 @@ const WEAKNESS = { Fire: "Water", Water: "Lightning", Grass: "Fire", Lightning: 
 const ALL_TYPES = ["Fire", "Water", "Grass", "Lightning", "Psychic", "Fighting", "Colorless"];
 
 const STATUS = ["HEADS: PARALYZED", "HEADS: ASLEEP", "HEADS: CONFUSED", "POISONED"];
+
+/* Chroma forms: the same pokemon painted with a different palette, and a typing
+   to match. Every pack carries two of them. */
+const CHROMA = [
+  { key: "ashen", label: "ASHEN", tcg: "Psychic", sat: 0.12, light: 1.2,
+    note: "storage accident: every pigment bleached to grey" },
+  { key: "ember", label: "EMBER", tcg: "Fire", targetHue: 18, hueMix: 0.72, sat: 1.2,
+    note: "the colours never cooled after hatching" },
+  { key: "glacial", label: "GLACIAL", tcg: "Water", targetHue: 200, hueMix: 0.78, sat: 0.95, light: 1.12,
+    note: "frozen mid-shift, blue right through the shell" },
+  { key: "toxic", label: "TOXIC", tcg: "Grass", targetHue: 96, hueMix: 0.7, sat: 1.35,
+    note: "a lab spill soaked into every plate" },
+  { key: "charged", label: "CHARGED", tcg: "Lightning", targetHue: 50, hueMix: 0.62, sat: 1.45, light: 1.14,
+    note: "static clings to the palette and will not let go" },
+  { key: "void", label: "VOID", tcg: "Psychic", invert: true,
+    note: "light falls through it the wrong way round" },
+  { key: "gilded", label: "GILDED", tcg: "Colorless", targetHue: 44, hueMix: 0.85, sat: 1.25, light: 1.06,
+    note: "plated in something that is not quite gold" },
+  { key: "neon", label: "NEON", tcg: "Colorless", sat: 2.2, light: 1.16,
+    note: "overexposed until only the brightest colours survive" },
+];
 
 export function tcgType(pokemon) {
   const slots = pokemon.types.map((t) => TYPE_MAP[t]).filter(Boolean);
@@ -63,8 +84,16 @@ export function buildPools(data) {
 const snap10 = (n) => Math.max(10, Math.round(n / 10) * 10);
 const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
 
+function chromaFor(rng, used) {
+  const pool = CHROMA.filter((v) => !used.has(v.key));
+  const pick = pool.length ? rng.pick(pool) : rng.pick(CHROMA);
+  used.add(pick.key);
+  return pick;
+}
+
 function rarityBonus(rarity) {
   if (rarity === "legend") return 20;
+  if (rarity === "chroma") return 15;
   if (rarity === "holo" || rarity === "rare") return 10;
   return 0;
 }
@@ -208,8 +237,8 @@ function spreadFoils(rng, cards) {
   return cards;
 }
 
-function makeCard(rng, pokemon, rarity, shiny) {
-  const tcg = tcgType(pokemon);
+function makeCard(rng, pokemon, rarity, shiny, opts = {}) {
+  const tcg = opts.tcg || tcgType(pokemon);
   const stage = Math.min(2, pokemon.stage || 0);
   const level = rarity === "legend" ? rng.int(45, 70) : stage === 0 ? rng.int(8, 25) : stage === 1 ? rng.int(18, 40) : rng.int(30, 60);
   const stageBonus = stage === 0 ? 0 : stage === 1 ? 15 : 30;
@@ -279,9 +308,16 @@ export function generatePack(data, seed, options = {}) {
 
   if (force === "shiny") slots[slots.length - 1].forceShiny = true;
 
+  /* two of the five slots are chroma forms: same pokemon, re-rolled palette */
+  const chromaUsed = new Set();
   const cards = slots.map((slot, index) => {
     const shiny = slot.forceShiny || rng.chance(1 / 40);
-    const card = makeCard(rng, slot.mon, slot.rarity, shiny);
+    const chroma = index < 2 ? chromaFor(rng, chromaUsed) : null;
+    const card = makeCard(rng, slot.mon, chroma ? "chroma" : slot.rarity, shiny, chroma ? { tcg: chroma.tcg } : {});
+    if (chroma) {
+      card.variant = { ...chroma }; /* keep the palette params: the renderer needs them */
+      card.finish = rollFinish(rng, PREMIUM);
+    }
     card.slot = index;
     return card;
   });

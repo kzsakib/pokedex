@@ -472,7 +472,7 @@
   align-items: center;
   justify-content: center;
   gap: 22px;
-  background: rgba(12, 10, 30, 0.88);
+  background: rgba(12, 10, 30, 0.95);
 }
 
 .kp-loading .kp-loader {
@@ -626,4 +626,41 @@
 .kp-binder-grid[hidden],
 .kp-binder-pulls[hidden] {
   display: none;
+}
+
+/* ---------- pokéball loader ---------- */
+.kp-loader-ball {
+  display: block;
+  width: 160px;
+  height: 160px;
+  image-rendering: pixelated;
+  margin-bottom: 22px;
+  animation: kp-ball-wobble 1.5s steps(2, end) infinite;
+}
+
+.kp-loader-ring {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 232px;
+  height: 232px;
+  border: 3px solid rgba(255, 215, 106, 0.32);
+  animation: kp-ring-pop 1.5s steps(6, end) infinite;
+}
+
+@keyframes kp-ball-wobble {
+  0%, 100% { transform: rotate(-7deg) translateY(0); }
+  25% { transform: rotate(7deg) translateY(-4px); }
+  50% { transform: rotate(-4deg) translateY(0); }
+  75% { transform: rotate(4deg) translateY(-2px); }
+}
+
+@keyframes kp-ring-pop {
+  0% { transform: scale(0.62); opacity: 0.85; }
+  55% { opacity: 0.25; }
+  100% { transform: scale(1.06); opacity: 0; }
+}
+
+.kp-caption-chroma {
+  color: #c9a6ff;
 }

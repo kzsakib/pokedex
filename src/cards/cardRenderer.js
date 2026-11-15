@@ -229,11 +229,12 @@ const RARITY5 = {
   common: [".XXX.", "XXXXX", "XXXXX", "XXXXX", ".XXX."],
   uncommon: ["..X..", ".XXX.", "XXXXX", ".XXX.", "..X.."],
   rare: ["..X..", "XXXXX", ".XXX.", ".X.X.", "X...X"],
+  chroma: [".XXX.", "X...X", "..X..", "X...X", ".XXX."],
 };
-const RARITY_COLOUR = { common: "#78788c", uncommon: "#5c94dc", rare: GOLD, holo: GOLD, legend: GOLD };
+const RARITY_COLOUR = { common: "#78788c", uncommon: "#5c94dc", rare: GOLD, holo: GOLD, legend: GOLD, chroma: "#a86be8" };
 
 function drawRarity(ctx, rarity, x, y) {
-  const rows = RARITY5[rarity === "common" || rarity === "uncommon" ? rarity : "rare"];
+  const rows = RARITY5[rarity] || RARITY5.rare;
   ctx.fillStyle = RARITY_COLOUR[rarity] || RARITY_COLOUR.common;
   rows.forEach((row, ry) => {
     [...row].forEach((ch, rx) => {
@@ -539,7 +540,8 @@ export function renderCard(card, sprite, options = {}) {
   lintDraw("B", 142, 23, 9, 9, () => drawIcon(ctx, card.tcg, 142, 23));
 
   // info strip
-  const genus = upper(String(card.genus || "")).replace(/\s*POKEMON$/i, "").trim();
+  const baseGenus = upper(String(card.genus || "")).replace(/\s*POKEMON$/i, "").trim();
+  const genus = card.variant && card.variant.label ? `${card.variant.label} ${baseGenus}`.trim() : baseGenus;
   const dex = `${String(card.id).padStart(3, "0")}/151`;
   const dexW = textWidth(dex, F3, 1);
   const genusW = 140 - dexW - 4 - 8;
