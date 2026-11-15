@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { makeMaterial } from "./scene.js";
 import { holoDensityFor } from "./holo.js";
-import { CARD_W, CARD_H, renderCardBack } from "./cardRenderer.js";
+import { CARD_W, CARD_H, renderCardBack, renderSpriteLayer, ART } from "./cardRenderer.js";
 
 function texture(canvas) {
   const tex = new THREE.CanvasTexture(canvas);
@@ -19,7 +19,7 @@ export function cardBackTexture() {
   return sharedBack;
 }
 
-export function createCardMesh({ front, mask, rarity, finish = "plain", dim = 1 }) {
+export function createCardMesh({ front, sprite, mask, rarity, finish = "plain", dim = 1 }) {
   const group = new THREE.Group();
   const effect =
     finish === "reverse" ? 1 :
@@ -47,6 +47,28 @@ export function createCardMesh({ front, mask, rarity, finish = "plain", dim = 1 
   face.position.z = 0;
   group.add(face);
 
+  /* sprite floats a few pixels in front of the frame so tilting separates them */
+  let spriteMesh = null;
+  if (sprite) {
+    const layer = renderSpriteLayer(null, sprite);
+    const spriteMat = makeMaterial({
+      map: texture(layer),
+      dim,
+      flat: true,
+      opaque: false,
+    });
+    spriteMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry((ART.inner.w / CARD_W) * CARD_W, (ART.inner.h / CARD_H) * CARD_H),
+      spriteMat
+    );
+    spriteMesh.position.set(
+      ART.inner.x + ART.inner.w / 2 - CARD_W / 2,
+      CARD_H / 2 - (ART.inner.y + ART.inner.h / 2),
+      6
+    );
+    group.add(spriteMesh);
+  }
+
   return {
     group,
     face,
@@ -55,6 +77,7 @@ export function createCardMesh({ front, mask, rarity, finish = "plain", dim = 1 
     setFlip(t) {
       group.rotation.y = Math.PI * t;
       group.position.z = Math.sin(Math.PI * t) * 8;
+      if (spriteMesh) spriteMesh.visible = t < 0.5;
     },
     setTilt(x, y) {
       group.rotation.y = x;
@@ -65,6 +88,7 @@ export function createCardMesh({ front, mask, rarity, finish = "plain", dim = 1 
       group.rotation.y = Math.PI * flip + x;
       group.rotation.x = y;
       group.position.z = Math.sin(Math.PI * flip) * 8;
+      if (spriteMesh) spriteMesh.visible = flip < 0.5;
       frontMat.uniforms.uTilt.value.set(x, y);
     },
     setDim(value) {

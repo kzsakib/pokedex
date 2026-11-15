@@ -276,9 +276,9 @@ export class KantoPacksGame {
 
     for (const card of this.cards) {
       const sprite = await spriteFor(card);
-      const front = renderCard(card, sprite);
+      const front = renderCard(card, sprite, { omitSprite: true });
       const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
-      const mesh = createCardMesh({ front, mask, rarity: card.rarity, finish: card.finish });
+      const mesh = createCardMesh({ front, sprite, mask, rarity: card.rarity, finish: card.finish });
       mesh.group.position.set(0, 40, 60 + this.meshes.length * 0.6);
       mesh.group.scale.setScalar(1);
       mesh.group.visible = false;

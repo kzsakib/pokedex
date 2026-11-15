@@ -7,6 +7,7 @@ export const CARD_H = 224;
 
 const INK = "#1a1a2e";
 const CREAM = "#f6efd4";
+const SHADOW = "#b9b09a";
 const HP_RED = "#c8281e";
 const GOLD = "#e8be46";
 const TEXT = "#1a1a2e";
@@ -208,6 +209,13 @@ function iconCanvas(type) {
       ctx.fillRect(2 + x, 2 + y, 1, 1);
     });
   });
+  /* 1px top-left highlight, 1px bottom-right shade */
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(2, 1, 1, 1);
+  ctx.fillRect(1, 2, 1, 1);
+  ctx.fillStyle = ramp.outline;
+  ctx.fillRect(6, 7, 1, 1);
+  ctx.fillRect(7, 6, 1, 1);
   iconCache.set(type, canvas);
   return canvas;
 }
@@ -317,7 +325,7 @@ function artBuffer(card, sprite) {
   return canvas;
 }
 
-function artWindow(ctx, card, sprite) {
+function artWindow(ctx, card, sprite, omitSprite = false) {
   const { x, y, w, h } = ART;
   // explicit border + bevel so every corner pixel is deliberate
   ctx.fillStyle = INK;
@@ -330,16 +338,17 @@ function artWindow(ctx, card, sprite) {
     ctx.fillRect(x + w - 1, y + i, 1, 1);
   }
   const ramp = rampFor(card.tcg);
-  const light = mix(ramp.light, "#ffffff", 0.55);
-  const dark = mix(ramp.outline, "#000000", 0.1);
-  ctx.fillStyle = light;
-  ctx.fillRect(x + 1, y + 1, w - 2, 1);
-  ctx.fillRect(x + 1, y + 1, 1, h - 2);
+  const light = mix(ramp.light, "#ffffff", 0.62);
+  const dark = mix(ramp.outline, "#000000", 0.22);
+  /* inset: 2px shadow inside the top and left, 1px light lip bottom and right */
   ctx.fillStyle = dark;
+  ctx.fillRect(x + 1, y + 1, w - 2, 2);
+  ctx.fillRect(x + 1, y + 1, 2, h - 2);
+  ctx.fillStyle = light;
   ctx.fillRect(x + 1, y + h - 2, w - 2, 1);
   ctx.fillRect(x + w - 2, y + 1, 1, h - 2);
 
-  const buffer = artBuffer(card, sprite);
+  const buffer = artBuffer(card, omitSprite ? null : sprite);
   const { inner } = ART;
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(buffer, 0, 0, BUFFER.w, BUFFER.h, inner.x, inner.y, inner.w, inner.h);
@@ -382,8 +391,19 @@ function frame(ctx, card) {
   ctx.fillRect(3, 3, CARD_W - 6, 1);
   ctx.fillRect(3, CARD_H - 4, CARD_W - 6, 1);
 
+  /* bevel the ink band: light from the top-left */
+  ctx.fillStyle = mix(ramp.base, "#ffffff", 0.34);
+  ctx.fillRect(1, 1, CARD_W - 2, 1);
+  ctx.fillRect(1, 1, 1, CARD_H - 2);
+  ctx.fillStyle = mix(ramp.outline, "#0d0b1e", 0.3);
+  ctx.fillRect(1, CARD_H - 2, CARD_W - 2, 1);
+  ctx.fillRect(CARD_W - 2, 1, 1, CARD_H - 2);
+
   ctx.fillStyle = mix(CREAM, ramp.base, 0.1);
   ctx.fillRect(4, 4, CARD_W - 8, CARD_H - 8);
+  /* faint lighter line along the panel's top inner edge */
+  ctx.fillStyle = mix(CREAM, "#ffffff", 0.5);
+  ctx.fillRect(5, 4, CARD_W - 10, 1);
 }
 
 /* ---------- moves and footer ---------- */
@@ -408,6 +428,7 @@ function moveSlot(ctx, card, move, y, zone) {
     fitText(ctx, move.name, Math.max(10, maxName), F5, TEXT, nameX, y + 1);
   });
   lintDraw(zone, 149 - dmgW, y + 1, dmgW, 7, () => {
+    drawText(ctx, 150, y + 2, dmg, F5, SHADOW, 1, "r", 1);
     drawText(ctx, 149, y + 1, dmg, F5, TEXT, 1, "r", 1);
   });
   if (move.effect) {
@@ -489,14 +510,17 @@ export function renderCard(card, sprite, options = {}) {
   lint = options.lint ? { boxes: [] } : null;
 
   frame(ctx, card);
-  artWindow(ctx, card, sprite);
+  artWindow(ctx, card, sprite, !!options.omitSprite);
 
   // Row A
   const stageName = card.rarity === "legend" ? "LEGEND" : card.stage === 2 ? "STAGE 2" : card.stage === 1 ? "STAGE 1" : "BASIC";
   lintDraw("A", 8, 10, 60, 5, () => drawText(ctx, 8, 10, `${stageName}  LV.${card.level}`, F3, TEXT, 1));
   const hp = String(card.hp);
   const hpW = textWidth(hp, F5, 1) * 2;
-  lintDraw("A", 151 - hpW, 5, hpW, 14, () => drawText(ctx, 151, 5, hp, F5, HP_RED, 1, "r", 2));
+  lintDraw("A", 151 - hpW, 5, hpW, 14, () => {
+    drawText(ctx, 152, 6, hp, F5, SHADOW, 1, "r", 2);
+    drawText(ctx, 151, 5, hp, F5, HP_RED, 1, "r", 2);
+  });
   lintDraw("A", 151 - hpW - 18, 13, 16, 5, () => drawText(ctx, 151 - hpW - 2, 13, "HP", F3, TEXT, 1, "r"));
 
   // Row B
@@ -505,6 +529,7 @@ export function renderCard(card, sprite, options = {}) {
     const raw = upper(card.name);
     let n = raw;
     while (textWidth(n, F5, 1) * 2 > nameMax && n.length > 0) n = n.slice(0, -1);
+    drawText(ctx, 9, 22, n, F5, SHADOW, 1, "l", 2);
     drawText(ctx, 8, 21, n, F5, TEXT, 1, "l", 2);
   });
   lintDraw("B", 142, 23, 9, 9, () => drawIcon(ctx, card.tcg, 142, 23));
@@ -608,6 +633,24 @@ export function renderCardBack() {
   drawText(ctx, cx, 156, "KANTO 151", F5, "#f6efd4", 1, "c", 2);
   drawText(ctx, cx, 176, "TRADE - PLAY - COLLECT", F3, "#8fa6d8", 1, "c");
   drawText(ctx, cx, CARD_H - 22, "FAN PROJECT", F3, "#5d6f9c", 1, "c");
+  return canvas;
+}
+
+/* The sprite on its own transparent layer, so it can float above the art
+   window and shift with the tilt. Coordinates match the art buffer. */
+export function renderSpriteLayer(card, sprite) {
+  const canvas = document.createElement("canvas");
+  canvas.width = ART.inner.w;
+  canvas.height = ART.inner.h;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  if (!sprite) return canvas;
+  const scale = sprite.width * 2 <= 66 && sprite.height * 2 <= 52 ? 2 : 1;
+  const sw = sprite.width * scale;
+  const sh = sprite.height * scale;
+  const sx = Math.round((BUFFER.w / 2 - sw / 2) * 2);
+  const sy = Math.max(2, Math.round(BUFFER.h - 4 - sh)) * 2;
+  ctx.drawImage(sprite, sx, sy, sw * 2, sh * 2);
   return canvas;
 }
 
