@@ -66,7 +66,7 @@ export default {
     const tcg = TYPES.has(body?.tcg) ? body.tcg : "Colorless";
     if (name.length < 2) return reply({ error: "bad species" }, 400, origin);
 
-    const prompt = `Species: ${name}. Its colours were completely swapped, so the card is labelled ${label} and it now counts as a ${tcg} type. Write a Pokédex entry saying what happened to it and how it lives with the new colours.`;
+    const prompt = `${name} is normally a different colour: this individual is ${label}. Write its Pokédex entry: one sentence about this pokemon's life, habits or habitat that makes its ${label} colouring feel natural, as if it is simply a rare variant of the species.`;
 
     let upstream;
     try {
@@ -82,7 +82,7 @@ export default {
             {
               role: "system",
               content:
-                "You write one-line Pokédex entries for a fan card game. Reply with the entry only: a single sentence, at most 22 words, no quotation marks, no preamble.",
+                "You write Pokédex entries in the style of the games: factual, in-world, about the pokemon itself. Reply with the entry only: one sentence, at most 22 words, no quotation marks, no preamble. Never mention cards, printing, palettes, inks, dyes, screens, data or software.",
             },
             { role: "user", content: prompt },
           ],

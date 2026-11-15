@@ -167,12 +167,12 @@ export class KantoPacksGame {
     this.entryEl = document.createElement("p");
     this.entryEl.className = "kp-entry";
     this.entryEl.setAttribute("aria-live", "polite");
-    this.container.insertAdjacentElement("afterend", this.entryEl);
+    this.container.appendChild(this.entryEl);
 
     this.captionEl = document.createElement("div");
     this.captionEl.className = "kp-caption kp-caption--flow";
     this.captionEl.setAttribute("aria-live", "polite");
-    this.entryEl.insertAdjacentElement("afterend", this.captionEl);
+    this.container.insertAdjacentElement("afterend", this.captionEl);
     this.hud = hud;
     this.el = {
       packs: hud.querySelector(".kp-packs"),
@@ -470,7 +470,6 @@ export class KantoPacksGame {
     this.el.caption.innerHTML = `
       <strong>${card.name}</strong>
       <span>${RARITY_LABEL[card.rarity]}${card.shiny ? " · SHINY ✦" : FINISH_TAG[card.finish] || ""}</span>
-      ${card.variant ? `<span class="kp-caption-chroma">${card.variant.label} FORM — ${card.variant.note}</span>` : ""}
       <span>${stats}</span>
       <span>seed ${this.seed}</span>
     `;

@@ -30,12 +30,12 @@ export function hueLabel(hueMap, source) {
 }
 
 const TEMPLATES = [
-  (c, l) => `${c.name} swapped palettes after a teleport went sideways; its ${l} hide is the only thing field teams can identify it by.`,
-  (c, l) => `A botched dye experiment turned ${c.name} ${l} overnight, and it has refused every attempt to change back.`,
-  (c, l) => `${c.name} absorbed a stray prism beam at the power plant. It now reads as ${l} on every scanner.`,
-  (c, l) => `Nobody knows why ${c.name} hatched ${l}. It simply arrived that way and acts as if nothing is unusual.`,
-  (c, l) => `${c.name} molted under an eclipse; the new ${l} shell keeps the heat of that night.`,
-  (c, l) => `A printing error at the card works recoloured ${c.name} ${l}. The pokemon itself seems fine with it.`,
+  (c, l) => `${c.name} hatched with ${l} markings instead of its usual colours; it uses them to hide in flowering fields.`,
+  (c, l) => `A ${l} strain of ${c.name} lives only in the deep caves, where the stone stains everything that stays too long.`,
+  (c, l) => `${c.name} changes colour when it feeds, and this ${l} shade means it has been eating nothing but mineral-rich soil.`,
+  (c, l) => `Rangers report ${c.name} in ${l} only in the cold months; the colour fades again by spring.`,
+  (c, l) => `This ${c.name} grew up among ${l} plants, and its body copied the shade to blend in with the leaves.`,
+  (c, l) => `${c.name} glows ${l} when it is ready to evolve, warning other pokemon to keep their distance.`,
 ];
 
 export function fallbackLore(card, seed = 0) {

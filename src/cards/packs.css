@@ -747,16 +747,23 @@
 
 /* ---------- typed pokédex entry ---------- */
 .kp-entry {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 68px;
+  z-index: 5;
   min-height: 2.6em;
-  max-width: 46ch;
-  margin: 10px auto 0;
-  padding: 0 12px;
+  max-width: 44ch;
+  margin: 0 auto;
+  padding: 8px 10px;
+  background: rgba(8, 6, 20, 0.82);
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
   font-size: 11px;
   line-height: 1.5;
   letter-spacing: 0.02em;
-  color: #b9b09a;
+  color: #efe6cf;
   text-align: center;
+  pointer-events: none;
 }
 
 .kp-entry::after {
@@ -766,7 +773,7 @@
 }
 
 .kp-entry--chroma {
-  color: #c9a6ff;
+  color: #dcc4ff;
 }
 
 @keyframes kp-caret {
