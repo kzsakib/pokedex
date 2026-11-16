@@ -21,7 +21,7 @@ export function cardBackTexture() {
   return sharedBack;
 }
 
-export function createCardMesh({ front, sprite, mask, rarity, finish = "plain", dim = 1 }) {
+export function createCardMesh({ front, spriteLayout, mask, rarity, finish = "plain", dim = 1 }) {
   const group = new THREE.Group();
   const effect =
     finish === "reverse" ? 1 :
@@ -56,18 +56,21 @@ export function createCardMesh({ front, sprite, mask, rarity, finish = "plain", 
   face.position.z = 0;
   group.add(face);
 
-  /* sprite floats in front so tilting separates it from the card */
+  /* the pokemon floats a few pixels proud of the face so tilting separates it */
   let spriteMesh = null;
-  if (sprite) {
-    const spriteMat = makeMaterial({ map: texture(renderSpriteLayer(null, sprite)), dim, flat: true, opaque: false });
+  if (spriteLayout) {
+    const { sprite, x, y, w, h } = spriteLayout;
+    const art = document.createElement("canvas");
+    art.width = w;
+    art.height = h;
+    const actx = art.getContext("2d");
+    actx.imageSmoothingEnabled = false;
+    actx.drawImage(sprite, 0, 0, sprite.width, sprite.height, 0, 0, w, h);
+    const spriteMat = makeMaterial({ map: texture(art), dim, flat: true, opaque: false });
     spriteMat.transparent = true;
     spriteMat.depthWrite = false;
-    spriteMesh = new THREE.Mesh(new THREE.PlaneGeometry(ART.inner.w - 6, ART.inner.h - 6), spriteMat);
-    spriteMesh.position.set(
-      ART.inner.x + ART.inner.w / 2 - CARD_W / 2,
-      CARD_H / 2 - (ART.inner.y + ART.inner.h / 2),
-      6
-    );
+    spriteMesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), spriteMat);
+    spriteMesh.position.set(x + w / 2 - CARD_W / 2, CARD_H / 2 - (y + h / 2), 7);
     spriteMesh.renderOrder = 3;
     group.add(spriteMesh);
   }

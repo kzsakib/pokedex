@@ -7,7 +7,7 @@ import { makeHoloMask } from "./holo.js";
 import { loadGen1, preloadSprites, loadSprite, spriteFor } from "./assets.js";
 import { generatePack, RARITY_LABEL } from "./generate.js";
 import { chromaLore } from "./lore.js";
-import { renderCard } from "./cardRenderer.js";
+import { cardSpriteLayout, renderCard } from "./cardRenderer.js";
 import { loadTypeIcons } from "./icons.js";
 import { renderPackFront, renderPackBack, renderStrip, VARIANTS } from "./packArt.js";
 
@@ -396,10 +396,12 @@ export class KantoPacksGame {
 
     for (const card of this.cards) {
       const sprite = await spriteFor(card);
-      const front = renderCard(card, sprite);
+      const isEx = card.special === "ex";
+      const front = renderCard(card, sprite, { omitSprite: isEx });
       const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
-      /* the pokemon is printed on the face, so nothing floats above it */
-      const mesh = createCardMesh({ front, sprite: null, mask, rarity: card.rarity, finish: card.finish });
+      /* EX keeps its pokemon on its own layer so it moves against the card */
+      const spriteLayout = isEx ? cardSpriteLayout(card, sprite) : null;
+      const mesh = createCardMesh({ front, spriteLayout, mask, rarity: card.rarity, finish: card.finish });
       mesh.group.position.set(0, 40, 70 + this.meshes.length * 0.6);
       mesh.group.scale.setScalar(1);
       mesh.group.visible = false;
@@ -958,9 +960,11 @@ export class KantoPacksGame {
     scene.canvas.style.height = "auto";
     scene.canvas.style.imageRendering = "pixelated";
 
-    const front = renderCard(card, sprite);
+    const isEx = card.special === "ex";
+    const front = renderCard(card, sprite, { omitSprite: isEx });
     const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
-    const mesh = createCardMesh({ front, sprite: null, mask, rarity: card.rarity, finish: card.finish });
+    const spriteLayout = isEx ? cardSpriteLayout(card, sprite) : null;
+    const mesh = createCardMesh({ front, spriteLayout, mask, rarity: card.rarity, finish: card.finish });
     mesh.group.position.set(0, 6, 0);
     mesh.group.scale.setScalar(0.94); /* room for the slab edge and its shadow */
     scene.root.add(mesh.group);

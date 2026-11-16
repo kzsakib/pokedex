@@ -344,6 +344,64 @@ function artBuffer(card, sprite) {
   return canvas;
 }
 
+const trimCache = new Map();
+function trimSprite(sprite) {
+  if (!sprite) return null;
+  const key = sprite.src || sprite;
+  if (trimCache.has(key)) return trimCache.get(key);
+  const probe = document.createElement("canvas");
+  probe.width = sprite.width;
+  probe.height = sprite.height;
+  const pctx = probe.getContext("2d");
+  pctx.imageSmoothingEnabled = false;
+  pctx.drawImage(sprite, 0, 0);
+  let minX = sprite.width;
+  let minY = sprite.height;
+  let maxX = -1;
+  let maxY = -1;
+  try {
+    const { data } = pctx.getImageData(0, 0, sprite.width, sprite.height);
+    for (let y = 0; y < sprite.height; y += 1) {
+      for (let x = 0; x < sprite.width; x += 1) {
+        if (data[(y * sprite.width + x) * 4 + 3] > 16) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+  } catch {
+    trimCache.set(key, sprite);
+    return sprite;
+  }
+  if (maxX < 0) {
+    trimCache.set(key, sprite);
+    return sprite;
+  }
+  const out = document.createElement("canvas");
+  out.width = maxX - minX + 1;
+  out.height = maxY - minY + 1;
+  const octx = out.getContext("2d");
+  octx.imageSmoothingEnabled = false;
+  octx.drawImage(probe, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
+  trimCache.set(key, out);
+  return out;
+}
+
+/* where the pokemon sits on the face, in card pixels; the 3D layer reuses this */
+export function cardSpriteLayout(card, sprite) {
+  const clean = trimSprite(sprite);
+  if (!clean) return null;
+  const isEx = card.special === "ex";
+  const geo = isEx ? ART_EX : ART;
+  const k = spriteScale(clean, geo.inner.w - 8, isEx ? geo.inner.h * 2 : geo.inner.h - 6);
+  const w = clean.width * k;
+  const h = clean.height * k;
+  const bottom = isEx ? geo.inner.y + geo.inner.h + 8 : geo.inner.y + geo.inner.h - 6;
+  return { sprite: clean, k, w, h, x: Math.round(CARD_W / 2 - w / 2), y: bottom - h };
+}
+
 /* largest whole-number scale that stays inside the box: no resampling mush */
 function spriteScale(sprite, maxW, maxH) {
   let k = 1;
@@ -351,11 +409,11 @@ function spriteScale(sprite, maxW, maxH) {
   return k;
 }
 
-function drawSpriteAt(ctx, sprite, k, bottomY) {
-  const dw = sprite.width * k;
-  const dh = sprite.height * k;
+function drawSpriteAt(ctx, place) {
+  const { sprite, k, x, y, w, h } = place;
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(sprite, Math.round(CARD_W / 2 - dw / 2), Math.round(bottomY - dh), dw, dh);
+  ctx.drawImage(sprite, 0, 0, sprite.width, sprite.height, x, y, w, h);
+  void k;
 }
 
 /* full art: the illustration covers the whole face and the text prints over it */
@@ -434,14 +492,15 @@ function drawFullArt(ctx, card, sprite) {
   }
 
   if (sprite) {
-    const k = spriteScale(sprite, CARD_W - 28, 132);
-    const dh = sprite.height * k;
-    const dw = sprite.width * k;
-    const feet = 144;
+    const clean = trimSprite(sprite);
+    const k = spriteScale(clean, CARD_W - 26, 112);
+    const dw = clean.width * k;
+    const dh = clean.height * k;
+    const feet = 142;
     ctx.fillStyle = "rgba(12, 10, 26, 0.26)";
-    ctx.fillRect(Math.round(CARD_W / 2 - dw * 0.3), feet - 2, Math.round(dw * 0.6), 3);
-    drawSpriteAt(ctx, sprite, k, feet);
-    void dh;
+    ctx.fillRect(Math.round(CARD_W / 2 - dw * 0.32), feet - 2, Math.round(dw * 0.64), 3);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(clean, 0, 0, clean.width, clean.height, Math.round(CARD_W / 2 - dw / 2), feet - dh, dw, dh);
   }
 
   /* ink scrim so the light text keeps its contrast over the illustration */
@@ -669,11 +728,9 @@ export function renderCard(card, sprite, options = {}) {
     frame(ctx, card);
     const geo = card.special === "ex" ? ART_EX : ART;
     artWindow(ctx, card, geo);
-    if (sprite && !options.omitArt) {
-      const isEx = card.special === "ex";
-      /* EX: one shallow box, so the pokemon overflows the frame on both edges */
-      const k = spriteScale(sprite, geo.inner.w - 4, isEx ? geo.inner.h * 2 : geo.inner.h + 14);
-      drawSpriteAt(ctx, sprite, k, isEx ? geo.inner.y + geo.inner.h + 8 : geo.inner.y + geo.inner.h - 4);
+    if (sprite && !options.omitSprite && !options.omitArt) {
+      const place = cardSpriteLayout(card, sprite);
+      if (place) drawSpriteAt(ctx, place);
     }
   }
 
