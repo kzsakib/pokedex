@@ -799,12 +799,18 @@ export class KantoPacksGame {
 
   layoutSummary() {
     const portrait = this.scene.portrait;
+    /* five cards plus a margin on both sides has to fit the render width */
+    const n = this.meshes.length || 5;
+    const gap = 12;
+    const fit = Math.min(1, (this.scene.W - 40 - gap * (n - 1)) / (152 * n));
+    const step = 152 * fit + gap;
+    const scale = portrait ? 2 : fit;
     this.meshes.forEach((mesh, i) => {
       mesh.group.visible = true;
       mesh.setFlipWithTilt(0, 0, 0);
       mesh.summaryTarget = portrait
         ? { x: 0, y: 0, scale: 2, portraitIndex: i }
-        : { x: (i - 2) * 172, y: 0, scale: 1 };
+        : { x: (i - (this.meshes.length - 1) / 2) * step, y: 0, scale };
     });
   }
 
