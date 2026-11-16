@@ -524,12 +524,19 @@ export function renderCard(card, sprite, options = {}) {
 
   frame(ctx, card);
 
+  /* premium cards bake the pokemon into the face, so the window never repeats it */
+  const premium = card.special === "ex" || card.special === "full";
+  const windowSprite = options.omitSprite || premium ? null : sprite;
+
   if (card.special === "full" && !options.omitArt) {
     /* full art: the scene bleeds to the card edges, the pokemon carries it */
     const backdrop = artBuffer(card, null);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(backdrop, 0, 0, BUFFER.w, BUFFER.h, 4, 34, CARD_W - 8, 178);
-    if (sprite && !options.omitSprite) drawBigSprite(ctx, sprite, 2.05, 148);
+    /* the scene keeps its proportions and sits on the plaque instead of stretching */
+    const artW = CARD_W - 8;
+    const artH = Math.round((BUFFER.h / BUFFER.w) * artW);
+    ctx.drawImage(backdrop, 4, 140 - artH, artW, artH);
+    if (sprite) drawBigSprite(ctx, sprite, 1.9, 138);
     /* cream bands top and bottom keep the printed text readable over the art */
     ctx.fillStyle = "rgba(246, 239, 212, 0.9)";
     ctx.fillRect(4, 4, CARD_W - 8, 32);
@@ -538,11 +545,11 @@ export function renderCard(card, sprite, options = {}) {
     ctx.fillRect(4, 35, CARD_W - 8, 1);
     ctx.fillRect(4, 140, CARD_W - 8, 1);
   } else {
-    artWindow(ctx, card, sprite, !!options.omitSprite, !!options.omitArt);
+    artWindow(ctx, card, windowSprite, !!options.omitSprite, !!options.omitArt);
   }
 
   /* EX: the pokemon swells out of its window and over the frame */
-  if (card.special === "ex" && sprite && !options.omitSprite) {
+  if (card.special === "ex" && sprite) {
     drawBigSprite(ctx, sprite, 2.45, ART.inner.y + ART.inner.h + 2);
   }
 

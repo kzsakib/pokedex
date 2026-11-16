@@ -397,7 +397,7 @@ export class KantoPacksGame {
     for (const card of this.cards) {
       const sprite = await spriteFor(card);
       const baked = card.special === "ex" || card.special === "full";
-      const front = renderCard(card, sprite, { omitSprite: baked });
+      const front = renderCard(card, sprite, { omitSprite: true });
       const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
       const mesh = createCardMesh({ front, sprite: baked ? null : sprite, mask, rarity: card.rarity, finish: card.finish });
       mesh.group.position.set(0, 40, 70 + this.meshes.length * 0.6);
@@ -959,7 +959,7 @@ export class KantoPacksGame {
     scene.canvas.style.imageRendering = "pixelated";
 
     const baked = card.special === "ex" || card.special === "full";
-    const front = renderCard(card, sprite, { omitSprite: baked });
+    const front = renderCard(card, sprite, { omitSprite: true });
     const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
     const mesh = createCardMesh({ front, sprite: baked ? null : sprite, mask, rarity: card.rarity, finish: card.finish });
     mesh.group.position.set(0, 6, 0);
