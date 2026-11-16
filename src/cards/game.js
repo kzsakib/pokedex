@@ -299,7 +299,6 @@ export class KantoPacksGame {
       summary: this.scene?.portrait ? "drag up and down to browse · open another or check the binder" : "five cards · open another or check the binder",
     };
     this.hint(hints[phase] || "");
-    if (this.beamMesh) this.beamMesh.visible = phase === "flash" || phase === "emerge";
     this.container.classList.toggle("kp-browsing", phase === "summary" && !!this.scene?.portrait);
     this.el.summary.classList.toggle("kp-show", phase === "summary");
     this.el.caption.classList.toggle("kp-show", phase === "reveal" && this.flipped[this.revealIndex]);
@@ -318,12 +317,6 @@ export class KantoPacksGame {
       mesh.dispose();
     }
     this.meshes = [];
-    if (this.beamMesh) {
-      this.scene.root.remove(this.beamMesh);
-      this.beamMesh.geometry.dispose();
-      this.beamMesh.material.dispose();
-      this.beamMesh = null;
-    }
   }
 
   async newPack(keepSeed = false) {
@@ -432,34 +425,6 @@ export class KantoPacksGame {
     this.generating = false;
     this.container.classList.remove("kp-loading");
 
-    /* light beam hints at the best pull */
-    const best = this.cards.reduce((acc, card) => (BEST[card.rarity] > BEST[acc] ? card.rarity : acc), "common");
-    const colour = best === "legend" ? 0xffd76a : best === "holo" ? 0x9be8ff : best === "rare" ? 0xffc94a : 0xbfd8ff;
-    const beamMat = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uColour: { value: new THREE.Color(colour) }, uFade: { value: 1 } },
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
-      vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }",
-      fragmentShader: `
-        varying vec2 vUv;
-        uniform float uTime;
-        uniform vec3 uColour;
-        uniform float uFade;
-        void main(){
-          float edge = smoothstep(0.0,0.35,vUv.x) * smoothstep(1.0,0.65,vUv.x);
-          float bands = 0.55 + 0.45 * step(0.45, fract(vUv.y*3.0 - uTime*1.2));
-          float a = edge * bands * uFade * 0.5;
-          gl_FragColor = vec4(uColour, a);
-        }
-      `,
-    });
-    const beam = new THREE.Mesh(new THREE.PlaneGeometry(220, 760), beamMat);
-    beam.position.set(0, 200, 40);
-    beam.visible = false;
-    this.beamMesh = beam;
-    this.scene.root.add(beam);
   }
 
   triggerFlash() {

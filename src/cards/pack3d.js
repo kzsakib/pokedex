@@ -30,7 +30,7 @@ function bulgedPlane(w, h, segX, segY, amount) {
 
 export function createPack({ front, back, strip }) {
   const group = new THREE.Group();
-  const frontMat = makeMaterial({ map: texture(front), glint: true });
+  const frontMat = makeMaterial({ map: texture(front) });
   frontMat.uniforms.uSheen.value = 0; /* no foil film over the pack art */
   frontMat.uniforms.uFlat.value = 1; /* and no stepped lighting wash */
   const backMat = makeMaterial({ map: texture(back) });
