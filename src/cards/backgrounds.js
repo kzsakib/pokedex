@@ -36,12 +36,13 @@ function ramp(ctx, x, y, w, h, stops) {
   const bands = stops.length - 1;
   const bandH = h / bands;
   for (let i = 0; i < bands; i += 1) {
-    const a = stops[i];
-    const b = stops[i + 1];
-    for (let yy = 0; yy < bandH; yy += 1) {
-      const t = yy / bandH;
-      const level = Math.round(t * 16);
-      dither(ctx, x, y + Math.round(i * bandH) + yy, w, 1, a, b, level > 12 ? 16 : level);
+    const top = Math.round(i * bandH);
+    const bottom = Math.round((i + 1) * bandH);
+    px(ctx, x, y + top, w, bottom - top, stops[i]);
+    /* only the seam is dithered, so the band stays a clean colour */
+    const fade = Math.max(2, Math.round((bottom - top) * 0.5));
+    for (let k = 0; k < fade; k += 1) {
+      dither(ctx, x, y + bottom - fade + k, w, 1, "transparent", stops[i + 1], Math.round((k / fade) * 11));
     }
   }
 }
