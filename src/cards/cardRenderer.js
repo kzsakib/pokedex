@@ -246,7 +246,9 @@ function drawRarity(ctx, rarity, x, y) {
 /* ---------- art window ---------- */
 
 const ART = { x: 8, y: 37, w: 144, h: 106, inner: { x: 10, y: 39, w: 140, h: 102 } };
-const BUFFER = { w: 70, h: 58 };
+/* EX art sits in a shallower box so the pokemon overflows its frame */
+const ART_EX = { x: 8, y: 36, w: 144, h: 98, inner: { x: 10, y: 38, w: 140, h: 94 } };
+const BUFFER = { w: 70, h: 51 };
 
 function artBuffer(card, sprite) {
   const canvas = document.createElement("canvas");
@@ -326,16 +328,102 @@ function artBuffer(card, sprite) {
   return canvas;
 }
 
-/* a sprite drawn straight onto the card, big enough to break the art frame */
-function drawBigSprite(ctx, sprite, scale, bottomY) {
-  const dw = Math.round(sprite.width * scale);
-  const dh = Math.round(sprite.height * scale);
+/* largest whole-number scale that stays inside the box: no resampling mush */
+function spriteScale(sprite, maxW, maxH) {
+  let k = 1;
+  while (sprite.width * (k + 1) <= maxW && sprite.height * (k + 1) <= maxH) k += 1;
+  return k;
+}
+
+function drawSpriteAt(ctx, sprite, k, bottomY) {
+  const dw = sprite.width * k;
+  const dh = sprite.height * k;
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(sprite, Math.round(CARD_W / 2 - dw / 2), Math.round(bottomY - dh), dw, dh);
 }
 
-function artWindow(ctx, card, sprite, omitSprite = false, omitArt = false) {
-  const { x, y, w, h } = ART;
+/* full art: the scene covers the whole face, text is printed over a light wash */
+function drawFullArt(ctx, card, sprite) {
+  const ramp = rampFor(card.tcg);
+  const skyTop = mix(ramp.light, "#ffffff", 0.66);
+  const skyMid = mix(ramp.light, "#ffffff", 0.34);
+  const skyLow = mix(ramp.light, ramp.base, 0.4);
+  const ground = mix(ramp.base, ramp.outline, 0.26);
+  const groundDeep = mix(ramp.outline, "#000000", 0.2);
+  const horizon = 122;
+
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = skyTop;
+  ctx.fillRect(0, 0, CARD_W, CARD_H);
+  /* dithered sky bands so the wash reads as pixel art, not a gradient */
+  const bands = [
+    [0, 76, skyTop],
+    [76, 26, skyMid],
+    [102, horizon - 102, skyLow],
+  ];
+  for (const [top, height, colour] of bands) {
+    ctx.fillStyle = colour;
+    ctx.fillRect(0, top, CARD_W, height);
+    for (let yy = top; yy < top + height; yy += 2) {
+      for (let xx = (yy / 2) % 2 === 0 ? 0 : 2; xx < CARD_W; xx += 4) {
+        if (BAYER[yy % 4][xx % 4] < 6) ctx.fillRect(xx, yy, 1, 1);
+      }
+    }
+  }
+
+  /* sun disc behind the pokemon */
+  ctx.fillStyle = mix(skyLow, "#ffffff", 0.55);
+  ctx.beginPath();
+  ctx.arc(CARD_W / 2, 78, 34, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = mix(skyLow, "#ffffff", 0.3);
+  ctx.beginPath();
+  ctx.arc(CARD_W / 2, 78, 46, 0, Math.PI * 2);
+  ctx.fill();
+
+  /* distant hills */
+  ctx.fillStyle = mix(ramp.base, ramp.light, 0.45);
+  for (let i = 0; i < 3; i += 1) {
+    const cx = 22 + i * 62;
+    const r = 30 + i * 6;
+    ctx.beginPath();
+    ctx.ellipse(cx, horizon + 4, r, 16, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /* ground with a lit horizon */
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, horizon, CARD_W, CARD_H - horizon);
+  ctx.fillStyle = mix(ground, "#ffffff", 0.3);
+  ctx.fillRect(0, horizon, CARD_W, 1);
+  ctx.fillStyle = mix(ground, groundDeep, 0.6);
+  ctx.fillRect(0, horizon + 10, CARD_W, 2);
+  for (let i = 0; i < 90; i += 1) {
+    const xx = (i * 37) % CARD_W;
+    const yy = horizon + 6 + ((i * 23) % (CARD_H - horizon - 8));
+    ctx.fillStyle = i % 3 === 0 ? mix(ground, "#ffffff", 0.12) : groundDeep;
+    ctx.fillRect(xx, yy, 2, 1);
+  }
+
+  if (sprite) {
+    const k = spriteScale(sprite, CARD_W - 24, 150);
+    const dh = sprite.height * k;
+    /* contact shadow, then the pokemon itself at whole-pixel scale */
+    ctx.fillStyle = "rgba(12,10,26,0.22)";
+    ctx.fillRect(CARD_W / 2 - Math.round(sprite.width * k * 0.34), 150, Math.round(sprite.width * k * 0.68), 3);
+    drawSpriteAt(ctx, sprite, k, 152 + Math.round(dh * 0.02));
+  }
+
+  /* soften the top and bottom so the printed text keeps its contrast */
+  for (let i = 0; i < 36; i += 1) {
+    ctx.fillStyle = `rgba(12,10,26,${(0.3 * (36 - i)) / 36})`;
+    ctx.fillRect(0, i, CARD_W, 1);
+  }
+}
+
+function artWindow(ctx, card, geo = ART) {
+  const { x, y, w, h } = geo;
+  const inner = geo.inner || { x: x + 2, y: y + 2, w: w - 4, h: h - 4 };
   // explicit border + bevel so every corner pixel is deliberate
   ctx.fillStyle = INK;
   for (let i = 0; i < w; i += 1) {
@@ -357,12 +445,7 @@ function artWindow(ctx, card, sprite, omitSprite = false, omitArt = false) {
   ctx.fillRect(x + 1, y + h - 2, w - 2, 1);
   ctx.fillRect(x + w - 2, y + 1, 1, h - 2);
 
-  const { inner } = ART;
-  if (omitArt) {
-    ctx.clearRect(inner.x, inner.y, inner.w, inner.h);
-    return;
-  }
-  const buffer = artBuffer(card, omitSprite ? null : sprite);
+  const buffer = artBuffer(card, null);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(buffer, 0, 0, BUFFER.w, BUFFER.h, inner.x, inner.y, inner.w, inner.h);
 }
@@ -376,12 +459,22 @@ const BAYER = [
   [15, 7, 13, 5],
 ];
 
-function frame(ctx, card) {
+function frame(ctx, card, options = {}) {
+  const bare = !!options.bare;
   const ramp = rampFor(card.tcg);
   const gold = card.rarity === "rare" || card.rarity === "holo" || card.rarity === "legend";
 
-  ctx.fillStyle = INK;
-  ctx.fillRect(0, 0, CARD_W, CARD_H);
+  if (!bare) {
+    ctx.fillStyle = INK;
+    ctx.fillRect(0, 0, CARD_W, CARD_H);
+  } else {
+    /* full art: keep only the printed border, the picture runs underneath */
+    ctx.fillStyle = INK;
+    ctx.fillRect(0, 0, CARD_W, 1);
+    ctx.fillRect(0, CARD_H - 1, CARD_W, 1);
+    ctx.fillRect(0, 0, 1, CARD_H);
+    ctx.fillRect(CARD_W - 1, 0, 1, CARD_H);
+  }
   // stair-stepped 4px corners
   ctx.clearRect(0, 0, 2, 1);
   ctx.clearRect(0, 0, 1, 2);
@@ -393,7 +486,7 @@ function frame(ctx, card) {
   ctx.clearRect(CARD_W - 1, CARD_H - 2, 1, 2);
 
   const lighter = mix(ramp.base, "#ffffff", 0.15);
-  for (let yy = 1; yy < CARD_H - 1; yy += 1) {
+  for (let yy = 1; yy < CARD_H - 1 && !bare; yy += 1) {
     for (let xx = 1; xx < CARD_W - 1; xx += 1) {
       const t = (BAYER[yy % 4][xx % 4] + 0.5) / 16;
       ctx.fillStyle = t < 0.55 ? ramp.base : lighter;
@@ -412,11 +505,13 @@ function frame(ctx, card) {
   ctx.fillRect(1, CARD_H - 2, CARD_W - 2, 1);
   ctx.fillRect(CARD_W - 2, 1, 1, CARD_H - 2);
 
-  ctx.fillStyle = mix(CREAM, ramp.base, 0.1);
-  ctx.fillRect(4, 4, CARD_W - 8, CARD_H - 8);
-  /* faint lighter line along the panel's top inner edge */
-  ctx.fillStyle = mix(CREAM, "#ffffff", 0.5);
-  ctx.fillRect(5, 4, CARD_W - 10, 1);
+  if (!bare) {
+    ctx.fillStyle = mix(CREAM, ramp.base, 0.1);
+    ctx.fillRect(4, 4, CARD_W - 8, CARD_H - 8);
+    /* faint lighter line along the panel's top inner edge */
+    ctx.fillStyle = mix(CREAM, "#ffffff", 0.5);
+    ctx.fillRect(5, 4, CARD_W - 10, 1);
+  }
 }
 
 /* ---------- moves and footer ---------- */
@@ -524,33 +619,27 @@ export function renderCard(card, sprite, options = {}) {
 
   frame(ctx, card);
 
-  /* premium cards bake the pokemon into the face, so the window never repeats it */
-  const premium = card.special === "ex" || card.special === "full";
-  const windowSprite = options.omitSprite || premium ? null : sprite;
-
   if (card.special === "full" && !options.omitArt) {
-    /* full art: the scene bleeds to the card edges, the pokemon carries it */
-    const backdrop = artBuffer(card, null);
-    ctx.imageSmoothingEnabled = false;
-    /* the scene keeps its proportions and sits on the plaque instead of stretching */
-    const artW = CARD_W - 8;
-    const artH = Math.round((BUFFER.h / BUFFER.w) * artW);
-    ctx.drawImage(backdrop, 4, 140 - artH, artW, artH);
-    if (sprite) drawBigSprite(ctx, sprite, 1.9, 138);
-    /* cream bands top and bottom keep the printed text readable over the art */
-    ctx.fillStyle = "rgba(246, 239, 212, 0.9)";
+    /* full art: the picture owns the whole face and the text prints over a wash */
+    drawFullArt(ctx, card, sprite);
+    frame(ctx, card, { bare: true });
+    ctx.fillStyle = "rgba(246, 239, 212, 0.55)";
     ctx.fillRect(4, 4, CARD_W - 8, 32);
-    ctx.fillRect(4, 140, CARD_W - 8, 76);
-    ctx.fillStyle = mix(rampFor(card.tcg).base, INK, 0.4);
-    ctx.fillRect(4, 35, CARD_W - 8, 1);
-    ctx.fillRect(4, 140, CARD_W - 8, 1);
+    ctx.fillStyle = "rgba(246, 239, 212, 0.78)";
+    ctx.fillRect(4, 139, CARD_W - 8, 74);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.16)";
+    ctx.fillRect(4, 4, CARD_W - 8, 1);
+    ctx.fillRect(4, 139, CARD_W - 8, 1);
   } else {
-    artWindow(ctx, card, windowSprite, !!options.omitSprite, !!options.omitArt);
-  }
-
-  /* EX: the pokemon swells out of its window and over the frame */
-  if (card.special === "ex" && sprite) {
-    drawBigSprite(ctx, sprite, 2.45, ART.inner.y + ART.inner.h + 2);
+    frame(ctx, card);
+    const geo = card.special === "ex" ? ART_EX : ART;
+    artWindow(ctx, card, geo);
+    if (sprite && !options.omitArt) {
+      const isEx = card.special === "ex";
+      /* EX: one shallow box, so the pokemon overflows the frame on both edges */
+      const k = spriteScale(sprite, geo.inner.w - 4, isEx ? geo.inner.h * 2 : geo.inner.h + 14);
+      drawSpriteAt(ctx, sprite, k, isEx ? geo.inner.y + geo.inner.h + 8 : geo.inner.y + geo.inner.h - 4);
+    }
   }
 
   // Row A

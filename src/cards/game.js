@@ -396,10 +396,10 @@ export class KantoPacksGame {
 
     for (const card of this.cards) {
       const sprite = await spriteFor(card);
-      const baked = card.special === "ex" || card.special === "full";
-      const front = renderCard(card, sprite, { omitSprite: true });
+      const front = renderCard(card, sprite);
       const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
-      const mesh = createCardMesh({ front, sprite: baked ? null : sprite, mask, rarity: card.rarity, finish: card.finish });
+      /* the pokemon is printed on the face, so nothing floats above it */
+      const mesh = createCardMesh({ front, sprite: null, mask, rarity: card.rarity, finish: card.finish });
       mesh.group.position.set(0, 40, 70 + this.meshes.length * 0.6);
       mesh.group.scale.setScalar(1);
       mesh.group.visible = false;
@@ -883,7 +883,7 @@ export class KantoPacksGame {
     for (const card of list) {
       const sprite = await spriteFor(card).catch(() => null);
       if (!wrap.isConnected) return;
-      const canvas = renderCard(card, sprite, { omitSprite: !sprite });
+      const canvas = renderCard(card, sprite);
       canvas.className = "kp-pull";
       const cell = document.createElement("figure");
       cell.className = `kp-pull-cell kp-${card.rarity}`;
@@ -958,10 +958,9 @@ export class KantoPacksGame {
     scene.canvas.style.height = "auto";
     scene.canvas.style.imageRendering = "pixelated";
 
-    const baked = card.special === "ex" || card.special === "full";
-    const front = renderCard(card, sprite, { omitSprite: true });
+    const front = renderCard(card, sprite);
     const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
-    const mesh = createCardMesh({ front, sprite: baked ? null : sprite, mask, rarity: card.rarity, finish: card.finish });
+    const mesh = createCardMesh({ front, sprite: null, mask, rarity: card.rarity, finish: card.finish });
     mesh.group.position.set(0, 6, 0);
     mesh.group.scale.setScalar(0.94); /* room for the slab edge and its shadow */
     scene.root.add(mesh.group);
