@@ -470,10 +470,10 @@ function frame(ctx, card, options = {}) {
   } else {
     /* full art: keep only the printed border, the picture runs underneath */
     ctx.fillStyle = INK;
-    ctx.fillRect(0, 0, CARD_W, 1);
-    ctx.fillRect(0, CARD_H - 1, CARD_W, 1);
-    ctx.fillRect(0, 0, 1, CARD_H);
-    ctx.fillRect(CARD_W - 1, 0, 1, CARD_H);
+    ctx.fillRect(0, 0, CARD_W, 2);
+    ctx.fillRect(0, CARD_H - 2, CARD_W, 2);
+    ctx.fillRect(0, 0, 2, CARD_H);
+    ctx.fillRect(CARD_W - 2, 0, 2, CARD_H);
   }
   // stair-stepped 4px corners
   ctx.clearRect(0, 0, 2, 1);
