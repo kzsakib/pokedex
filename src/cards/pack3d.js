@@ -32,8 +32,10 @@ export function createPack({ front, back, strip }) {
   const group = new THREE.Group();
   const frontMat = makeMaterial({ map: texture(front), glint: true });
   frontMat.uniforms.uSheen.value = 0; /* no foil film over the pack art */
+  frontMat.uniforms.uFlat.value = 1; /* and no stepped lighting wash */
   const backMat = makeMaterial({ map: texture(back) });
   backMat.uniforms.uSheen.value = 0;
+  backMat.uniforms.uFlat.value = 1;
   const body = new THREE.Mesh(bulgedPlane(PACK_W, PACK_H, 10, 20, 6), frontMat);
   group.add(body);
 
@@ -45,6 +47,7 @@ export function createPack({ front, back, strip }) {
   const stripTex = texture(strip);
   const stripMat = makeMaterial({ map: stripTex });
   stripMat.uniforms.uSheen.value = 0;
+  stripMat.uniforms.uFlat.value = 1;
   const stripMesh = new THREE.Mesh(new THREE.PlaneGeometry(PACK_W, TEAR_Y), stripMat);
   stripMesh.position.set(0, PACK_H / 2 - TEAR_Y / 2 + 0.02, 6.4);
   group.add(stripMesh);
