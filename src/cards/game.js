@@ -967,7 +967,8 @@ export class KantoPacksGame {
     const front = renderCard(card, sprite, { omitSprite: true });
     const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
     const mesh = createCardMesh({ front, sprite, mask, rarity: card.rarity, finish: card.finish });
-    mesh.group.position.set(0, 4, 0);
+    mesh.group.position.set(0, 6, 0);
+    mesh.group.scale.setScalar(0.94); /* room for the slab edge and its shadow */
     scene.root.add(mesh.group);
 
     let yaw = 0;
