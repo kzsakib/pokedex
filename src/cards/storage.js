@@ -76,6 +76,21 @@ export function recordPack(binder, cards) {
   return binder;
 }
 
+/* pulls saved before entries were kept get backfilled when the lore arrives */
+export function backfillNote(binder, card) {
+  let changed = false;
+  for (const pull of binder.pulls || []) {
+    const c = pull.card;
+    if (!c || !c.variant) continue;
+    if (c.id !== card.id) continue;
+    if (c.variant.key !== card.variant.key) continue;
+    c.variant.note = card.variant.note;
+    changed = true;
+  }
+  if (changed) saveBinder(binder);
+  return changed;
+}
+
 export function resetBinder() {
   try {
     localStorage.removeItem(KEY);

@@ -78,18 +78,18 @@ async function fromKey(card, timeoutMs) {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },
       body: JSON.stringify({
         model: "openai/gpt-oss-20b",
-        temperature: 1.05,
+        temperature: 1.15,
         max_tokens: 300,
         reasoning_effort: "low",
         messages: [
           {
             role: "system",
             content:
-              "You write one-line Pokédex entries for a fan card game. Reply with the entry only: a single sentence, at most 22 words, no quotation marks, no preamble.",
+              "You write Pokédex entries for a monster-catching game. Reply with the entry only: one sentence, 18 to 30 words, in-world and matter-of-fact, the way a real dex reads. Treat this individual's unusual colour as a natural adaptation: say what it eats, where it nests, how it hunts, or what the colour does for it. Be specific and a little strange. Never mention cards, printing, palettes, dyes, ink, screens, data or software, and never say it looks unusual.",
           },
           {
             role: "user",
-            content: `Species: ${card.name}. Its colours were completely swapped, so the card is labelled ${card.variant?.label || "REPAINTED"} and it now counts as a ${card.tcg} type. Write a Pokédex entry saying what happened to it and how it lives with the new colours.`,
+            content: `Species: ${card.name}. This individual is ${card.variant?.label || "REPAINTED"} rather than the usual colour for ${card.name}. Write its Pokédex entry.`,
           },
         ],
       }),

@@ -66,7 +66,7 @@ export default {
     const tcg = TYPES.has(body?.tcg) ? body.tcg : "Colorless";
     if (name.length < 2) return reply({ error: "bad species" }, 400, origin);
 
-    const prompt = `${name} is normally a different colour: this individual is ${label}. Write its Pokédex entry: one sentence about this pokemon's life, habits or habitat that makes its ${label} colouring feel natural, as if it is simply a rare variant of the species.`;
+    const prompt = `Species: ${name}. This individual is ${label} rather than the usual colour for ${name}. Write its Pokédex entry.`;
 
     let upstream;
     try {
@@ -75,14 +75,14 @@ export default {
         headers: { "content-type": "application/json", authorization: `Bearer ${env.GROQ_KEY}` },
         body: JSON.stringify({
           model: "openai/gpt-oss-20b",
-          temperature: 1.05,
+          temperature: 1.15,
           max_tokens: 300,
           reasoning_effort: "low",
           messages: [
             {
               role: "system",
               content:
-                "You write Pokédex entries in the style of the games: factual, in-world, about the pokemon itself. Reply with the entry only: one sentence, at most 22 words, no quotation marks, no preamble. Never mention cards, printing, palettes, inks, dyes, screens, data or software.",
+                "You write Pokédex entries for a monster-catching game. Reply with the entry only: one sentence, 18 to 30 words, in-world and matter-of-fact, the way a real dex reads. Treat this individual's unusual colour as a natural adaptation: say what it eats, where it nests, how it hunts, or what the colour does for it. Be specific and a little strange. Never mention cards, printing, palettes, dyes, ink, screens, data or software, and never say it looks unusual.",
             },
             { role: "user", content: prompt },
           ],
@@ -97,7 +97,7 @@ export default {
     const line = String(data?.choices?.[0]?.message?.content || "")
       .trim()
       .replace(/^["'“]|["'”]$/g, "")
-      .slice(0, 220);
+      .slice(0, 400);
     if (!line) return reply({ error: "empty completion" }, 502, origin);
     return reply({ line }, 200, origin);
   },

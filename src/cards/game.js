@@ -14,7 +14,7 @@ import { renderPackFront, renderPackBack, renderStrip, VARIANTS } from "./packAr
 const FINISH_TAG = { reverse: " · REVERSE", holo: "", prism: " · PRISM", gold: " · GOLD", foil: " · FOIL", star: " · STARLIGHT", ember: " · EMBER", crystal: " · CRYSTAL", lightning: " · STORM", bubble: " · AQUA", grid: " · CIRCUIT", confetti: " · FESTIVAL", shiny: "" };
 import { freshSeed } from "./rng.js";
 import { KantoAudio } from "./audio.js";
-import { loadBinder, recordPack, resetBinder } from "./storage.js";
+import { loadBinder, recordPack, resetBinder, backfillNote } from "./storage.js";
 
 const ORDER = ["common", "uncommon", "rare", "holo", "legend"];
 const SPARKLES = { uncommon: "silver", rare: "gold", holo: "rainbow", legend: "legend" };
@@ -321,6 +321,27 @@ export class KantoPacksGame {
   }
 
   async newPack(keepSeed = false) {
+    if (this.newPackBusy) return;
+    this.newPackBusy = true;
+    this.closePullView();
+    this.el.binder.hidden = true;
+    this.el.help.hidden = true;
+    this.el.summary.classList.remove("kp-show");
+    this.el.caption.classList.remove("kp-show");
+    this.el.caption.innerHTML = "";
+    if (this.entryEl) this.entryEl.textContent = "";
+    if (this.typeTimer) {
+      clearInterval(this.typeTimer);
+      this.typeTimer = null;
+    }
+    this.dragging = false;
+    this.slicing = false;
+    this.summaryDragging = false;
+    this.focusIndex = -1;
+    this.suppressPick = false;
+    this.summaryScroll = 0;
+    this.hoverYaw = 0;
+    this.hoverPitch = 0;
     this.clearScene();
     if (!keepSeed) this.seed = freshSeed();
     this.tear = 0;
@@ -350,9 +371,12 @@ export class KantoPacksGame {
     this.scene.root.add(this.pack.group);
     this.setPhase("idle");
     this.packKick = 0;
+    this.newPackBusy = false;
   }
 
   async generate() {
+    if (this.generating) return;
+    this.generating = true;
     this.container.classList.add("kp-loading");
     this.drawLoaderBall();
     this.resetLoader();
@@ -382,13 +406,17 @@ export class KantoPacksGame {
         .filter((card) => card.variant)
         .map(async (card) => {
           const line = await chromaLore(card);
-          if (line) card.variant.note = line;
+          if (line) {
+            card.variant.note = line;
+            backfillNote(this.binder, card);
+          }
         })
     );
 
     /* the pack has served its purpose once the cards exist */
     if (this.pack) this.pack.group.visible = false;
     await minShow;
+    this.generating = false;
     this.container.classList.remove("kp-loading");
 
     /* light beam hints at the best pull */
@@ -498,9 +526,7 @@ export class KantoPacksGame {
           this.audio.tear(this.tear);
           return;
         }
-        this.dragging = true;
-        this.packTilt.vy = 0;
-        this.packTilt.vp = 0;
+        /* the pack is not draggable: it only leans toward the cursor */
         this.packKick = 1;
         return;
       }
@@ -537,6 +563,13 @@ export class KantoPacksGame {
       if (this.slicing) {
         this.tearAt(p);
         return;
+      }
+      if (this.phase === "idle" || this.phase === "tearing") {
+        const rect = this.scene.canvas.getBoundingClientRect();
+        const nx = clamp((e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2), -1, 1);
+        const ny = clamp((e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2), -1, 1);
+        this.hoverYaw = -nx * 0.38;
+        this.hoverPitch = -ny * 0.24;
       }
       if ((this.phase === "reveal" || this.phase === "stack" || this.phase === "summary") && !this.dragging) {
         /* lean away from the pointer: the side under the cursor sinks back */
@@ -969,7 +1002,10 @@ export class KantoPacksGame {
     }
 
     if (pack) {
-      if (!this.dragging) {
+      if (this.phase === "idle" || this.phase === "tearing" || this.phase === "flash" || this.phase === "emerge") {
+        this.packTilt.yaw += ((this.hoverYaw || 0) - this.packTilt.yaw) * 0.07;
+        this.packTilt.pitch += ((this.hoverPitch || 0) - this.packTilt.pitch) * 0.07;
+      } else if (!this.dragging) {
         this.packTilt.yaw += this.packTilt.vy;
         this.packTilt.pitch = clamp(this.packTilt.pitch + this.packTilt.vp, -0.44, 0.44);
         this.packTilt.vy *= 0.92;

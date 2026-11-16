@@ -303,8 +303,8 @@ export class PixelScene {
     const rect = this.container.getBoundingClientRect();
     const portrait = rect.height > rect.width * 1.05;
     /* fewer world units across the same box = a physically bigger card and pack */
-    this.W = portrait ? 310 : 850;
-    this.H = portrait ? 600 : 600;
+    this.W = portrait ? 288 : 790;
+    this.H = portrait ? 560 : 560;
     this.renderer.setSize(this.W, this.H, false);
     this.camera.left = -this.W / 2;
     this.camera.right = this.W / 2;

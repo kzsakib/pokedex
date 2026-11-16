@@ -1,6 +1,6 @@
 /* Card meshes: crisp front/back planes, stepped flip, tilt and holo shimmer. */
-const THICK = 7;    /* real thickness so the card reads as an object, not a decal */
-const SPRITE_Z = 6;  /* how far the art floats above the face */
+const THICK = 5.5;   /* real thickness so the card reads as an object, not a decal */
+const SPRITE_Z = 11; /* how far the art floats above the face */
 import * as THREE from "three";
 import { makeMaterial } from "./scene.js";
 import { holoDensityFor } from "./holo.js";
@@ -101,7 +101,7 @@ export function createCardMesh({ front, sprite, mask, rarity, finish = "plain", 
     depthWrite: false,
     depthTest: false,
   });
-  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(152, 32), shadowMat);
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(168, 36), shadowMat);
   shadow.position.set(0, -CARD_H / 2 - 10, -THICK - 4);
   shadow.renderOrder = -1;
   group.add(shadow);
@@ -120,11 +120,11 @@ export function createCardMesh({ front, sprite, mask, rarity, finish = "plain", 
       group.rotation.y = x;
       group.rotation.x = y;
       frontMat.uniforms.uTilt.value.set(x, y);
-      shadow.position.x = -x * 110;
-      shadow.position.y = -CARD_H / 2 - 10 + y * 46;
+      shadow.position.x = -x * 150;
+      shadow.position.y = -CARD_H / 2 - 12 + y * 62;
       const k = 1 - Math.min(0.16, (Math.abs(x) + Math.abs(y)) * 0.5);
       shadow.scale.set(k, k, 1);
-      shadowMat.opacity = 0.55 + Math.min(0.2, (Math.abs(x) + Math.abs(y)) * 0.5);
+      shadowMat.opacity = 0.62 + Math.min(0.24, (Math.abs(x) + Math.abs(y)) * 0.6);
     },
     setFlipWithTilt(flip, x, y) {
       group.rotation.y = Math.PI * flip + x;
