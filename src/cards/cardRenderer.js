@@ -404,7 +404,7 @@ export function cardSpriteLayout(card, sprite) {
   }
   const isEx = card.special === "ex";
   const geo = isEx ? ART_EX : ART;
-  const k = fitScale(clean, geo.inner.w - 10, isEx ? geo.inner.h + 10 : geo.inner.h - 8);
+  const k = fitScale(clean, geo.inner.w - 22, isEx ? geo.inner.h + 10 : geo.inner.h - 16);
   const w = clean.width * k;
   const h = clean.height * k;
   const bottom = isEx ? geo.inner.y + geo.inner.h + 8 : geo.inner.y + geo.inner.h - 6;
