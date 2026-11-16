@@ -74,9 +74,25 @@ function textWidth(s, font, sp = 1) {
   return Math.max(0, w - sp);
 }
 
-function glyphs(ctx, text, font, x, y, color, sp, scale = 1) {
+/* full art prints its text over the picture, so the ink palette is swapped for that pass */
+let TEXT_MODE = null;
+function ink(colour) {
+  if (!TEXT_MODE) return colour;
+  if (colour === TEXT) return TEXT_MODE.text;
+  if (colour === TEXT_MUTED) return TEXT_MODE.muted;
+  if (colour === SHADOW) return TEXT_MODE.shadow;
+  if (colour === "#544854") return TEXT_MODE.effect;
+  return colour;
+}
+
+function glyphs(ctx, text, font, x, y, color, sp, scale = 1, outline = false) {
   if (globalThis.__textLog) globalThis.__textLog.push({ text, x: Math.round(x), y: Math.round(y), color, scale });
-  ctx.fillStyle = color;
+  if (TEXT_MODE && TEXT_MODE.outline && !outline && ink(color) === TEXT_MODE.text) {
+    for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      glyphs(ctx, text, font, x + ox, y + oy, TEXT_MODE.outline, sp, scale, true);
+    }
+  }
+  ctx.fillStyle = ink(color);
   let cx = Math.round(x);
   const cy = Math.round(y);
   for (const ch of text) {
@@ -342,81 +358,101 @@ function drawSpriteAt(ctx, sprite, k, bottomY) {
   ctx.drawImage(sprite, Math.round(CARD_W / 2 - dw / 2), Math.round(bottomY - dh), dw, dh);
 }
 
-/* full art: the scene covers the whole face, text is printed over a light wash */
+/* full art: the illustration covers the whole face and the text prints over it */
 function drawFullArt(ctx, card, sprite) {
   const ramp = rampFor(card.tcg);
-  const skyTop = mix(ramp.light, "#ffffff", 0.66);
-  const skyMid = mix(ramp.light, "#ffffff", 0.34);
-  const skyLow = mix(ramp.light, ramp.base, 0.4);
-  const ground = mix(ramp.base, ramp.outline, 0.26);
-  const groundDeep = mix(ramp.outline, "#000000", 0.2);
-  const horizon = 122;
+  const skyHigh = mix(ramp.light, "#ffffff", 0.72);
+  const skyMid = mix(ramp.light, "#ffffff", 0.4);
+  const skyLow = mix(ramp.light, ramp.base, 0.3);
+  const hillFar = mix(ramp.base, ramp.light, 0.55);
+  const hillNear = mix(ramp.base, ramp.outline, 0.12);
+  const ground = mix(ramp.base, ramp.outline, 0.34);
+  const groundDeep = mix(ramp.outline, "#000000", 0.22);
+  const horizon = 116;
 
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = skyTop;
-  ctx.fillRect(0, 0, CARD_W, CARD_H);
-  /* dithered sky bands so the wash reads as pixel art, not a gradient */
+
+  /* sky: three bands with a dithered seam so it reads as pixel art */
   const bands = [
-    [0, 76, skyTop],
-    [76, 26, skyMid],
-    [102, horizon - 102, skyLow],
+    [0, 62, skyHigh],
+    [62, 34, skyMid],
+    [96, horizon - 96, skyLow],
   ];
   for (const [top, height, colour] of bands) {
     ctx.fillStyle = colour;
     ctx.fillRect(0, top, CARD_W, height);
-    for (let yy = top; yy < top + height; yy += 2) {
-      for (let xx = (yy / 2) % 2 === 0 ? 0 : 2; xx < CARD_W; xx += 4) {
-        if (BAYER[yy % 4][xx % 4] < 6) ctx.fillRect(xx, yy, 1, 1);
+  }
+
+  /* low sun behind the pokemon, dithered edge so it stays pixel art */
+  for (let r = 34; r > 0; r -= 2) {
+    ctx.fillStyle = mix(skyLow, "#ffffff", 0.22 + (34 - r) / 90);
+    const inner = r - 2;
+    for (let yy = -r; yy <= r; yy += 1) {
+      const half = Math.sqrt(Math.max(0, r * r - yy * yy));
+      const halfIn = Math.max(0, inner * inner - yy * yy);
+      const x0 = Math.round(CARD_W / 2 - half);
+      const w = Math.round(half * 2);
+      if (w <= 0) continue;
+      ctx.fillRect(x0, 88 + yy, w, 1);
+      if (halfIn > 0) {
+        ctx.clearRect(0, 0, 0, 0);
       }
     }
   }
 
-  /* sun disc behind the pokemon */
-  ctx.fillStyle = mix(skyLow, "#ffffff", 0.55);
-  ctx.beginPath();
-  ctx.arc(CARD_W / 2, 78, 34, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = mix(skyLow, "#ffffff", 0.3);
-  ctx.beginPath();
-  ctx.arc(CARD_W / 2, 78, 46, 0, Math.PI * 2);
-  ctx.fill();
+  /* two hill layers with stepped, dithered tops */
+  const hill = (baseY, height, colour, offset) => {
+    for (let xx = 0; xx < CARD_W; xx += 2) {
+      const wave = Math.sin((xx + offset) / 26) * 10 + Math.sin((xx + offset) / 9) * 3;
+      const top = Math.round(baseY - height - wave);
+      ctx.fillStyle = colour;
+      ctx.fillRect(xx, top, 2, horizon + 6 - top);
+      ctx.fillStyle = mix(colour, "#ffffff", 0.22);
+      ctx.fillRect(xx, top, 2, 2);
+    }
+  };
+  hill(horizon, 6, hillFar, 18);
+  hill(horizon + 2, 3, hillNear, 70);
 
-  /* distant hills */
-  ctx.fillStyle = mix(ramp.base, ramp.light, 0.45);
-  for (let i = 0; i < 3; i += 1) {
-    const cx = 22 + i * 62;
-    const r = 30 + i * 6;
-    ctx.beginPath();
-    ctx.ellipse(cx, horizon + 4, r, 16, 0, Math.PI, Math.PI * 2);
-    ctx.fill();
-  }
-
-  /* ground with a lit horizon */
+  /* ground */
   ctx.fillStyle = ground;
-  ctx.fillRect(0, horizon, CARD_W, CARD_H - horizon);
-  ctx.fillStyle = mix(ground, "#ffffff", 0.3);
-  ctx.fillRect(0, horizon, CARD_W, 1);
-  ctx.fillStyle = mix(ground, groundDeep, 0.6);
-  ctx.fillRect(0, horizon + 10, CARD_W, 2);
-  for (let i = 0; i < 90; i += 1) {
-    const xx = (i * 37) % CARD_W;
-    const yy = horizon + 6 + ((i * 23) % (CARD_H - horizon - 8));
-    ctx.fillStyle = i % 3 === 0 ? mix(ground, "#ffffff", 0.12) : groundDeep;
-    ctx.fillRect(xx, yy, 2, 1);
+  ctx.fillRect(0, horizon + 4, CARD_W, CARD_H - horizon - 4);
+  ctx.fillStyle = mix(ground, "#ffffff", 0.28);
+  ctx.fillRect(0, horizon + 4, CARD_W, 1);
+  ctx.fillStyle = groundDeep;
+  ctx.fillRect(0, horizon + 22, CARD_W, 2);
+  ctx.fillRect(0, CARD_H - 3, CARD_W, 3);
+  /* a few deliberate tufts along the horizon, nothing scattered under the text */
+  for (const [tx, blades, tone] of [[16, 3, 0.16], [42, 2, 0.1], [63, 4, 0.18], [96, 2, 0.12], [118, 3, 0.16], [143, 2, 0.1]]) {
+    ctx.fillStyle = mix(ground, "#ffffff", tone);
+    for (let b = 0; b < blades; b += 1) {
+      const bx = tx + b * 3;
+      const bh = 2 + (b % 2) * 2;
+      ctx.fillRect(bx, horizon + 8 - bh, 1, bh);
+      ctx.fillRect(bx + 1, horizon + 8 - bh + 1, 1, bh - 1);
+    }
   }
 
   if (sprite) {
-    const k = spriteScale(sprite, CARD_W - 24, 150);
+    const k = spriteScale(sprite, CARD_W - 28, 132);
     const dh = sprite.height * k;
-    /* contact shadow, then the pokemon itself at whole-pixel scale */
-    ctx.fillStyle = "rgba(12,10,26,0.22)";
-    ctx.fillRect(CARD_W / 2 - Math.round(sprite.width * k * 0.34), 150, Math.round(sprite.width * k * 0.68), 3);
-    drawSpriteAt(ctx, sprite, k, 152 + Math.round(dh * 0.02));
+    const dw = sprite.width * k;
+    const feet = 144;
+    ctx.fillStyle = "rgba(12, 10, 26, 0.26)";
+    ctx.fillRect(Math.round(CARD_W / 2 - dw * 0.3), feet - 2, Math.round(dw * 0.6), 3);
+    drawSpriteAt(ctx, sprite, k, feet);
+    void dh;
   }
 
-  /* soften the top and bottom so the printed text keeps its contrast */
-  for (let i = 0; i < 36; i += 1) {
-    ctx.fillStyle = `rgba(12,10,26,${(0.3 * (36 - i)) / 36})`;
+  /* ink scrim so the light text keeps its contrast over the illustration */
+  const scrimTop = 112;
+  for (let i = 0; i < CARD_H - scrimTop; i += 1) {
+    const t = i / (CARD_H - scrimTop);
+    ctx.fillStyle = `rgba(10, 8, 22, ${(0.26 * t ** 1.4).toFixed(3)})`;
+    ctx.fillRect(0, scrimTop + i, CARD_W, 1);
+  }
+  for (let i = 0; i < 34; i += 1) {
+    ctx.fillStyle = `rgba(10, 8, 22, ${(0.3 * (34 - i)) / 34})`;
     ctx.fillRect(0, i, CARD_W, 1);
   }
 }
@@ -616,6 +652,7 @@ export function renderCard(card, sprite, options = {}) {
   ctx.imageSmoothingEnabled = false;
 
   lint = options.lint ? { boxes: [] } : null;
+  TEXT_MODE = null;
 
   frame(ctx, card);
 
@@ -623,13 +660,11 @@ export function renderCard(card, sprite, options = {}) {
     /* full art: the picture owns the whole face and the text prints over a wash */
     drawFullArt(ctx, card, sprite);
     frame(ctx, card, { bare: true });
-    ctx.fillStyle = "rgba(246, 239, 212, 0.55)";
-    ctx.fillRect(4, 4, CARD_W - 8, 32);
-    ctx.fillStyle = "rgba(246, 239, 212, 0.78)";
-    ctx.fillRect(4, 139, CARD_W - 8, 74);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.16)";
+    /* printed hairlines, no panel: the art stays visible behind the attacks */
+    ctx.fillStyle = "rgba(246, 239, 212, 0.4)";
     ctx.fillRect(4, 4, CARD_W - 8, 1);
-    ctx.fillRect(4, 139, CARD_W - 8, 1);
+    ctx.fillRect(4, 138, CARD_W - 8, 1);
+    ctx.fillRect(4, 207, CARD_W - 8, 1);
   } else {
     frame(ctx, card);
     const geo = card.special === "ex" ? ART_EX : ART;
@@ -654,7 +689,7 @@ export function renderCard(card, sprite, options = {}) {
   lintDraw("A", 151 - hpW - 18, 13, 16, 5, () => drawText(ctx, 151 - hpW - 2, 13, "HP", F3, TEXT, 1, "r"));
 
   // Row B
-  const nameMax = 118;
+  const nameMax = card.special === "ex" ? 110 : 118;
   lintDraw("B", 8, 21, nameMax, 14, () => {
     const raw = upper(card.name);
     let n = raw;
@@ -664,8 +699,13 @@ export function renderCard(card, sprite, options = {}) {
   });
   lintDraw("B", 142, 23, 9, 9, () => drawIcon(ctx, card.tcg, 142, 23));
   if (card.special === "ex") {
-    drawText(ctx, 118, 22, "EX", F5, SHADOW, 1, "l", 1);
-    drawText(ctx, 117, 21, "EX", F5, "#c8281e", 1, "l", 1);
+    drawText(ctx, 137, 24, "EX", F5, SHADOW, 1, "r", 1);
+    drawText(ctx, 136, 23, "EX", F5, "#c8281e", 1, "r", 1);
+  }
+
+  if (card.special === "full" && !options.omitArt) {
+    /* below the picture's horizon the text prints light over the ink scrim */
+    TEXT_MODE = { text: "#f6efd4", muted: "#e8dfc6", shadow: "#0a0816", effect: "#ded5b8" };
   }
 
   // info strip
@@ -679,8 +719,10 @@ export function renderCard(card, sprite, options = {}) {
   lintDraw("info", 146, 145, 5, 5, () => drawRarity(ctx, card.rarity, 146, 145));
 
   // move slots
+  const fullArt = card.special === "full" && !options.omitArt;
+  const ruleColour = fullArt ? "rgba(246, 239, 212, 0.45)" : mix(rampFor(card.tcg).base, INK, 0.25);
   moveSlot(ctx, card, card.moves[0], 152, "move1");
-  ctx.fillStyle = mix(rampFor(card.tcg).base, INK, 0.25);
+  ctx.fillStyle = ruleColour;
   for (let x = 8; x < 152; x += 2) ctx.fillRect(x, 169, 1, 1);
 
   if (card.moves[1]) {
@@ -696,9 +738,10 @@ export function renderCard(card, sprite, options = {}) {
 
   }
 
-  ctx.fillStyle = mix(rampFor(card.tcg).base, INK, 0.3);
+  ctx.fillStyle = fullArt ? "rgba(246, 239, 212, 0.4)" : mix(rampFor(card.tcg).base, INK, 0.3);
   ctx.fillRect(6, 207, 148, 1);
   footer(ctx, card);
+  TEXT_MODE = null;
 
   if (lint) {
     const seen = new Map();
