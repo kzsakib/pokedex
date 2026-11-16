@@ -228,28 +228,6 @@ function recolorSprite(base, variant) {
     let nl = variant.invert ? 1 - l : l;
     nl = Math.min(1, Math.max(0, nl * (variant.light ?? 1)));
     let out = hslToRgb(h, sat, nl);
-    /* hue moved, brightness did not: each shade is lifted toward white (or
-       pulled down) until it carries the luminance the source pixel had, so a
-       pale highlight stays pale and an outline stays dark after the swap */
-    if (!variant.invert && !variant.ramp && !variant.swap && (variant.hueMap || typeof variant.targetHue === "number")) {
-      const srcY = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      let c0 = out[0] / 255;
-      let c1 = out[1] / 255;
-      let c2 = out[2] / 255;
-      const gotY = 0.2126 * c0 + 0.7152 * c1 + 0.0722 * c2;
-      if (srcY > 0.004 && gotY < srcY) {
-        const mix = (srcY - gotY) / Math.max(0.02, 1 - gotY); /* toward white */
-        c0 += (1 - c0) * mix;
-        c1 += (1 - c1) * mix;
-        c2 += (1 - c2) * mix;
-      } else if (gotY > 0.004 && gotY > srcY) {
-        const k = srcY / gotY;
-        c0 *= k;
-        c1 *= k;
-        c2 *= k;
-      }
-      out = [Math.round(c0 * 255), Math.round(c1 * 255), Math.round(c2 * 255)];
-    }
     if (variant.ramp) out = rampColor(variant.ramp, nl);
     if (variant.swap) {
       const v = [out[0], out[1], out[2]];
