@@ -677,6 +677,11 @@ export function renderCard(card, sprite, options = {}) {
     }
   }
 
+  if (card.special === "full" && !options.omitArt) {
+    /* every printed line goes light with a dark keyline so it reads over the art */
+    TEXT_MODE = { text: "#f6efd4", muted: "#e8dfc6", shadow: "#0a0816", effect: "#ded5b8", outline: "#0d0b1e" };
+  }
+
   // Row A
   const stageName = card.rarity === "legend" ? "LEGEND" : card.stage === 2 ? "STAGE 2" : card.stage === 1 ? "STAGE 1" : "BASIC";
   lintDraw("A", 8, 10, 60, 5, () => drawText(ctx, 8, 10, `${stageName}  LV.${card.level}`, F3, TEXT, 1));
@@ -701,11 +706,6 @@ export function renderCard(card, sprite, options = {}) {
   if (card.special === "ex") {
     drawText(ctx, 137, 24, "EX", F5, SHADOW, 1, "r", 1);
     drawText(ctx, 136, 23, "EX", F5, "#c8281e", 1, "r", 1);
-  }
-
-  if (card.special === "full" && !options.omitArt) {
-    /* below the picture's horizon the text prints light over the ink scrim */
-    TEXT_MODE = { text: "#f6efd4", muted: "#e8dfc6", shadow: "#0a0816", effect: "#ded5b8" };
   }
 
   // info strip
