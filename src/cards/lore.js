@@ -29,18 +29,22 @@ export function hueLabel(hueMap, source) {
   return HUE_FAMILIES[best];
 }
 
+/* entries say why the colour changed, never what the colour is */
+const COLOUR =
+  /\b(jade|magenta|crimson|cobalt|azure|violet|amber|verdant|lime|cyan|indigo|ember|teal|scarlet|maroon|ochre|purple|pink|green|blue|red|yellow|orange|brown|grey|gray|white|black|gold|silver|bronze|copper|turquoise|lavender|olive|beige|rust|rose|mint|navy|hued|hue|colou?r|colou?red|shade|tint|pigment|palette|dark|pale|blacken\w*|reddish|greenish|bluish|greyish|grayish|yellowish|pinkish|purplish|brownish|whiten\w*)\b/i;
+
 const TEMPLATES = [
-  (c, l) => `${c.name} hatched with ${l} markings instead of its usual colours; it uses them to hide in flowering fields.`,
-  (c, l) => `A ${l} strain of ${c.name} lives only in the deep caves, where the stone stains everything that stays too long.`,
-  (c, l) => `${c.name} changes colour when it feeds, and this ${l} shade means it has been eating nothing but mineral-rich soil.`,
-  (c, l) => `Rangers report ${c.name} in ${l} only in the cold months; the colour fades again by spring.`,
-  (c, l) => `This ${c.name} grew up among ${l} plants, and its body copied the shade to blend in with the leaves.`,
-  (c, l) => `${c.name} glows ${l} when it is ready to evolve, warning other pokemon to keep their distance.`,
+  (c) => `${c.name} nests in mineral caves as a hatchling, and the dust it breathes settles in its coat for life.`,
+  (c) => `Rangers only find ${c.name} where volcanic soil is warm; the heat changes how its body grows its markings.`,
+  (c) => `This ${c.name} feeds on fermented berries, and the acids in them permanently alter the way its skin reflects light.`,
+  (c) => `${c.name} hides among flowering vines as a juvenile, and its body copies the plants it grows up beside.`,
+  (c) => `A ${c.name} that survives a lightning strike often keeps the scorched pattern for the rest of its life.`,
+  (c) => `Deep water blocks the sunlight ${c.name} needs, so its body compensates by changing how it catches the light.`,
 ];
 
 export function fallbackLore(card, seed = 0) {
   const pick = Math.abs(Math.floor(seed)) % TEMPLATES.length;
-  return TEMPLATES[pick](card, (card.variant && card.variant.label) || "UNUSUAL");
+  return TEMPLATES[pick](card);
 }
 
 async function fromProxy(card, timeoutMs) {
@@ -53,7 +57,6 @@ async function fromProxy(card, timeoutMs) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: card.name,
-        label: card.variant?.label || "REPAINTED",
         tcg: card.tcg,
       }),
     });
@@ -61,7 +64,8 @@ async function fromProxy(card, timeoutMs) {
     const json = await res.json();
     const line = String(json?.line || "").trim();
     if (!line) throw new Error("proxy empty");
-    return line;
+    /* the entry explains the cause, it must never name the colour */
+    return COLOUR.test(line) ? null : line;
   } finally {
     clearTimeout(timer);
   }
@@ -85,11 +89,11 @@ async function fromKey(card, timeoutMs) {
           {
             role: "system",
             content:
-              "You write Pokédex entries for a monster-catching game. Reply with the entry only: one sentence, 18 to 30 words, in-world and matter-of-fact, the way a real dex reads. Treat this individual's unusual colour as a natural adaptation: say what it eats, where it nests, how it hunts, or what the colour does for it. Be specific and a little strange. Never mention cards, printing, palettes, dyes, ink, screens, data or software, and never say it looks unusual.",
+              "You write Pokédex entries for a monster-catching game. Reply with the entry only: one sentence, 18 to 30 words, in-world and matter-of-fact. Explain what in this individual's life, diet, habitat or history changed its colouring and how that helps it survive. Never name a colour, hue, shade, tint or pigment, and never call it odd, unusual, a variant or a mutation: describe the cause and the behaviour only. Never mention cards, printing or software.",
           },
           {
             role: "user",
-            content: `Species: ${card.name}. This individual is ${card.variant?.label || "REPAINTED"} rather than the usual colour for ${card.name}. Write its Pokédex entry.`,
+            content: `Species: ${card.name}. Type: ${card.tcg}. Write its Pokédex entry: what in its life, diet or habitat changed its colouring, and how that helps it survive. Do not name any colour.`,
           },
         ],
       }),
@@ -97,7 +101,8 @@ async function fromKey(card, timeoutMs) {
     if (!res.ok) throw new Error(`groq ${res.status}`);
     const json = await res.json();
     const line = json?.choices?.[0]?.message?.content?.trim().replace(/^["'“]|["'”]$/g, "");
-    return line || null;
+    if (!line || COLOUR.test(line)) return null;
+    return line;
   } finally {
     clearTimeout(timer);
   }
