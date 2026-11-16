@@ -192,7 +192,7 @@ void main() {
       float line = max(smoothstep(0.47, 0.5, gx), smoothstep(0.47, 0.5, gy));
       col = mix(col, vec3(0.86, 0.9, 1.0), onFrame * line * 0.10);
       col = mix(col, vec3(1.0), onFrame * smoothstep(0.9, 1.0, fract(vUv.y * 0.9 + tilt.x * 0.4)) * 0.05);
-    } else {
+    } else if (uEffect < 12.5) {
       /* confetti: flecks that tumble only behind the art */
       vec2 p = vUv * vec2(26.0, 36.0) + tilt * 0.8;
       vec2 cell = floor(p);
@@ -203,6 +203,111 @@ void main() {
         vec3 pick = h > 0.975 ? vec3(1.0, 0.44, 0.54) : h > 0.955 ? vec3(1.0, 0.86, 0.36) : vec3(0.5, 0.74, 1.0);
         col = mix(col, pick, inArt * flake * 0.35);
       }
+    } else if (uEffect < 13.5) {
+      /* aurora: ribbons of light drifting up the art, each one out of phase */
+      float ribbons = 0.0;
+      for (int i = 0; i < 3; i++) {
+        float fi = float(i);
+        float x = vUv.x * (3.0 + fi * 1.4) + sin(vUv.y * (7.0 - fi) + t * (0.25 + fi * 0.08) + tilt.x * 2.0 + fi * 2.1) * 0.35;
+        float ribbon = smoothstep(0.42, 0.0, abs(fract(x) - 0.5));
+        float lift = smoothstep(0.05, 0.5, vUv.y) * smoothstep(0.95, 0.55, vUv.y);
+        ribbons += ribbon * lift * (0.55 + 0.45 * sin(t * 0.6 + fi * 2.0));
+      }
+      vec3 aur = mix(vec3(0.35, 1.0, 0.62), vec3(0.62, 0.52, 1.0), smoothstep(0.2, 0.8, vUv.x));
+      col = mix(col, aur, inArt * min(ribbons, 1.0) * 0.16);
+      col = mix(col, vec3(0.92, 1.0, 0.95), inArt * smoothstep(0.85, 1.0, ribbons) * 0.10);
+    } else if (uEffect < 14.5) {
+      /* rain of glyphs: columns of blocks falling at different speeds */
+      float colX = floor(vUv.x * 22.0);
+      float hc = fract(sin(colX * 12.9898) * 43758.5453);
+      float speed = 0.25 + hc * 0.55;
+      float drop = fract(vUv.y * 1.0 + t * speed + hc * 7.0);
+      float head = smoothstep(0.36, 0.3, drop) * step(drop, 0.36);
+      float trail = smoothstep(0.9, 0.34, drop) * 0.55;
+      vec2 q = fract(vec2(vUv.x * 22.0, vUv.y * 26.0 - t * speed * 26.0));
+      float glyph = step(0.42, fract(sin(floor(q.x) * 1.7 + floor(q.y) * 17.0) * 43758.5453));
+      vec3 neon = vec3(0.45, 1.0, 0.55);
+      col = mix(col, neon, inArt * trail * glyph * 0.18);
+      col = mix(col, vec3(0.86, 1.0, 0.9), inArt * head * glyph * 0.42);
+    } else if (uEffect < 15.5) {
+      /* petals: layered blossoms drifting and spinning across the art */
+      for (int i = 0; i < 2; i++) {
+        float fi = float(i);
+        float speed = 0.05 + fi * 0.03;
+        vec2 p = vUv * vec2(6.0 + fi * 3.0, 9.0 + fi * 4.0) + vec2(t * speed * 3.0, -t * speed * 5.0) + tilt * (0.5 + fi * 0.4);
+        vec2 cell = floor(p);
+        float h = fract(sin(dot(cell, vec2(21.7, 63.1))) * 5234.27);
+        if (h > 0.55) {
+          vec2 g = fract(p) - 0.5;
+          float a = t * (0.6 + h) + h * 6.28;
+          g = mat2(cos(a), sin(a), -sin(a), cos(a)) * g;
+          float petal = smoothstep(0.30, 0.06, abs(g.x) * 1.6 + abs(g.y) * 0.9) * smoothstep(0.32, 0.16, length(g));
+          vec3 tint = h > 0.85 ? vec3(1.0, 0.86, 0.92) : h > 0.7 ? vec3(1.0, 0.72, 0.80) : vec3(0.98, 0.92, 1.0);
+          col = mix(col, tint, inArt * petal * 0.34);
+        }
+      }
+    } else if (uEffect < 16.5) {
+      /* ripples: rings spreading from the centre, each one tinted on its own */
+      vec2 c = (vUv - vec2(0.5, 0.55)) * vec2(0.62, 1.0);
+      float r = length(c);
+      float wave = fract(r * 6.0 - t * 0.22 + tilt.x * 0.3);
+      float ring = smoothstep(0.34, 0.42, wave) * smoothstep(0.5, 0.44, wave);
+      float fade = smoothstep(0.05, 0.5, r);
+      vec3 tint = rainbow(floor(fract(r * 1.4 + t * 0.03) * 6.0));
+      col = mix(col, tint, inArt * ring * fade * 0.14);
+      col = mix(col, vec3(1.0), inArt * smoothstep(0.46, 0.5, wave) * smoothstep(0.5, 0.48, wave) * fade * 0.10);
+      col = mix(col, vec3(1.0), inArt * smoothstep(0.08, 0.0, r) * 0.12);
+    } else if (uEffect < 17.5) {
+      /* honeycomb: a hex lattice that catches the light cell by cell */
+      vec2 p = vUv * vec2(14.0, 19.0);
+      p.x *= 1.1547;
+      p.y += mod(floor(p.x), 2.0) * 0.5;
+      vec2 f = fract(p) - 0.5;
+      float d = max(abs(f.x) * 0.866 + abs(f.y) * 0.5, abs(f.y));
+      float edge = smoothstep(0.40, 0.47, d);
+      vec2 cell = floor(p);
+      float h = fract(sin(dot(cell, vec2(19.3, 7.7))) * 8314.13);
+      float lit = smoothstep(0.6, 1.0, sin(t * 1.2 + h * 6.28 + tilt.x * 2.0) * 0.5 + 0.5);
+      col = mix(col, vec3(1.0, 0.86, 0.44), inArt * edge * 0.16);
+      col = mix(col, vec3(1.0, 0.95, 0.70), inArt * (1.0 - edge) * lit * 0.10);
+      col = mix(col, vec3(1.0), inArt * smoothstep(0.47, 0.5, d) * 0.06);
+    } else if (uEffect < 18.5) {
+      /* star chart: a faint constellation net that twinkles */
+      vec2 p = vUv * vec2(18.0, 25.0) + tilt * 0.35;
+      vec2 cell = floor(p);
+      vec2 g = fract(p) - 0.5;
+      float h = fract(sin(dot(cell, vec2(13.7, 91.3))) * 4721.9);
+      float star = smoothstep(0.14, 0.0, length(g)) * step(0.62, h);
+      float twinkle = 0.55 + 0.45 * sin(t * 2.0 + h * 12.0);
+      float lx = smoothstep(0.42, 0.5, abs(fract(p.x / 3.0) - 0.5));
+      float ly = smoothstep(0.42, 0.5, abs(fract(p.y / 3.0) - 0.5));
+      float net = max(lx, ly) * 0.5;
+      col = mix(col, vec3(0.72, 0.82, 1.0), inArt * net * 0.07);
+      col = mix(col, vec3(1.0, 0.98, 0.9), inArt * star * twinkle * 0.42);
+      col = mix(col, rainbow(floor(h * 6.0)), inArt * star * 0.10);
+    } else if (uEffect < 19.5) {
+      /* shattered glass: hard facets, each catching a different colour */
+      vec2 p = vUv * vec2(7.0, 9.0);
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      float d1 = 8.0;
+      float d2 = 8.0;
+      vec2 id = i;
+      for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+          vec2 nb = vec2(float(x), float(y));
+          vec2 o = vec2(fract(sin(dot(i + nb, vec2(41.7, 28.9))) * 9137.3), fract(sin(dot(i + nb, vec2(11.3, 73.1))) * 4157.7));
+          float d = length(nb + o - f);
+          if (d < d1) { d2 = d1; d1 = d; id = i + nb; }
+          else if (d < d2) { d2 = d; }
+        }
+      }
+      float seam = smoothstep(0.06, 0.0, d2 - d1);
+      float h = fract(sin(dot(id, vec2(63.1, 21.7))) * 1731.7);
+      vec3 facet = rainbow(floor(h * 6.0));
+      col = mix(col, facet, inArt * 0.10);
+      col = mix(col, vec3(1.0), inArt * seam * (0.16 + 0.14 * abs(uTilt.x)));
+      col = mix(col, vec3(0.82, 0.94, 1.0), inArt * smoothstep(0.4, 0.0, d1) * 0.04);
     }
   }
 

@@ -36,6 +36,13 @@ export function createCardMesh({ front, spriteLayout, mask, rarity, finish = "pl
     finish === "bubble" ? 10 :
     finish === "grid" ? 11 :
     finish === "confetti" ? 12 :
+    finish === "aurora" ? 13 :
+    finish === "matrix" ? 14 :
+    finish === "petals" ? 15 :
+    finish === "ripple" ? 16 :
+    finish === "hex" ? 17 :
+    finish === "zodiac" ? 18 :
+    finish === "shatter" ? 19 :
     finish === "shiny" ? 3 : 0;
   const density = holoDensityFor(rarity);
 

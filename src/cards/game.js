@@ -290,6 +290,7 @@ export class KantoPacksGame {
     this.phase = phase;
     this.phaseTime = 0;
     const hints = {
+      choose: "three packs — tap one to open it",
       idle: "hover to tilt · swipe the dotted line to slice",
       tearing: "keep going…",
       flash: "",
@@ -307,6 +308,12 @@ export class KantoPacksGame {
   /* ---------- scene ---------- */
 
   clearScene() {
+    for (const entry of this.packs || []) {
+      this.scene.root.remove(entry.pack.group);
+      entry.pack.dispose();
+    }
+    this.packs = [];
+    this.hoverPack = -1;
     if (this.pack) {
       this.scene.root.remove(this.pack.group);
       this.pack.dispose();
@@ -367,16 +374,22 @@ export class KantoPacksGame {
     this.el.sparkles.innerHTML = "";
 
     const keys = Object.keys(VARIANTS);
-    const variant = VARIANTS[keys[Math.floor(Math.random() * keys.length)]];
-    const mascot = await loadSprite(variant.mascot);
-    const front = renderPackFront(variant, mascot);
-    const back = renderPackBack(variant);
-    const strip = renderStrip(variant);
-    this.pack = createPack({ front, back, strip });
-    this.pack.group.position.set(0, 0, 0);
-    this.pack.group.scale.setScalar(1);
-    this.scene.root.add(this.pack.group);
-    this.setPhase("idle");
+    const shuffled = keys.sort(() => Math.random() - 0.5).slice(0, 3);
+    const built = [];
+    for (const key of shuffled) {
+      const variant = VARIANTS[key];
+      const mascot = await loadSprite(variant.mascot);
+      const front = renderPackFront(variant, mascot);
+      const back = renderPackBack(variant);
+      const strip = renderStrip(variant);
+      built.push({ variant, pack: createPack({ front, back, strip }) });
+    }
+    this.packs = built;
+    this.hoverPack = -1;
+    this.pack = null;
+    for (const entry of this.packs) this.scene.root.add(entry.pack.group);
+    this.layoutPacks();
+    this.setPhase("choose");
     this.packKick = 0;
   }
 
@@ -498,6 +511,11 @@ export class KantoPacksGame {
       this.lastPointer = { x: e.clientX, y: e.clientY, t: performance.now() };
       this.pressAt = { x: e.clientX, y: e.clientY };
 
+      if (this.phase === "choose") {
+        const idx = this.packAt(p);
+        if (idx >= 0) this.choosePack(idx);
+        return;
+      }
       if (this.phase === "idle" || this.phase === "tearing") {
         if (this.nearTear(e)) {
           this.slicing = true;
@@ -540,6 +558,10 @@ export class KantoPacksGame {
         return;
       }
       const p = this.toLocal(e);
+      if (this.phase === "choose") {
+        this.hoverPack = this.packAt(p);
+        return;
+      }
       if (this.slicing) {
         this.tearAt(p, e);
         return;
@@ -646,6 +668,68 @@ export class KantoPacksGame {
     window.addEventListener("keyup", (e) => {
       if (e.code === "Space") this.spaceHeld = false;
     });
+  }
+
+  layoutPacks() {
+    if (!this.packs?.length) return;
+    const W = this.scene?.W || 288;
+    const packW = 176;
+    const fit = (W - 14) / (3 * packW * 0.82);
+    const scale = Math.max(0.4, Math.min(1, fit));
+    const gap = packW * scale * 0.82;
+    this.packs.forEach((entry, i) => {
+      entry.home = {
+        x: (i - 1) * gap,
+        y: i === 1 ? 8 : -6,
+        z: i === 1 ? 10 : -30,
+        rot: (i - 1) * 0.26,
+        scale,
+      };
+      const g = entry.pack.group;
+      g.position.set(entry.home.x, entry.home.y, entry.home.z);
+      g.rotation.set(0, entry.home.rot, 0);
+      g.scale.setScalar(scale);
+    });
+  }
+
+  packAt(p) {
+    if (!this.packs?.length) return -1;
+    const wx = p.x - (this.scene?.W || 288) / 2;
+    const wy = (this.scene?.H || 560) / 2 - p.y;
+    let best = -1;
+    let bestD = Infinity;
+    this.packs.forEach((entry, i) => {
+      const g = entry.pack.group;
+      const dx = wx - g.position.x;
+      const dy = wy - g.position.y;
+      const d = Math.hypot(dx, dy);
+      const reach = 176 * 0.5 * (entry.home?.scale || 1) * 1.3;
+      if (d < reach && d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    return best;
+  }
+
+  choosePack(index) {
+    const chosen = this.packs[index];
+    if (!chosen) return;
+    this.packs.forEach((entry, i) => {
+      if (i === index) return;
+      this.scene.root.remove(entry.pack.group);
+      entry.pack.dispose();
+    });
+    const g = chosen.pack.group;
+    g.position.set(0, 0, 0);
+    g.rotation.set(0, 0, 0);
+    g.scale.setScalar(1);
+    this.pack = chosen.pack;
+    this.packs = [];
+    this.hoverPack = -1;
+    this.packKick = 1;
+    this.packTilt = { yaw: 0, pitch: 0, vy: 0, vp: 0 };
+    this.setPhase("idle");
   }
 
   toLocal(e) {
@@ -1097,6 +1181,24 @@ export class KantoPacksGame {
       this.tear = Math.min(this.tearTarget, this.tear + Math.max(dt * 1.6, 0.004));
       this.pack?.setTear(this.tear);
       if (this.tear >= 1) this.completeTear();
+    }
+
+    if (this.phase === "choose" && this.packs?.length) {
+      this.packs.forEach((entry, i) => {
+        const home = entry.home;
+        const hover = this.hoverPack === i;
+        const g = entry.pack.group;
+        const ty = home.y + Math.sin(this.time * 1.2 + i * 1.9) * 4 + (hover ? 10 : 0);
+        const tz = home.z + (hover ? 22 : 0);
+        const ts = home.scale * (hover ? 1.06 : 1);
+        g.position.x += (home.x - g.position.x) * 0.16;
+        g.position.y += (ty - g.position.y) * 0.16;
+        g.position.z += (tz - g.position.z) * 0.16;
+        g.rotation.y += ((home.rot + (hover ? this.hoverYaw * 0.5 : 0)) - g.rotation.y) * 0.16;
+        const sc = g.scale.x + (ts - g.scale.x) * 0.16;
+        g.scale.setScalar(sc);
+        entry.pack.update(dt, this.time);
+      });
     }
 
     if (pack) {
