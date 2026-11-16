@@ -86,105 +86,123 @@ void main() {
     col = mix(col, vec3(0.72, 0.62, 0.95), 0.03 * band);
   }
 
+  /* real cards foil one zone or the other: holo lives in the art window,
+     reverse holo lives on the frame and text box and the art stays matte */
+  vec4 AR = vec4(0.05, 0.30, 0.95, 0.84);
+  float inArt = smoothstep(AR.x - 0.004, AR.x + 0.004, vUv.x) * smoothstep(AR.z + 0.004, AR.z - 0.004, vUv.x)
+              * smoothstep(AR.y - 0.004, AR.y + 0.004, vUv.y) * smoothstep(AR.w + 0.004, AR.w - 0.004, vUv.y);
+  float onFrame = 1.0 - inArt;
+
   if (!backside && uEffect > 0.5) {
     float t = uTime;
+    vec2 tilt = uTilt * vec2(0.55, 0.35); /* foil slides with the pointer, parallax between layers */
+
     if (uEffect < 1.5) {
-      /* 1 reverse: cold silver brushed metal, diagonal grain drifting left */
-      float grain = sin((vUv.x * 1.4 + vUv.y * 0.2) * 70.0 - t * 1.6 + sin(vUv.y * 9.0 + t * 0.7) * 2.0) * 0.5 + 0.5;
-      float sweep = fract(vUv.x * 0.55 + vUv.y * 0.9 - uTilt.x * 1.1 - t * 0.09);
-      col = mix(col, vec3(0.76, 0.84, 1.0), grain * 0.05 + (1.0 - sweep) * 0.045);
-      col = mix(col, vec3(1.0), smoothstep(0.93, 1.0, grain) * 0.07);
+      /* reverse holo: plain silver foil on the frame and text box, art stays matte */
+      float streak = sin((vUv.x * 0.6 - vUv.y * 1.7) * 90.0 + tilt.x * 26.0) * 0.5 + 0.5;
+      float sweep = fract(vUv.y * 0.8 - vUv.x * 0.35 + tilt.y * 0.9 + t * 0.02);
+      col = mix(col, vec3(0.80, 0.86, 1.0), onFrame * (streak * 0.06 + smoothstep(0.7, 1.0, sweep) * 0.07));
+      vec2 stamp = fract((vUv * vec2(160.0, 224.0)) / 26.0 + tilt * 0.15) - 0.5;
+      float ring = smoothstep(0.30, 0.26, length(stamp)) * smoothstep(0.14, 0.20, length(stamp));
+      col = mix(col, vec3(1.0), onFrame * ring * 0.07);
     } else if (uEffect < 2.5) {
-      /* 2 holo: cyan-into-magenta bands, tilted 30 degrees, always travelling */
-      float s = fract((vUv.x * 0.62 + vUv.y * 0.78) * 1.35 - uTilt.x * 0.9 + t * 0.055);
-      vec3 duo = mix(vec3(0.16, 0.88, 0.94), vec3(0.96, 0.24, 0.78), smoothstep(0.0, 1.0, s));
-      col = mix(col, duo, 0.06 + 0.07 * (0.5 + 0.5 * sin(s * 6.2832 + t * 0.9)));
+      /* cosmos holo: dots and circles of different sizes inside the art, in two
+         parallax layers that slide against each other as the card tilts */
+      float ang = 0.6 + tilt.x * 0.5;
+      vec2 uv = vUv - 0.5;
+      uv = mat2(cos(ang), sin(ang), -sin(ang), cos(ang)) * uv + 0.5;
+      vec2 p1 = fract(uv * vec2(13.0, 18.0) + tilt * 0.5) - 0.5;
+      vec2 p2 = fract(uv * vec2(23.0, 31.0) - tilt * 0.9) - 0.5;
+      float dots = smoothstep(0.30, 0.24, length(p1)) * 0.65 + smoothstep(0.20, 0.14, length(p2)) * 0.45;
+      float sheen = fract(uv.x * 0.8 + uv.y * 0.6 + tilt.x * 0.55);
+      col = mix(col, rainbow(floor(sheen * 6.0)), inArt * dots * 0.10);
+      col = mix(col, vec3(1.0), inArt * dots * (0.05 + 0.16 * abs(uTilt.x)));
+      col = mix(col, vec3(1.0), inArt * smoothstep(0.92, 1.0, sheen) * 0.09);
     } else if (uEffect < 3.5) {
-      /* 3 prism: full spectrum plus twinkling stars */
-      float s = fract(vUv.x * 0.5 + vUv.y * 0.7 + uTilt.x * 0.9 - t * 0.04);
-      col = mix(col, rainbow(floor(s * 6.0)), 0.13);
-      vec2 cell = floor(vUv * vec2(46.0, 64.0));
-      float h = fract(sin(dot(cell, vec2(12.9898, 78.233)) + floor(t * 2.5)) * 43758.5453);
-      if (h > 0.988) col = mix(col, vec3(1.0), 0.5);
+      /* rainbow rare: the printed rainbow runs over the whole face, radial from the centre */
+      vec2 c = vUv - 0.5;
+      float r = length(c * vec2(0.72, 1.0));
+      float hue = fract(r * 1.9 + atan(c.y, c.x) * 0.08 + tilt.y * 0.35 + t * 0.01);
+      col = mix(col, rainbow(floor(hue * 6.0)), 0.15);
+      col = mix(col, vec3(1.0), smoothstep(0.06, 0.0, abs(fract(hue * 2.0) - 0.5)) * 0.10);
     } else if (uEffect < 4.5) {
-      /* 4 gold: amber with a wide embossed band rolling upwards */
-      col = mix(col, vec3(1.0, 0.80, 0.36), 0.075);
-      float band = smoothstep(0.38, 0.5, abs(fract(vUv.y * 1.5 - t * 0.06 + uTilt.x * 0.4) - 0.5));
-      col = mix(col, vec3(1.0, 0.96, 0.78), band * 0.11);
-      col = mix(col, vec3(0.55, 0.36, 0.08), 0.035);
+      /* gold secret rare: engraved horizontals under an amber lift */
+      col = mix(col, vec3(1.0, 0.82, 0.42), 0.09);
+      float engrave = sin(vUv.y * 300.0 + tilt.y * 20.0) * 0.5 + 0.5;
+      col = mix(col, vec3(1.0, 0.93, 0.62), engrave * 0.06);
+      float gloss = smoothstep(0.35, 0.5, abs(fract(vUv.y * 1.1 - tilt.x * 0.4 + t * 0.02) - 0.5));
+      col = mix(col, vec3(1.0, 0.97, 0.85), gloss * 0.10);
+      col = mix(col, vec3(0.48, 0.32, 0.10), 0.03);
     } else if (uEffect < 5.5) {
-      /* 5 foil: stamped silver laminate, crosshatch with a rotating glint */
-      float hatch = sin((vUv.x + vUv.y) * 150.0) * 0.5 + 0.5;
-      float weft = sin((vUv.x - vUv.y) * 150.0) * 0.5 + 0.5;
-      float sweep = fract((vUv.x - vUv.y) * 0.35 + t * 0.05 + uTilt.y * 0.6);
-      col = mix(col, vec3(0.90, 0.93, 1.0), (hatch * 0.5 + weft * 0.5) * 0.045);
-      col = mix(col, vec3(1.0), smoothstep(0.82, 1.0, sweep) * 0.11);
+      /* starlight holo: blurry starbursts of different sizes, each on its own plane */
+      vec2 p = vUv * vec2(9.0, 12.0);
+      vec2 cell = floor(p);
+      float h = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+      vec2 g = fract(p) - 0.5 - tilt * (0.35 + h * 0.5);
+      float d = length(g);
+      float burst = smoothstep(0.34, 0.02, d) * step(0.35, h);
+      float rays = smoothstep(0.06, 0.0, abs(sin(atan(g.y, g.x) * 2.5 + h * 6.0)) * d) * burst;
+      col = mix(col, vec3(0.94, 0.96, 1.0), inArt * (burst * 0.12 + rays * 0.14));
+      col = mix(col, vec3(1.0), inArt * smoothstep(0.05, 0.0, d) * 0.18);
     } else if (uEffect < 6.5) {
-      /* 6 star: deep violet night with twinkling stars and a slow sweep */
-      col = mix(col, vec3(0.30, 0.22, 0.58), 0.08);
-      vec2 cell = floor(vUv * vec2(38.0, 54.0));
-      float h = fract(sin(dot(cell, vec2(35.13, 91.7)) + floor(t * 1.7)) * 24634.6345);
-      if (h > 0.978) col = mix(col, vec3(1.0, 0.98, 0.86), 0.5);
-      float s = fract(vUv.x * 0.4 - vUv.y * 0.6 + t * 0.035 + uTilt.x * 0.5);
-      col = mix(col, vec3(0.58, 0.76, 1.0), smoothstep(0.78, 1.0, s) * 0.12);
+      /* galaxy holo: spiral arms of stars inside the art */
+      vec2 c = vUv - 0.5;
+      float r = length(c);
+      float sw = sin(atan(c.y, c.x) * 2.0 + r * 26.0 - tilt.x * 3.0 + t * 0.05);
+      col = mix(col, vec3(0.34, 0.24, 0.62), inArt * smoothstep(0.3, 1.0, sw) * 0.10);
+      vec2 cell = floor(vUv * vec2(40.0, 56.0) + tilt * 0.4);
+      float h = fract(sin(dot(cell, vec2(35.13, 91.7))) * 24634.63);
+      if (h > 0.984) col = mix(col, vec3(1.0, 0.98, 0.9), inArt * 0.5);
     } else if (uEffect < 7.5) {
-      /* 7 ember: heat rising from the bottom with drifting cinders */
-      float heat = fract(vUv.y * 1.3 - t * 0.13 + uTilt.x * 0.3);
-      col = mix(col, vec3(1.0, 0.45, 0.14), smoothstep(0.82, 1.0, heat) * 0.11);
-      float cool = fract(vUv.y * 1.3 - t * 0.13 + 0.5 + uTilt.x * 0.3);
-      col = mix(col, vec3(0.42, 0.10, 0.05), smoothstep(0.86, 1.0, cool) * 0.08);
-      vec2 cell = floor(vUv * vec2(30.0, 44.0));
-      float h = fract(sin(dot(cell, vec2(78.233, 12.9898)) + floor(t * 3.0)) * 43758.5453);
-      if (h > 0.972) col = mix(col, vec3(1.0, 0.86, 0.38), 0.5);
+      /* ember: cinders drift up behind the art only */
+      float heat = fract(vUv.y * 1.6 + t * 0.05 + tilt.x * 0.4);
+      col = mix(col, vec3(1.0, 0.48, 0.16), inArt * smoothstep(0.86, 1.0, heat) * 0.10);
+      vec2 cell = floor(vUv * vec2(26.0, 38.0) + vec2(tilt.x, t * 0.6));
+      float h = fract(sin(dot(cell, vec2(78.233, 12.9898))) * 43758.5453);
+      if (h > 0.975) col = mix(col, vec3(1.0, 0.84, 0.4), inArt * 0.45);
     } else if (uEffect < 8.5) {
-      /* 8 crystal: angular facets with a cool seam and a violet sweep */
-      float f = abs(fract((vUv.x + vUv.y * 0.7) * 3.0 + uTilt.x * 0.5 - t * 0.02) - 0.5);
-      col = mix(col, vec3(0.62, 0.88, 1.0), smoothstep(0.42, 0.5, f) * 0.13);
-      float g2 = abs(fract((vUv.x - vUv.y * 0.9) * 5.0 + uTilt.y * 0.4) - 0.5);
-      col = mix(col, vec3(0.86, 0.96, 1.0), smoothstep(0.46, 0.5, g2) * 0.07);
-      float s = fract((vUv.x - vUv.y) * 0.5 + t * 0.05 + uTilt.x * 0.3);
-      col = mix(col, vec3(0.72, 0.52, 1.0), smoothstep(0.8, 1.0, s) * 0.09);
+      /* cracked ice: facet seams sliding against each other */
+      float f1 = abs(fract((vUv.x + vUv.y * 0.65) * 4.0 + tilt.x * 0.6) - 0.5);
+      float f2 = abs(fract((vUv.x * 1.4 - vUv.y) * 6.0 - tilt.y * 0.5) - 0.5);
+      col = mix(col, vec3(0.72, 0.9, 1.0), inArt * smoothstep(0.46, 0.5, f1) * 0.12);
+      col = mix(col, vec3(0.9, 0.98, 1.0), inArt * smoothstep(0.47, 0.5, f2) * 0.08);
+      col = mix(col, rainbow(floor(fract(vUv.x + vUv.y + tilt.x * 0.5) * 6.0)), inArt * 0.03);
     } else if (uEffect < 9.5) {
-      /* 9 lightning: forked bolts cracking down the card */
-      float bolt = fract(vUv.x * 2.0 + sin(vUv.y * 18.0 + t * 1.6) * 0.12 + uTilt.x * 0.3);
-      float core = smoothstep(0.02, 0.0, abs(bolt - 0.5));
-      col = mix(col, vec3(0.86, 0.94, 1.0), core * 0.35);
-      col = mix(col, vec3(0.55, 0.72, 1.0), smoothstep(0.1, 0.0, abs(bolt - 0.5)) * 0.12);
-      float flash = step(0.72, fract(t * 0.7 + uTilt.y * 0.4));
-      col = mix(col, vec3(1.0), flash * core * 0.22);
+      /* lightning: one forked bolt in the art, struck on a slow cycle */
+      float cycle = fract(t * 0.22 + 0.35);
+      float pulse = smoothstep(0.0, 0.15, cycle) * smoothstep(0.4, 0.2, cycle);
+      float x = fract(vUv.x * 1.6 + sin(vUv.y * 22.0 + t * 0.5) * 0.1 + tilt.x * 0.3);
+      float core = smoothstep(0.03, 0.0, abs(x - 0.5));
+      col = mix(col, vec3(0.92, 0.97, 1.0), inArt * core * pulse * 0.55);
+      col = mix(col, vec3(0.6, 0.78, 1.0), inArt * smoothstep(0.09, 0.0, abs(x - 0.5)) * pulse * 0.15);
     } else if (uEffect < 10.5) {
-      /* 10 bubble: soft rings drifting up over a cool wash */
-      col = mix(col, vec3(0.42, 0.78, 0.92), 0.06);
-      vec2 g = fract(vUv * vec2(9.0, 13.0)) - 0.5;
-      vec2 cell = floor(vUv * vec2(9.0, 13.0));
-      float h = fract(sin(dot(cell, vec2(41.7, 17.3)) + floor(t * 0.8)) * 3847.31);
-      float r = length(g) + (h - 0.5) * 0.1;
-      float ring = smoothstep(0.32, 0.28, r) * smoothstep(0.2, 0.25, r);
-      col = mix(col, vec3(0.82, 0.96, 1.0), ring * 0.2);
-      float glint = smoothstep(0.09, 0.03, length(g - vec2(-0.12, -0.14)));
-      col = mix(col, vec3(1.0), glint * 0.22);
+      /* bubbles: rings rising inside the art */
+      vec2 p = vUv * vec2(9.0, 12.0) + vec2(tilt.x * 0.4, -t * 0.06);
+      vec2 cell = floor(p);
+      float h = fract(sin(dot(cell, vec2(41.7, 17.3))) * 3847.31);
+      vec2 g = fract(p) - 0.5;
+      float rad = 0.18 + h * 0.16;
+      float ring = smoothstep(rad, rad - 0.05, length(g)) * smoothstep(rad - 0.13, rad - 0.06, length(g));
+      col = mix(col, vec3(0.84, 0.97, 1.0), inArt * ring * 0.22);
+      col = mix(col, vec3(1.0), inArt * smoothstep(0.05, 0.0, length(g - vec2(-0.1, -0.12))) * 0.2);
     } else if (uEffect < 11.5) {
-      /* 11 grid: wireframe lattice that slides against the tilt */
-      float gx = abs(fract(vUv.x * 11.0 + uTilt.x * 0.6) - 0.5);
-      float gy = abs(fract(vUv.y * 15.0 - uTilt.y * 0.5) - 0.5);
-      float line = max(smoothstep(0.44, 0.5, gx), smoothstep(0.44, 0.5, gy));
-      col = mix(col, vec3(0.30, 0.92, 0.84), line * 0.17);
-      float scan = smoothstep(0.90, 1.0, fract(vUv.y * 1.4 - t * 0.22));
-      col = mix(col, vec3(0.72, 1.0, 0.96), scan * 0.1);
+      /* etched grid: hairlines pressed into the frame only */
+      float gx = abs(fract(vUv.x * 26.0 + tilt.x * 0.5) - 0.5);
+      float gy = abs(fract(vUv.y * 36.0 - tilt.y * 0.4) - 0.5);
+      float line = max(smoothstep(0.47, 0.5, gx), smoothstep(0.47, 0.5, gy));
+      col = mix(col, vec3(0.86, 0.9, 1.0), onFrame * line * 0.10);
+      col = mix(col, vec3(1.0), onFrame * smoothstep(0.9, 1.0, fract(vUv.y * 0.9 + tilt.x * 0.4)) * 0.05);
     } else {
-      /* 12 confetti: coloured flecks tumbling across the face */
-      vec2 cell = floor(vUv * vec2(34.0, 48.0));
+      /* confetti: flecks that tumble only behind the art */
+      vec2 p = vUv * vec2(26.0, 36.0) + tilt * 0.8;
+      vec2 cell = floor(p);
       float h = fract(sin(dot(cell, vec2(23.1, 71.7))) * 9137.13);
-      float life = fract(h * 7.0 + t * 0.22);
-      if (h > 0.90 && life > 0.15 && life < 0.85) {
-        vec3 c1 = vec3(1.0, 0.42, 0.52);
-        vec3 c2 = vec3(1.0, 0.86, 0.34);
-        vec3 c3 = vec3(0.46, 0.72, 1.0);
-        vec3 c4 = vec3(0.58, 1.0, 0.62);
-        vec3 pick = h > 0.975 ? c1 : h > 0.95 ? c2 : h > 0.925 ? c3 : c4;
-        col = mix(col, pick, 0.34);
+      if (h > 0.93) {
+        vec2 g = fract(p) - 0.5 - tilt * (h - 0.5);
+        float flake = smoothstep(0.28, 0.12, abs(g.x) + abs(g.y) * 1.6);
+        vec3 pick = h > 0.975 ? vec3(1.0, 0.44, 0.54) : h > 0.955 ? vec3(1.0, 0.86, 0.36) : vec3(0.5, 0.74, 1.0);
+        col = mix(col, pick, inArt * flake * 0.35);
       }
-      col = mix(col, vec3(1.0, 0.95, 0.92), 0.02);
     }
   }
 
