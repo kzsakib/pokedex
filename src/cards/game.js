@@ -918,8 +918,6 @@ export class KantoPacksGame {
   async openPullView(card) {
     this.closePullView();
     const sprite = await spriteFor(card).catch(() => null);
-    const canvas = renderCard(card, sprite, { omitSprite: !sprite });
-    canvas.className = "kp-pull-big";
     const wrap = document.createElement("div");
     wrap.className = "kp-pull-view";
     wrap.innerHTML = `
@@ -938,7 +936,7 @@ export class KantoPacksGame {
         </div>
       </div>
     `;
-    wrap.querySelector(".kp-pull-view-card").appendChild(canvas);
+    this.pullViewer = this.buildPullViewer(wrap.querySelector(".kp-pull-view-card"), card, sprite);
     wrap.addEventListener("click", (e) => {
       if (e.target === wrap || e.target.closest(".kp-pull-view-close")) this.closePullView();
     });
@@ -946,7 +944,85 @@ export class KantoPacksGame {
     this.pullView = wrap;
   }
 
+  /* the enlarged binder card is the same mesh as the pack one: live foil and tilt */
+  buildPullViewer(holder, card, sprite) {
+    const scene = new PixelScene(holder);
+    scene.renderer.setClearColor(0x0d0b1e, 1);
+    scene.bg.visible = false;
+
+    const W = 176;
+    const H = 246;
+    scene.W = W;
+    scene.H = H;
+    scene.renderer.setSize(W, H, false);
+    scene.camera.left = -W / 2;
+    scene.camera.right = W / 2;
+    scene.camera.top = H / 2;
+    scene.camera.bottom = -H / 2;
+    scene.camera.updateProjectionMatrix();
+    scene.canvas.style.width = "100%";
+    scene.canvas.style.height = "auto";
+    scene.canvas.style.imageRendering = "pixelated";
+
+    const front = renderCard(card, sprite, { omitSprite: true });
+    const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
+    const mesh = createCardMesh({ front, sprite, mask, rarity: card.rarity, finish: card.finish });
+    mesh.group.position.set(0, 4, 0);
+    scene.root.add(mesh.group);
+
+    let yaw = 0;
+    let pitch = 0;
+    let targetYaw = 0;
+    let targetPitch = 0;
+    let hover = 0;
+    let raf = 0;
+    const started = performance.now();
+
+    const onMove = (e) => {
+      const rect = holder.getBoundingClientRect();
+      const nx = clamp((e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2), -1, 1);
+      const ny = clamp((e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2), -1, 1);
+      targetYaw = nx * 0.55;
+      targetPitch = -ny * 0.38;
+      hover = 1;
+    };
+    const onLeave = () => {
+      hover = 0;
+    };
+    holder.addEventListener("pointermove", onMove);
+    holder.addEventListener("pointerleave", onLeave);
+
+    const loop = (now) => {
+      const t = (now - started) / 1000;
+      if (!hover) {
+        /* keep it alive while idle: a slow sway instead of a frozen print */
+        targetYaw = Math.sin(t * 0.8) * 0.22;
+        targetPitch = Math.cos(t * 0.62) * 0.13;
+      }
+      yaw += (targetYaw - yaw) * 0.12;
+      pitch += (targetPitch - pitch) * 0.12;
+      mesh.setTilt(yaw, pitch);
+      scene.render(t);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+
+    return {
+      dispose() {
+        cancelAnimationFrame(raf);
+        holder.removeEventListener("pointermove", onMove);
+        holder.removeEventListener("pointerleave", onLeave);
+        mesh.dispose();
+        scene.dispose();
+      },
+    };
+  }
+
   closePullView() {
+    if (this.pullViewer) {
+      this.pullViewer.dispose();
+      this.pullViewer = null;
+    }
     if (this.pullView) {
       this.pullView.remove();
       this.pullView = null;
