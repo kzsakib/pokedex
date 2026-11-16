@@ -393,13 +393,26 @@ function trimSprite(sprite) {
 export function cardSpriteLayout(card, sprite) {
   const clean = trimSprite(sprite);
   if (!clean) return null;
+  if (card.special === "full") {
+    const k = fitScale(clean, CARD_W - 26, 108);
+    const w = clean.width * k;
+    const h = clean.height * k;
+    const feet = 142;
+    return { sprite: clean, k, w, h, x: Math.round(CARD_W / 2 - w / 2), y: feet - h, feet };
+  }
   const isEx = card.special === "ex";
   const geo = isEx ? ART_EX : ART;
-  const k = spriteScale(clean, geo.inner.w - 8, isEx ? geo.inner.h * 2 : geo.inner.h - 6);
+  const k = fitScale(clean, geo.inner.w - 10, isEx ? geo.inner.h * 2 : geo.inner.h - 8);
   const w = clean.width * k;
   const h = clean.height * k;
   const bottom = isEx ? geo.inner.y + geo.inner.h + 8 : geo.inner.y + geo.inner.h - 6;
   return { sprite: clean, k, w, h, x: Math.round(CARD_W / 2 - w / 2), y: bottom - h };
+}
+
+/* fill the box on the sprite's larger axis so every pokemon reads the same size */
+function fitScale(sprite, maxW, maxH) {
+  const k = Math.min(maxW / sprite.width, maxH / sprite.height);
+  return Math.max(0.8, Math.min(4, k));
 }
 
 /* largest whole-number scale that stays inside the box: no resampling mush */
@@ -417,7 +430,7 @@ function drawSpriteAt(ctx, place) {
 }
 
 /* full art: the illustration covers the whole face and the text prints over it */
-function drawFullArt(ctx, card, sprite) {
+function drawFullArt(ctx, card, place, bakeSprite = true) {
   const ramp = rampFor(card.tcg);
   const skyHigh = mix(ramp.light, "#ffffff", 0.72);
   const skyMid = mix(ramp.light, "#ffffff", 0.4);
@@ -491,16 +504,13 @@ function drawFullArt(ctx, card, sprite) {
     }
   }
 
-  if (sprite) {
-    const clean = trimSprite(sprite);
-    const k = spriteScale(clean, CARD_W - 26, 112);
-    const dw = clean.width * k;
-    const dh = clean.height * k;
-    const feet = 142;
+  if (place) {
     ctx.fillStyle = "rgba(12, 10, 26, 0.26)";
-    ctx.fillRect(Math.round(CARD_W / 2 - dw * 0.32), feet - 2, Math.round(dw * 0.64), 3);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(clean, 0, 0, clean.width, clean.height, Math.round(CARD_W / 2 - dw / 2), feet - dh, dw, dh);
+    ctx.fillRect(Math.round(place.x + place.w * 0.18), place.feet - 2, Math.round(place.w * 0.64), 3);
+    if (bakeSprite) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(place.sprite, 0, 0, place.sprite.width, place.sprite.height, place.x, place.y, place.w, place.h);
+    }
   }
 
   /* ink scrim so the light text keeps its contrast over the illustration */
@@ -717,7 +727,7 @@ export function renderCard(card, sprite, options = {}) {
 
   if (card.special === "full" && !options.omitArt) {
     /* full art: the picture owns the whole face and the text prints over a wash */
-    drawFullArt(ctx, card, sprite);
+    drawFullArt(ctx, card, card.special === "full" && sprite && !options.omitArt ? cardSpriteLayout(card, sprite) : null, !options.omitSprite);
     frame(ctx, card, { bare: true });
     /* printed hairlines, no panel: the art stays visible behind the attacks */
     ctx.fillStyle = "rgba(246, 239, 212, 0.4)";

@@ -396,11 +396,10 @@ export class KantoPacksGame {
 
     for (const card of this.cards) {
       const sprite = await spriteFor(card);
-      const isEx = card.special === "ex";
-      const front = renderCard(card, sprite, { omitSprite: isEx });
+      const front = renderCard(card, sprite, { omitSprite: true });
       const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
-      /* EX keeps its pokemon on its own layer so it moves against the card */
-      const spriteLayout = isEx ? cardSpriteLayout(card, sprite) : null;
+      /* every pokemon rides its own layer so it moves against the card */
+      const spriteLayout = cardSpriteLayout(card, sprite);
       const mesh = createCardMesh({ front, spriteLayout, mask, rarity: card.rarity, finish: card.finish });
       mesh.group.position.set(0, 40, 70 + this.meshes.length * 0.6);
       mesh.group.scale.setScalar(1);
@@ -960,10 +959,9 @@ export class KantoPacksGame {
     scene.canvas.style.height = "auto";
     scene.canvas.style.imageRendering = "pixelated";
 
-    const isEx = card.special === "ex";
-    const front = renderCard(card, sprite, { omitSprite: isEx });
+    const front = renderCard(card, sprite, { omitSprite: true });
     const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
-    const spriteLayout = isEx ? cardSpriteLayout(card, sprite) : null;
+    const spriteLayout = cardSpriteLayout(card, sprite);
     const mesh = createCardMesh({ front, spriteLayout, mask, rarity: card.rarity, finish: card.finish });
     mesh.group.position.set(0, 6, 0);
     mesh.group.scale.setScalar(0.94); /* room for the slab edge and its shadow */
