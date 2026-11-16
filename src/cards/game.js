@@ -15,6 +15,7 @@ const FINISH_TAG = { reverse: " · REVERSE", holo: "", prism: " · PRISM", gold:
 import { freshSeed } from "./rng.js";
 import { KantoAudio } from "./audio.js";
 import { loadBinder, recordPack, resetBinder, backfillNote } from "./storage.js";
+import { fallbackLore } from "./lore.js";
 
 const ORDER = ["common", "uncommon", "rare", "holo", "legend"];
 const SPARKLES = { uncommon: "silver", rare: "gold", holo: "rainbow", legend: "legend" };
@@ -28,6 +29,11 @@ export class KantoPacksGame {
     this.container = container;
     this.audio = new KantoAudio();
     this.binder = loadBinder();
+    /* older saves kept the flavour line but not the generated entry */
+    for (const pull of this.binder.pulls || []) {
+      const c = pull.card;
+      if (c?.variant && !c.variant.note) c.variant.note = fallbackLore(c);
+    }
     this.seed = this.readSeedFromUrl() || freshSeed();
     this.force = this.readForceFromUrl();
     this.phase = "idle";
@@ -97,7 +103,7 @@ export class KantoPacksGame {
     this.container.classList.remove("kp-loading");
     this.resetLoader();
     this.ready = true;
-    this.hint("drag to rotate · swipe the dotted line to slice");
+    this.hint("hover to tilt · swipe the dotted line to slice");
     this.newPack();
     this.loop();
   }
@@ -284,7 +290,7 @@ export class KantoPacksGame {
     this.phase = phase;
     this.phaseTime = 0;
     const hints = {
-      idle: "drag to rotate · swipe the dotted line to slice",
+      idle: "hover to tilt · swipe the dotted line to slice",
       tearing: "keep going…",
       flash: "",
       emerge: "",
@@ -323,6 +329,14 @@ export class KantoPacksGame {
   async newPack(keepSeed = false) {
     if (this.newPackBusy) return;
     this.newPackBusy = true;
+    try {
+      await this.buildPack(keepSeed);
+    } finally {
+      this.newPackBusy = false;
+    }
+  }
+
+  async buildPack(keepSeed) {
     this.closePullView();
     this.el.binder.hidden = true;
     this.el.help.hidden = true;
@@ -371,7 +385,6 @@ export class KantoPacksGame {
     this.scene.root.add(this.pack.group);
     this.setPhase("idle");
     this.packKick = 0;
-    this.newPackBusy = false;
   }
 
   async generate() {

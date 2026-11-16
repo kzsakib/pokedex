@@ -142,7 +142,8 @@ export function createCardMesh({ front, sprite, mask, rarity, finish = "plain", 
     dispose() {
       group.traverse((o) => {
         if (o.geometry) o.geometry.dispose();
-        if (o.material) o.material.dispose();
+        if (Array.isArray(o.material)) o.material.forEach((m) => m.dispose());
+        else if (o.material) o.material.dispose();
       });
     },
   };
