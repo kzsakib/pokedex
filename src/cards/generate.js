@@ -313,6 +313,12 @@ export function generatePack(data, seed, options = {}) {
     if (chroma) {
       card.variant = { ...chroma }; /* the hue map rides along: the sprite needs it */
       card.finish = rollFinish(rng, PREMIUM);
+    } else {
+      /* premium printings: full art bleeds to the edges, EX breaks out of the window */
+      const special = rng.random();
+      if (card.rarity === "legend") card.special = special < 0.5 ? "full" : "ex";
+      else if (card.rarity === "holo") card.special = special < 0.22 ? "full" : special < 0.42 ? "ex" : null;
+      else if (card.rarity === "rare") card.special = special < 0.12 ? "full" : special < 0.26 ? "ex" : null;
     }
     card.slot = index;
     return card;
@@ -325,6 +331,7 @@ export function generatePack(data, seed, options = {}) {
     if (a.shiny !== b.shiny) return a.shiny ? -1 : 1;
     return a.slot - b.slot;
   });
+  if (force === "full" || force === "ex") cards[cards.length - 1].special = force;
   const best = cards.reduce((acc, card) => (RARITY_ORDER[card.rarity] > RARITY_ORDER[acc] ? card.rarity : acc), "common");
   return { seed, cards, best, hash: hashSeed(seed) };
 }

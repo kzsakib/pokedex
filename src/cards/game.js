@@ -396,9 +396,10 @@ export class KantoPacksGame {
 
     for (const card of this.cards) {
       const sprite = await spriteFor(card);
-      const front = renderCard(card, sprite, { omitSprite: true });
+      const baked = card.special === "ex" || card.special === "full";
+      const front = renderCard(card, sprite, { omitSprite: baked });
       const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
-      const mesh = createCardMesh({ front, sprite, mask, rarity: card.rarity, finish: card.finish });
+      const mesh = createCardMesh({ front, sprite: baked ? null : sprite, mask, rarity: card.rarity, finish: card.finish });
       mesh.group.position.set(0, 40, 70 + this.meshes.length * 0.6);
       mesh.group.scale.setScalar(1);
       mesh.group.visible = false;
@@ -499,9 +500,9 @@ export class KantoPacksGame {
       if (this.phase === "idle" || this.phase === "tearing") {
         if (this.nearTear(e)) {
           this.slicing = true;
+          this.lastSliceX = null;
           this.setPhase("tearing");
-          this.tearAt(p);
-          this.audio.tear(this.tear);
+          this.tearAt(p, e);
           return;
         }
         /* the pack is not draggable: it only leans toward the cursor */
@@ -539,7 +540,7 @@ export class KantoPacksGame {
       }
       const p = this.toLocal(e);
       if (this.slicing) {
-        this.tearAt(p);
+        this.tearAt(p, e);
         return;
       }
       if (this.phase === "idle" || this.phase === "tearing") {
@@ -665,23 +666,51 @@ export class KantoPacksGame {
     return Math.abs(py - sy) < 18 && Math.abs(px - sx) < this.scene.W * 0.4;
   }
 
-  tearAt(p) {
+  tearAt(p, e) {
     if (!this.pack) return;
-    const rect = this.scene.canvas.getBoundingClientRect();
-    const nx = clamp((p.x / this.scene.W) * 2 - 1, -0.6, 0.6);
-    const next = clamp(Math.abs(nx) * 1.6 + 0.12, 0, 1);
-    if (next > this.tear) {
-      this.tear = next;
-      this.pack.setTear(this.tear);
-      if (Math.random() < 0.5) this.audio.tear(this.tear);
+    /* the cut follows the hand: distance swiped along the dotted line, not a jump */
+    const step = this.lastSliceX == null ? 0 : Math.abs(p.x - this.lastSliceX);
+    this.lastSliceX = p.x;
+    const gained = step / (this.scene.W * 0.42);
+    if (gained > 0.0004) {
+      this.tearTarget = clamp(this.tearTarget + gained, 0, 1);
+      this.spawnSpark(e, p);
+      if (this.cutClock == null || this.time - this.cutClock > 0.05) {
+        this.cutClock = this.time;
+        this.audio.tear(this.tearTarget);
+      }
     }
-    if (this.tear >= 1) this.completeTear();
+    if (this.tearTarget >= 1) this.tear = Math.max(this.tear, 0.999);
+  }
+
+  /* paper flecks kicked out of the cut, straight DOM so it costs nothing */
+  spawnSpark(e, p) {
+    const stage = this.el?.stage || this.container.querySelector(".kp-stage") || this.container;
+    if (!stage) return;
+    const rect = this.scene.canvas.getBoundingClientRect();
+    const host = stage.getBoundingClientRect();
+    const clientX = e && e.clientX ? e.clientX : rect.left + (p.x / this.scene.W) * rect.width;
+    const clientY = e && e.clientY ? e.clientY : rect.top + (p.y / this.scene.H) * rect.height;
+    const spark = document.createElement("i");
+    spark.className = "kp-spark";
+    spark.style.left = `${clientX - host.left}px`;
+    spark.style.top = `${clientY - host.top}px`;
+    spark.style.setProperty("--dx", `${(Math.random() - 0.5) * 60}px`);
+    spark.style.setProperty("--dy", `${-30 - Math.random() * 70}px`);
+    spark.style.setProperty("--spin", `${(Math.random() - 0.5) * 540}deg`);
+    stage.appendChild(spark);
+    spark.addEventListener("animationend", () => spark.remove(), { once: true });
+    setTimeout(() => spark.remove(), 700);
   }
 
   completeTear() {
     if (this.phase !== "tearing") return;
     this.slicing = false;
     this.tear = 1;
+    this.tearTarget = 1;
+    this.lastSliceX = null;
+    this.container.classList.add("kp-rip");
+    setTimeout(() => this.container.classList.remove("kp-rip"), 280);
     this.pack.detachStrip();
     this.audio.rip();
     this.setPhase("flash");
@@ -893,7 +922,7 @@ export class KantoPacksGame {
           <strong>${card.name || ""}</strong>
           <span>${RARITY_LABEL[card.rarity] || ""}${card.variant ? ` · ${card.variant.label} FORM` : ""}${card.shiny ? " · SHINY ✦" : ""}</span>
           ${card.variant ? `<span class="kp-pull-view-note">${card.variant.label} FORM</span>` : ""}
-          <span>${(FINISH_TAG[card.finish] || "").replace(/^ · /, "").toLowerCase() || "standard"} finish</span>
+          <span>${card.special === "full" ? "FULL ART" : card.special === "ex" ? "EX · BREAKS THE FRAME" : `${(FINISH_TAG[card.finish] || "").replace(/^ · /, "").toLowerCase() || "standard"} finish`}</span>
           ${(() => {
             const line = (card.variant && card.variant.note) || card.flavour || "";
             return line ? `<span class="kp-pull-view-entry">${line}</span>` : "";
@@ -929,9 +958,10 @@ export class KantoPacksGame {
     scene.canvas.style.height = "auto";
     scene.canvas.style.imageRendering = "pixelated";
 
-    const front = renderCard(card, sprite, { omitSprite: true });
+    const baked = card.special === "ex" || card.special === "full";
+    const front = renderCard(card, sprite, { omitSprite: baked });
     const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
-    const mesh = createCardMesh({ front, sprite, mask, rarity: card.rarity, finish: card.finish });
+    const mesh = createCardMesh({ front, sprite: baked ? null : sprite, mask, rarity: card.rarity, finish: card.finish });
     mesh.group.position.set(0, 6, 0);
     mesh.group.scale.setScalar(0.94); /* room for the slab edge and its shadow */
     scene.root.add(mesh.group);
@@ -1056,9 +1086,15 @@ export class KantoPacksGame {
         this.setPhase("tearing");
         this.pack.setTear(0.001);
       }
-      this.tear = Math.min(1, this.tear + dt / 0.9);
-      this.pack?.setTear(this.tear);
+      this.tearTarget = Math.min(1, (this.tearTarget || 0) + dt / 0.9);
       if (Math.random() < 0.25) this.audio.tear(this.tear);
+      if (this.tear >= 1) this.completeTear();
+    }
+
+    if (this.phase === "tearing" && this.tear < this.tearTarget) {
+      /* the tear eases to the cut instead of snapping with the cursor */
+      this.tear = Math.min(this.tearTarget, this.tear + Math.max(dt * 1.6, 0.004));
+      this.pack?.setTear(this.tear);
       if (this.tear >= 1) this.completeTear();
     }
 

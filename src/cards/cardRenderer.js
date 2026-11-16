@@ -245,7 +245,7 @@ function drawRarity(ctx, rarity, x, y) {
 
 /* ---------- art window ---------- */
 
-const ART = { x: 8, y: 37, w: 144, h: 120, inner: { x: 10, y: 39, w: 140, h: 116 } };
+const ART = { x: 8, y: 37, w: 144, h: 106, inner: { x: 10, y: 39, w: 140, h: 102 } };
 const BUFFER = { w: 70, h: 58 };
 
 function artBuffer(card, sprite) {
@@ -324,6 +324,14 @@ function artBuffer(card, sprite) {
     ctx.drawImage(sprite, sx, sy, sw, sh);
   }
   return canvas;
+}
+
+/* a sprite drawn straight onto the card, big enough to break the art frame */
+function drawBigSprite(ctx, sprite, scale, bottomY) {
+  const dw = Math.round(sprite.width * scale);
+  const dh = Math.round(sprite.height * scale);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(sprite, Math.round(CARD_W / 2 - dw / 2), Math.round(bottomY - dh), dw, dh);
 }
 
 function artWindow(ctx, card, sprite, omitSprite = false, omitArt = false) {
@@ -515,7 +523,28 @@ export function renderCard(card, sprite, options = {}) {
   lint = options.lint ? { boxes: [] } : null;
 
   frame(ctx, card);
-  artWindow(ctx, card, sprite, !!options.omitSprite, !!options.omitArt);
+
+  if (card.special === "full" && !options.omitArt) {
+    /* full art: the scene bleeds to the card edges, the pokemon carries it */
+    const backdrop = artBuffer(card, null);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(backdrop, 0, 0, BUFFER.w, BUFFER.h, 4, 34, CARD_W - 8, 178);
+    if (sprite && !options.omitSprite) drawBigSprite(ctx, sprite, 2.05, 148);
+    /* cream bands top and bottom keep the printed text readable over the art */
+    ctx.fillStyle = "rgba(246, 239, 212, 0.9)";
+    ctx.fillRect(4, 4, CARD_W - 8, 32);
+    ctx.fillRect(4, 140, CARD_W - 8, 76);
+    ctx.fillStyle = mix(rampFor(card.tcg).base, INK, 0.4);
+    ctx.fillRect(4, 35, CARD_W - 8, 1);
+    ctx.fillRect(4, 140, CARD_W - 8, 1);
+  } else {
+    artWindow(ctx, card, sprite, !!options.omitSprite, !!options.omitArt);
+  }
+
+  /* EX: the pokemon swells out of its window and over the frame */
+  if (card.special === "ex" && sprite && !options.omitSprite) {
+    drawBigSprite(ctx, sprite, 2.45, ART.inner.y + ART.inner.h + 2);
+  }
 
   // Row A
   const stageName = card.rarity === "legend" ? "LEGEND" : card.stage === 2 ? "STAGE 2" : card.stage === 1 ? "STAGE 1" : "BASIC";
@@ -538,6 +567,10 @@ export function renderCard(card, sprite, options = {}) {
     drawText(ctx, 8, 21, n, F5, TEXT, 1, "l", 2);
   });
   lintDraw("B", 142, 23, 9, 9, () => drawIcon(ctx, card.tcg, 142, 23));
+  if (card.special === "ex") {
+    drawText(ctx, 118, 22, "EX", F5, SHADOW, 1, "l", 1);
+    drawText(ctx, 117, 21, "EX", F5, "#c8281e", 1, "l", 1);
+  }
 
   // info strip
   const baseGenus = upper(String(card.genus || "")).replace(/\s*POKEMON$/i, "").trim();
@@ -545,24 +578,24 @@ export function renderCard(card, sprite, options = {}) {
   const dex = `${String(card.id).padStart(3, "0")}/151`;
   const dexW = textWidth(dex, F3, 1);
   const genusW = 140 - dexW - 4 - 8;
-  lintDraw("info", 8, 159, genusW, 5, () => fitText(ctx, genus, genusW, F3, TEXT_MUTED, 8, 159));
-  lintDraw("info", 140 - dexW, 159, dexW, 5, () => drawText(ctx, 140, 159, dex, F3, TEXT_MUTED, 1, "r"));
-  lintDraw("info", 146, 159, 5, 5, () => drawRarity(ctx, card.rarity, 146, 159));
+  lintDraw("info", 8, 145, genusW, 5, () => fitText(ctx, genus, genusW, F3, TEXT_MUTED, 8, 145));
+  lintDraw("info", 140 - dexW, 145, dexW, 5, () => drawText(ctx, 140, 145, dex, F3, TEXT_MUTED, 1, "r"));
+  lintDraw("info", 146, 145, 5, 5, () => drawRarity(ctx, card.rarity, 146, 145));
 
   // move slots
-  moveSlot(ctx, card, card.moves[0], 166, "move1");
+  moveSlot(ctx, card, card.moves[0], 152, "move1");
   ctx.fillStyle = mix(rampFor(card.tcg).base, INK, 0.25);
-  for (let x = 8; x < 152; x += 2) ctx.fillRect(x, 183, 1, 1);
+  for (let x = 8; x < 152; x += 2) ctx.fillRect(x, 169, 1, 1);
 
   if (card.moves[1]) {
-    moveSlot(ctx, card, card.moves[1], 186, "move2");
+    moveSlot(ctx, card, card.moves[1], 172, "move2");
   } else {
     const total = Math.round((card.height || 0) * 39.3701);
     const ft = Math.floor(total / 12);
     const inch = total % 12;
     const lb = Math.round((card.weight || 0) * 2.2046);
-    lintDraw("move2", 9, 188, 140, 5, () =>
-      fitText(ctx, `HT ${ft}'${String(inch).padStart(2, "0")}"  WT ${lb} LB`, 140, F3, TEXT, 9, 188)
+    lintDraw("move2", 9, 174, 140, 5, () =>
+      fitText(ctx, `HT ${ft}'${String(inch).padStart(2, "0")}"  WT ${lb} LB`, 140, F3, TEXT, 9, 174)
     );
 
   }
