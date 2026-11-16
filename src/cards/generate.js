@@ -316,9 +316,10 @@ export function generatePack(data, seed, options = {}) {
     } else {
       /* premium printings: full art bleeds to the edges, EX breaks out of the window */
       const special = rng.random();
-      if (card.rarity === "legend") card.special = special < 0.5 ? "full" : "ex";
-      else if (card.rarity === "holo") card.special = special < 0.22 ? "full" : special < 0.42 ? "ex" : null;
-      else if (card.rarity === "rare") card.special = special < 0.12 ? "full" : special < 0.26 ? "ex" : null;
+      if (card.rarity === "legend") card.special = special < 0.6 ? "full" : "ex";
+      else if (card.rarity === "holo") card.special = special < 0.38 ? "full" : special < 0.56 ? "ex" : null;
+      else if (card.rarity === "rare") card.special = special < 0.26 ? "full" : special < 0.38 ? "ex" : null;
+      else if (card.rarity === "uncommon") card.special = special < 0.1 ? "full" : null;
     }
     card.slot = index;
     return card;

@@ -5,13 +5,11 @@
 const W = 70;
 const H = 51;
 
-/* 4x4 ordered dither: 0..16 levels of the second colour */
-const BAYER = [
-  [0, 8, 2, 10],
-  [12, 4, 14, 6],
-  [3, 11, 1, 9],
-  [15, 7, 13, 5],
-];
+/* per-pixel hash: an aperiodic stipple, so no pattern tiles into stripes */
+function noiseAt(x, y) {
+  const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return v - Math.floor(v);
+}
 
 function px(ctx, x, y, w, h, c) {
   ctx.fillStyle = c;
@@ -24,9 +22,10 @@ function dither(ctx, x, y, w, h, a, b, level) {
   if (n === 16) return px(ctx, x, y, w, h, b);
   px(ctx, x, y, w, h, a);
   ctx.fillStyle = b;
+  const cut = n / 16;
   for (let yy = 0; yy < h; yy += 1) {
     for (let xx = 0; xx < w; xx += 1) {
-      if (BAYER[(y + yy) % 4][(x + xx) % 4] < n) ctx.fillRect(x + xx, y + yy, 1, 1);
+      if (noiseAt(x + xx, y + yy) < cut) ctx.fillRect(x + xx, y + yy, 1, 1);
     }
   }
 }
@@ -547,12 +546,12 @@ export function backgroundFor(card) {
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
   set[variant](ctx, null, seedOf(card, variant));
-  for (let i = 0; i < 4; i += 1) {
-    dither(ctx, 0, i, W, 1, "transparent", "#1b1630", 6 - i);
-    dither(ctx, 0, H - 1 - i, W, 1, "transparent", "#1b1630", 6 - i);
-    dither(ctx, i, 0, 1, H, "transparent", "#1b1630", 5 - i);
-    dither(ctx, W - 1 - i, 0, 1, H, "transparent", "#1b1630", 5 - i);
-  }
+  /* a single soft seam all round instead of a dotted black border */
+  ctx.fillStyle = "rgba(27, 22, 48, 0.35)";
+  ctx.fillRect(0, 0, W, 1);
+  ctx.fillRect(0, H - 1, W, 1);
+  ctx.fillRect(0, 0, 1, H);
+  ctx.fillRect(W - 1, 0, 1, H);
   cache.set(key, canvas);
   return canvas;
 }
