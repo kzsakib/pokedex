@@ -259,6 +259,8 @@ function drawRarity(ctx, rarity, x, y) {
   });
 }
 
+import { backgroundFor } from "./backgrounds.js";
+
 /* ---------- art window ---------- */
 
 const ART = { x: 8, y: 37, w: 144, h: 106, inner: { x: 10, y: 39, w: 140, h: 102 } };
@@ -550,7 +552,7 @@ function artWindow(ctx, card, geo = ART) {
   ctx.fillRect(x + 1, y + h - 2, w - 2, 1);
   ctx.fillRect(x + w - 2, y + 1, 1, h - 2);
 
-  const buffer = artBuffer(card, null);
+  const buffer = backgroundFor(card);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(buffer, 0, 0, BUFFER.w, BUFFER.h, inner.x, inner.y, inner.w, inner.h);
 }
@@ -906,7 +908,7 @@ export function renderBackdropLayer(card) {
   canvas.height = ART.inner.h;
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
-  const buffer = artBuffer(card, null);
+  const buffer = backgroundFor(card);
   ctx.drawImage(buffer, 0, 0, BUFFER.w, BUFFER.h, 0, 0, ART.inner.w, ART.inner.h);
   return canvas;
 }
