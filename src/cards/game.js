@@ -9,6 +9,7 @@ import { generatePack, RARITY_LABEL } from "./generate.js";
 import { chromaLore } from "./lore.js";
 import { cardSpriteLayout, renderCard } from "./cardRenderer.js";
 import { loadTypeIcons } from "./icons.js";
+import { TYPE_COL, keyOf } from "./theme.js";
 import { renderPackFront, renderPackBack, renderStrip, VARIANTS } from "./packArt.js";
 
 const FINISH_TAG = { reverse: " · REVERSE", holo: "", prism: " · PRISM", gold: " · GOLD", foil: " · FOIL", star: " · STARLIGHT", ember: " · EMBER", crystal: " · CRYSTAL", lightning: " · STORM", bubble: " · AQUA", grid: " · CIRCUIT", confetti: " · FESTIVAL", shiny: "" };
@@ -414,7 +415,14 @@ export class KantoPacksGame {
       const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
       /* every pokemon rides its own layer so it moves against the card */
       const spriteLayout = cardSpriteLayout(card, sprite);
-      const mesh = createCardMesh({ front, spriteLayout, mask, rarity: card.rarity, finish: card.finish });
+      const mesh = createCardMesh({
+        front,
+        spriteLayout,
+        mask,
+        rarity: card.rarity,
+        finish: card.finish,
+        typeColor: TYPE_COL[keyOf(card.tcg)],
+      });
       mesh.group.position.set(0, 40, 70 + this.meshes.length * 0.6);
       mesh.group.scale.setScalar(1);
       mesh.group.visible = false;
@@ -1049,7 +1057,14 @@ export class KantoPacksGame {
     const front = renderCard(card, sprite, { omitSprite: true });
     const mask = makeHoloMask(card.finish === "reverse" ? "holo" : card.rarity);
     const spriteLayout = cardSpriteLayout(card, sprite);
-    const mesh = createCardMesh({ front, spriteLayout, mask, rarity: card.rarity, finish: card.finish });
+    const mesh = createCardMesh({
+      front,
+      spriteLayout,
+      mask,
+      rarity: card.rarity,
+      finish: card.finish,
+      typeColor: TYPE_COL[keyOf(card.tcg)],
+    });
     mesh.group.position.set(0, 6, 0);
     mesh.group.scale.setScalar(0.94); /* room for the slab edge and its shadow */
     scene.root.add(mesh.group);

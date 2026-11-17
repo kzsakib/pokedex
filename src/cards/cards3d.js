@@ -21,7 +21,7 @@ export function cardBackTexture() {
   return sharedBack;
 }
 
-export function createCardMesh({ front, spriteLayout, mask, rarity, finish = "plain", dim = 1 }) {
+export function createCardMesh({ front, spriteLayout, mask, rarity, finish = "plain", typeColor = null, dim = 1 }) {
   const group = new THREE.Group();
   const effect =
     finish === "reverse" ? 1 :
@@ -54,6 +54,7 @@ export function createCardMesh({ front, spriteLayout, mask, rarity, finish = "pl
     holo: false,
     holoDensity: density,
     effect,
+    typeColor,
     dim,
     flat: true,
     opaque: true,

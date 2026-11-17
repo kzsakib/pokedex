@@ -29,14 +29,17 @@ ${BAYER_GLSL}
 uniform sampler2D uMap;
 uniform sampler2D uBack;
 uniform float uTwoSided;
-/* foil layers lighten the print (screen blend) instead of washing it out */
-vec3 glow(vec3 base, vec3 layer, float amt) {
-  return 1.0 - (1.0 - base) * (1.0 - clamp(layer * amt, 0.0, 1.0));
+/* foil layers dodge the print: they multiply brightness and keep the print's
+   own colour, which stays crisp instead of veiling it in white */
+vec3 dodge(vec3 base, vec3 layer, float amt) {
+  vec3 l = clamp(layer * amt, 0.0, 0.9);
+  return clamp(base / max(1.0 - l, 0.1), 0.0, 1.0);
 }
 
 uniform sampler2D uMask;
 uniform float uHolo;
 uniform float uHoloDensity;
+uniform vec3 uTypeCol;
 uniform vec2 uTilt;
 uniform float uOpacity;
 uniform float uGlint;
@@ -74,6 +77,10 @@ void main() {
 
   if (uUseTint > 0.5) col *= uTint;
 
+  /* the foil itself is iridescent: hue slides across the card with the tilt */
+  vec3 irid = rainbow(floor(fract(vUv.x * 0.35 + vUv.y * 0.55 + uTilt.x * 0.4 + uTime * 0.004) * 6.0));
+  vec3 typecol = uTypeCol;
+
   if (!backside && uSheen > 0.5) {
     float a = uTime * 0.05 + uTilt.x * 0.6;
     float dir = cos(a), dy = sin(a);
@@ -100,13 +107,18 @@ void main() {
     vec2 tilt = uTilt * vec2(0.55, 0.35); /* foil slides with the pointer, parallax between layers */
 
     if (uEffect < 1.5) {
-      /* reverse holo: plain silver foil on the frame and text box, art stays matte */
-      float streak = sin((vUv.x * 0.6 - vUv.y * 1.7) * 90.0 + tilt.x * 26.0) * 0.5 + 0.5;
-      float sweep = fract(vUv.y * 0.8 - vUv.x * 0.35 + tilt.y * 0.9 + t * 0.02);
-      col = glow(col, vec3(0.80, 0.86, 1.0), onFrame * (streak * 0.06 + smoothstep(0.7, 1.0, sweep) * 0.07));
+      /* reverse holo: the card's own type colour washes over the print as a
+         gradient, sliding with the tilt and banded in hard steps */
+      float grad = fract(vUv.y * 0.85 - vUv.x * 0.3 + tilt.y * 0.5 + t * 0.008);
+      float bandA = smoothstep(0.0, 0.35, grad) * (1.0 - smoothstep(0.45, 0.95, grad));
+      float bandB = smoothstep(0.86, 1.0, grad);
+      col = dodge(col, typecol, (0.12 + 0.16 * bandA) * onFrame);
+      col = dodge(col, mix(typecol, irid, 0.35), onFrame * bandB * 0.22);
+      float streak = sin((vUv.x * 0.6 - vUv.y * 1.7) * 78.0 + tilt.x * 22.0) * 0.5 + 0.5;
+      col = dodge(col, typecol * 1.25, onFrame * smoothstep(0.72, 1.0, streak) * 0.10);
       vec2 stamp = fract((vUv * vec2(160.0, 224.0)) / 26.0 + tilt * 0.15) - 0.5;
       float ring = smoothstep(0.30, 0.26, length(stamp)) * smoothstep(0.14, 0.20, length(stamp));
-      col = glow(col, vec3(1.0), onFrame * ring * 0.07);
+      col = dodge(col, mix(typecol, irid, 0.35), onFrame * ring * 0.16);
     } else if (uEffect < 2.5) {
       /* cosmos holo: dots and circles of different sizes inside the art, in two
          parallax layers that slide against each other as the card tilts */
@@ -117,33 +129,33 @@ void main() {
          hard iridescent edge where two bands cross */
       float sheen = fract(uv.x * 0.5 + uv.y * 0.42 + tilt.x * 0.85 + t * 0.01);
       float wave = sin(sheen * 6.2831 + tilt.y * 2.0) * 0.5 + 0.5;
-      col = glow(col, rainbow(floor(sheen * 6.0)), inArt * (0.10 + 0.14 * wave));
-      col = glow(col, rainbow(floor(fract(sheen * 3.0 + 0.33) * 6.0)), inArt * smoothstep(0.55, 0.5, abs(sheen - 0.5)) * 0.10);
+      col = dodge(col, rainbow(floor(sheen * 6.0)), inArt * (0.10 + 0.14 * wave));
+      col = dodge(col, rainbow(floor(fract(sheen * 3.0 + 0.33) * 6.0)), inArt * smoothstep(0.55, 0.5, abs(sheen - 0.5)) * 0.10);
       float rim = smoothstep(0.88, 1.0, fract(sheen * 2.0 + uv.y * 0.18));
-      col = glow(col, vec3(1.0, 0.99, 0.95), inArt * rim * 0.12);
+      col = dodge(col, mix(irid, irid, 0.30), inArt * rim * 0.12);
       /* sparkle: two parallax layers of hard pixel stars that twinkle in step */
       vec2 p1 = fract(uv * vec2(13.0, 18.0) + tilt * 0.55) - 0.5;
       vec2 p2 = fract(uv * vec2(23.0, 31.0) - tilt * 0.95) - 0.5;
       float s1 = smoothstep(0.13, 0.05, max(abs(p1.x), abs(p1.y)));
       float s2 = smoothstep(0.10, 0.04, max(abs(p2.x), abs(p2.y)));
       float twinkle = step(0.5, fract(sin(dot(floor(uv * 46.0), vec2(12.9898, 78.233))) * 437.58 + t * 0.35));
-      col = glow(col, rainbow(floor(fract(sheen + 0.5) * 6.0)), (s1 * 0.6 + s2 * 0.4) * twinkle * 0.55);
-      col = glow(col, vec3(1.0), (s1 + s2 * 0.7) * (1.0 - twinkle * 0.6) * 0.42);
+      col = dodge(col, rainbow(floor(fract(sheen + 0.5) * 6.0)), (s1 * 0.6 + s2 * 0.4) * twinkle * 0.55);
+      col = dodge(col, irid, (s1 + s2 * 0.7) * (1.0 - twinkle * 0.6) * 0.42);
     } else if (uEffect < 3.5) {
       /* rainbow rare: the printed rainbow runs over the whole face, radial from the centre */
       vec2 c = vUv - 0.5;
       float r = length(c * vec2(0.72, 1.0));
       float hue = fract(r * 1.9 + atan(c.y, c.x) * 0.08 + tilt.y * 0.35 + t * 0.01);
-      col = glow(col, rainbow(floor(hue * 6.0)), 0.15);
-      col = glow(col, vec3(1.0), smoothstep(0.06, 0.0, abs(fract(hue * 2.0) - 0.5)) * 0.10);
+      col = dodge(col, rainbow(floor(hue * 6.0)), 0.15);
+      col = dodge(col, irid, smoothstep(0.06, 0.0, abs(fract(hue * 2.0) - 0.5)) * 0.10);
     } else if (uEffect < 4.5) {
       /* gold secret rare: engraved horizontals under an amber lift */
-      col = glow(col, vec3(1.0, 0.82, 0.42), 0.09);
+      col = dodge(col, vec3(1.0, 0.82, 0.42), 0.09);
       float engrave = sin(vUv.y * 300.0 + tilt.y * 20.0) * 0.5 + 0.5;
-      col = glow(col, vec3(1.0, 0.93, 0.62), engrave * 0.06);
+      col = dodge(col, vec3(1.0, 0.93, 0.62), engrave * 0.06);
       float gloss = smoothstep(0.35, 0.5, abs(fract(vUv.y * 1.1 - tilt.x * 0.4 + t * 0.02) - 0.5));
-      col = glow(col, vec3(1.0, 0.97, 0.85), gloss * 0.10);
-      col = glow(col, vec3(0.48, 0.32, 0.10), 0.03);
+      col = dodge(col, vec3(1.0, 0.97, 0.85), gloss * 0.10);
+      col = dodge(col, vec3(0.48, 0.32, 0.10), 0.03);
     } else if (uEffect < 5.5) {
       /* starlight holo: blurry starbursts of different sizes, each on its own plane */
       vec2 p = vUv * vec2(9.0, 12.0);
@@ -153,39 +165,39 @@ void main() {
       float d = length(g);
       float burst = smoothstep(0.34, 0.02, d) * step(0.35, h);
       float rays = smoothstep(0.06, 0.0, abs(sin(atan(g.y, g.x) * 2.5 + h * 6.0)) * d) * burst;
-      col = glow(col, vec3(0.94, 0.96, 1.0), inArt * (burst * 0.12 + rays * 0.14));
-      col = glow(col, vec3(1.0), inArt * smoothstep(0.05, 0.0, d) * 0.18);
+      col = dodge(col, vec3(0.94, 0.96, 1.0), inArt * (burst * 0.12 + rays * 0.14));
+      col = dodge(col, irid, inArt * smoothstep(0.05, 0.0, d) * 0.18);
     } else if (uEffect < 6.5) {
       /* galaxy holo: spiral arms of stars inside the art */
       vec2 c = vUv - 0.5;
       float r = length(c);
       float sw = sin(atan(c.y, c.x) * 2.0 + r * 26.0 - tilt.x * 3.0 + t * 0.05);
-      col = glow(col, vec3(0.34, 0.24, 0.62), inArt * smoothstep(0.3, 1.0, sw) * 0.10);
+      col = dodge(col, vec3(0.34, 0.24, 0.62), inArt * smoothstep(0.3, 1.0, sw) * 0.10);
       vec2 cell = floor(vUv * vec2(40.0, 56.0) + tilt * 0.4);
       float h = fract(sin(dot(cell, vec2(35.13, 91.7))) * 24634.63);
-      if (h > 0.984) col = glow(col, vec3(1.0, 0.98, 0.9), inArt * 0.5);
+      if (h > 0.984) col = dodge(col, vec3(1.0, 0.98, 0.9), inArt * 0.5);
     } else if (uEffect < 7.5) {
       /* ember: cinders drift up behind the art only */
       float heat = fract(vUv.y * 1.6 + t * 0.05 + tilt.x * 0.4);
-      col = glow(col, vec3(1.0, 0.48, 0.16), inArt * smoothstep(0.86, 1.0, heat) * 0.10);
+      col = dodge(col, vec3(1.0, 0.48, 0.16), inArt * smoothstep(0.86, 1.0, heat) * 0.10);
       vec2 cell = floor(vUv * vec2(26.0, 38.0) + vec2(tilt.x, t * 0.6));
       float h = fract(sin(dot(cell, vec2(78.233, 12.9898))) * 43758.5453);
-      if (h > 0.975) col = glow(col, vec3(1.0, 0.84, 0.4), inArt * 0.45);
+      if (h > 0.975) col = dodge(col, vec3(1.0, 0.84, 0.4), inArt * 0.45);
     } else if (uEffect < 8.5) {
       /* cracked ice: facet seams sliding against each other */
       float f1 = abs(fract((vUv.x + vUv.y * 0.65) * 4.0 + tilt.x * 0.6) - 0.5);
       float f2 = abs(fract((vUv.x * 1.4 - vUv.y) * 6.0 - tilt.y * 0.5) - 0.5);
-      col = glow(col, vec3(0.72, 0.9, 1.0), inArt * smoothstep(0.46, 0.5, f1) * 0.12);
-      col = glow(col, vec3(0.9, 0.98, 1.0), inArt * smoothstep(0.47, 0.5, f2) * 0.08);
-      col = glow(col, rainbow(floor(fract(vUv.x + vUv.y + tilt.x * 0.5) * 6.0)), inArt * 0.03);
+      col = dodge(col, vec3(0.72, 0.9, 1.0), inArt * smoothstep(0.46, 0.5, f1) * 0.12);
+      col = dodge(col, vec3(0.9, 0.98, 1.0), inArt * smoothstep(0.47, 0.5, f2) * 0.08);
+      col = dodge(col, rainbow(floor(fract(vUv.x + vUv.y + tilt.x * 0.5) * 6.0)), inArt * 0.03);
     } else if (uEffect < 9.5) {
       /* lightning: one forked bolt in the art, struck on a slow cycle */
       float cycle = fract(t * 0.22 + 0.35);
       float pulse = smoothstep(0.0, 0.15, cycle) * smoothstep(0.4, 0.2, cycle);
       float x = fract(vUv.x * 1.6 + sin(vUv.y * 22.0 + t * 0.5) * 0.1 + tilt.x * 0.3);
       float core = smoothstep(0.03, 0.0, abs(x - 0.5));
-      col = glow(col, vec3(0.92, 0.97, 1.0), inArt * core * pulse * 0.55);
-      col = glow(col, vec3(0.6, 0.78, 1.0), inArt * smoothstep(0.09, 0.0, abs(x - 0.5)) * pulse * 0.15);
+      col = dodge(col, vec3(0.92, 0.97, 1.0), inArt * core * pulse * 0.55);
+      col = dodge(col, vec3(0.6, 0.78, 1.0), inArt * smoothstep(0.09, 0.0, abs(x - 0.5)) * pulse * 0.15);
     } else if (uEffect < 10.5) {
       /* bubbles: rings rising inside the art */
       vec2 p = vUv * vec2(9.0, 12.0) + vec2(tilt.x * 0.4, -t * 0.06);
@@ -194,15 +206,15 @@ void main() {
       vec2 g = fract(p) - 0.5;
       float rad = 0.18 + h * 0.16;
       float ring = smoothstep(rad, rad - 0.05, length(g)) * smoothstep(rad - 0.13, rad - 0.06, length(g));
-      col = glow(col, vec3(0.84, 0.97, 1.0), inArt * ring * 0.22);
-      col = glow(col, vec3(1.0), inArt * smoothstep(0.05, 0.0, length(g - vec2(-0.1, -0.12))) * 0.2);
+      col = dodge(col, vec3(0.84, 0.97, 1.0), inArt * ring * 0.22);
+      col = dodge(col, irid, inArt * smoothstep(0.05, 0.0, length(g - vec2(-0.1, -0.12))) * 0.2);
     } else if (uEffect < 11.5) {
       /* etched grid: hairlines pressed into the frame only */
       float gx = abs(fract(vUv.x * 26.0 + tilt.x * 0.5) - 0.5);
       float gy = abs(fract(vUv.y * 36.0 - tilt.y * 0.4) - 0.5);
       float line = max(smoothstep(0.47, 0.5, gx), smoothstep(0.47, 0.5, gy));
-      col = glow(col, vec3(0.86, 0.9, 1.0), onFrame * line * 0.10);
-      col = glow(col, vec3(1.0), onFrame * smoothstep(0.9, 1.0, fract(vUv.y * 0.9 + tilt.x * 0.4)) * 0.05);
+      col = dodge(col, vec3(0.86, 0.9, 1.0), onFrame * line * 0.10);
+      col = dodge(col, irid, onFrame * smoothstep(0.9, 1.0, fract(vUv.y * 0.9 + tilt.x * 0.4)) * 0.05);
     } else if (uEffect < 12.5) {
       /* confetti: flecks that tumble only behind the art */
       vec2 p = vUv * vec2(26.0, 36.0) + tilt * 0.8;
@@ -212,7 +224,7 @@ void main() {
         vec2 g = fract(p) - 0.5 - tilt * (h - 0.5);
         float flake = smoothstep(0.28, 0.12, abs(g.x) + abs(g.y) * 1.6);
         vec3 pick = h > 0.975 ? vec3(1.0, 0.44, 0.54) : h > 0.955 ? vec3(1.0, 0.86, 0.36) : vec3(0.5, 0.74, 1.0);
-        col = glow(col, pick, inArt * flake * 0.35);
+        col = dodge(col, pick, inArt * flake * 0.35);
       }
     } else if (uEffect < 13.5) {
       /* aurora: ribbons of light drifting up the art, each one out of phase */
@@ -225,8 +237,8 @@ void main() {
         ribbons += ribbon * lift * (0.55 + 0.45 * sin(t * 0.6 + fi * 2.0));
       }
       vec3 aur = mix(vec3(0.35, 1.0, 0.62), vec3(0.62, 0.52, 1.0), smoothstep(0.2, 0.8, vUv.x));
-      col = glow(col, aur, inArt * min(ribbons, 1.0) * 0.16);
-      col = glow(col, vec3(0.92, 1.0, 0.95), inArt * smoothstep(0.85, 1.0, ribbons) * 0.10);
+      col = dodge(col, aur, inArt * min(ribbons, 1.0) * 0.16);
+      col = dodge(col, vec3(0.92, 1.0, 0.95), inArt * smoothstep(0.85, 1.0, ribbons) * 0.10);
     } else if (uEffect < 14.5) {
       /* rain of glyphs: columns of blocks falling at different speeds */
       float colX = floor(vUv.x * 22.0);
@@ -238,8 +250,8 @@ void main() {
       vec2 q = fract(vec2(vUv.x * 22.0, vUv.y * 26.0 - t * speed * 26.0));
       float glyph = step(0.42, fract(sin(floor(q.x) * 1.7 + floor(q.y) * 17.0) * 43758.5453));
       vec3 neon = vec3(0.45, 1.0, 0.55);
-      col = glow(col, neon, inArt * trail * glyph * 0.18);
-      col = glow(col, vec3(0.86, 1.0, 0.9), inArt * head * glyph * 0.42);
+      col = dodge(col, neon, inArt * trail * glyph * 0.18);
+      col = dodge(col, vec3(0.86, 1.0, 0.9), inArt * head * glyph * 0.42);
     } else if (uEffect < 15.5) {
       /* petals: layered blossoms drifting and spinning across the art */
       for (int i = 0; i < 2; i++) {
@@ -254,7 +266,7 @@ void main() {
           g = mat2(cos(a), sin(a), -sin(a), cos(a)) * g;
           float petal = smoothstep(0.30, 0.06, abs(g.x) * 1.6 + abs(g.y) * 0.9) * smoothstep(0.32, 0.16, length(g));
           vec3 tint = h > 0.85 ? vec3(1.0, 0.86, 0.92) : h > 0.7 ? vec3(1.0, 0.72, 0.80) : vec3(0.98, 0.92, 1.0);
-          col = glow(col, tint, inArt * petal * 0.34);
+          col = dodge(col, tint, inArt * petal * 0.34);
         }
       }
     } else if (uEffect < 16.5) {
@@ -265,9 +277,9 @@ void main() {
       float ring = smoothstep(0.34, 0.42, wave) * smoothstep(0.5, 0.44, wave);
       float fade = smoothstep(0.05, 0.5, r);
       vec3 tint = rainbow(floor(fract(r * 1.4 + t * 0.03) * 6.0));
-      col = glow(col, tint, inArt * ring * fade * 0.14);
-      col = glow(col, vec3(1.0), inArt * smoothstep(0.46, 0.5, wave) * smoothstep(0.5, 0.48, wave) * fade * 0.10);
-      col = glow(col, vec3(1.0), inArt * smoothstep(0.08, 0.0, r) * 0.12);
+      col = dodge(col, tint, inArt * ring * fade * 0.14);
+      col = dodge(col, irid, inArt * smoothstep(0.46, 0.5, wave) * smoothstep(0.5, 0.48, wave) * fade * 0.10);
+      col = dodge(col, irid, inArt * smoothstep(0.08, 0.0, r) * 0.12);
     } else if (uEffect < 17.5) {
       /* honeycomb: a hex lattice that catches the light cell by cell */
       vec2 p = vUv * vec2(14.0, 19.0);
@@ -279,9 +291,9 @@ void main() {
       vec2 cell = floor(p);
       float h = fract(sin(dot(cell, vec2(19.3, 7.7))) * 8314.13);
       float lit = smoothstep(0.6, 1.0, sin(t * 1.2 + h * 6.28 + tilt.x * 2.0) * 0.5 + 0.5);
-      col = glow(col, vec3(1.0, 0.86, 0.44), inArt * edge * 0.16);
-      col = glow(col, vec3(1.0, 0.95, 0.70), inArt * (1.0 - edge) * lit * 0.10);
-      col = glow(col, vec3(1.0), inArt * smoothstep(0.47, 0.5, d) * 0.06);
+      col = dodge(col, vec3(1.0, 0.86, 0.44), inArt * edge * 0.16);
+      col = dodge(col, vec3(1.0, 0.95, 0.70), inArt * (1.0 - edge) * lit * 0.10);
+      col = dodge(col, irid, inArt * smoothstep(0.47, 0.5, d) * 0.06);
     } else if (uEffect < 18.5) {
       /* star chart: a faint constellation net that twinkles */
       vec2 p = vUv * vec2(18.0, 25.0) + tilt * 0.35;
@@ -293,9 +305,9 @@ void main() {
       float lx = smoothstep(0.42, 0.5, abs(fract(p.x / 3.0) - 0.5));
       float ly = smoothstep(0.42, 0.5, abs(fract(p.y / 3.0) - 0.5));
       float net = max(lx, ly) * 0.5;
-      col = glow(col, vec3(0.72, 0.82, 1.0), inArt * net * 0.07);
-      col = glow(col, vec3(1.0, 0.98, 0.9), inArt * star * twinkle * 0.42);
-      col = glow(col, rainbow(floor(h * 6.0)), inArt * star * 0.10);
+      col = dodge(col, vec3(0.72, 0.82, 1.0), inArt * net * 0.07);
+      col = dodge(col, vec3(1.0, 0.98, 0.9), inArt * star * twinkle * 0.42);
+      col = dodge(col, rainbow(floor(h * 6.0)), inArt * star * 0.10);
     } else if (uEffect < 19.5) {
       /* shattered glass: hard facets, each catching a different colour */
       vec2 p = vUv * vec2(7.0, 9.0);
@@ -316,9 +328,9 @@ void main() {
       float seam = smoothstep(0.06, 0.0, d2 - d1);
       float h = fract(sin(dot(id, vec2(63.1, 21.7))) * 1731.7);
       vec3 facet = rainbow(floor(h * 6.0));
-      col = glow(col, facet, inArt * 0.10);
-      col = glow(col, vec3(1.0), inArt * seam * (0.16 + 0.14 * abs(uTilt.x)));
-      col = glow(col, vec3(0.82, 0.94, 1.0), inArt * smoothstep(0.4, 0.0, d1) * 0.04);
+      col = dodge(col, facet, inArt * 0.10);
+      col = dodge(col, irid, inArt * seam * (0.16 + 0.14 * abs(uTilt.x)));
+      col = dodge(col, vec3(0.82, 0.94, 1.0), inArt * smoothstep(0.4, 0.0, d1) * 0.04);
     }
   }
 
@@ -334,7 +346,7 @@ void main() {
 }
 `;
 
-export function makeMaterial({ map, back = null, mask = null, holo = false, holoDensity = 0.33, effect = 0, glint = false, tint = null, dim = 1, flat = false, opaque = false }) {
+export function makeMaterial({ map, back = null, mask = null, holo = false, holoDensity = 0.33, effect = 0, glint = false, tint = null, typeColor = null, dim = 1, flat = false, opaque = false }) {
   return new THREE.ShaderMaterial({
     uniforms: {
       uMap: { value: map },
@@ -343,6 +355,7 @@ export function makeMaterial({ map, back = null, mask = null, holo = false, holo
       uMask: { value: mask },
       uHolo: { value: holo ? 1 : 0 },
       uHoloDensity: { value: holoDensity },
+      uTypeCol: { value: new THREE.Color(typeColor ?? 0xffffff) },
       uTilt: { value: new THREE.Vector2(0, 0) },
       uOpacity: { value: 1 },
       uGlint: { value: 0 },
