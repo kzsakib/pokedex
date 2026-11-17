@@ -257,7 +257,7 @@ export class KantoAudio {
     this.musicPlaying = true;
     this.musicStep = 0;
     this.nextNoteTime = this.ctx.currentTime + 0.15;
-    if (this.music) this.music.gain.setTargetAtTime(0.9, this.ctx.currentTime, 1.2);
+    if (this.music) this.music.gain.setTargetAtTime(1.5, this.ctx.currentTime, 1.2);
     this.musicTimer = setInterval(() => this.scheduleMusic(), 25);
   }
 
@@ -312,13 +312,13 @@ export class KantoAudio {
     const fifth = [164.81, 130.81, 196, 146.83];
     const arp = [440, 523.25, 587.33, 659.25, 587.33, 523.25, 493.88, 440];
     if (beat === 0) {
-      this.musicVoice(roots[bar], t, stepDur * 7.4, 0.075, "sine", 0.04);
+      this.musicVoice(roots[bar], t, stepDur * 7.4, 0.085, "sine", 0.04);
       this.musicVoice(third[bar], t, stepDur * 7.4, 0.028, "triangle", 0.25);
       this.musicVoice(fifth[bar] * 2, t, stepDur * 6.5, 0.012, "sine", 0.5);
     }
     if (beat % 2 === 0) {
       const f = arp[(Math.floor(step / 1) + bar * 2) % arp.length] * (beat === 4 ? 1 : 1);
-      this.musicVoice(f, t, stepDur * 1.6, 0.02, "triangle", 0.01);
+      this.musicVoice(f, t, stepDur * 1.6, 0.026, "triangle", 0.01);
     }
     if (beat === 2 || beat === 6) {
       const ctx = this.ctx;
