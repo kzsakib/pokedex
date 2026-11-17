@@ -1001,48 +1001,136 @@ export function renderCardBack() {
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
 
-  ctx.fillStyle = INK;
-  ctx.fillRect(0, 0, CARD_W, CARD_H);
-  ctx.fillStyle = "#1d2b52";
-  ctx.fillRect(3, 3, CARD_W - 6, CARD_H - 6);
-  ctx.fillStyle = "#101a31";
-  ctx.fillRect(5, 5, CARD_W - 10, CARD_H - 10);
+  const INK_DEEP = "#080c18";
+  const SLATE = "#0e1526";
+  const SLATE_2 = "#121b30";
+  const HAIR = "#243252";
+  const GOLD_HI = "#f2d894";
+  const MUTED_BACK = "#7d90b8";
 
-  ctx.fillStyle = "#182741";
-  for (let d = -CARD_H; d < CARD_W + CARD_H; d += 14) {
+  const px = (x, y, colour) => {
+    ctx.fillStyle = colour;
+    ctx.fillRect(x, y, 1, 1);
+  };
+  const rect = (x, y, w, h, colour) => {
+    ctx.fillStyle = colour;
+    ctx.fillRect(x, y, w, h);
+  };
+
+  /* base + inner sheet */
+  rect(0, 0, CARD_W, CARD_H, INK_DEEP);
+  rect(2, 2, CARD_W - 4, CARD_H - 4, SLATE);
+  rect(6, 6, CARD_W - 12, CARD_H - 12, SLATE_2);
+
+  /* faint diagonal hatch, one tone, 16px apart */
+  for (let d = -CARD_H; d < CARD_W + CARD_H; d += 16) {
     for (let y = 8; y < CARD_H - 8; y += 1) {
       const x = d + y;
-      if (x >= 8 && x < CARD_W - 9) ctx.fillRect(x, y, 1, 1);
+      if (x >= 8 && x < CARD_W - 8) px(x, y, "#16203a");
     }
   }
-  ctx.fillStyle = GOLD;
-  ctx.fillRect(8, 10, CARD_W - 16, 1);
-  ctx.fillRect(8, CARD_H - 11, CARD_W - 16, 1);
 
+  /* outer frame: gold hairline with corner chamfers and a gap mid-top / mid-bottom */
+  const cut = 10;
+  const guard = (x, y) => {
+    const dx = Math.min(x - 2, CARD_W - 3 - x);
+    const dy = Math.min(y - 2, CARD_H - 3 - y);
+    return dx + dy < cut;
+  };
+  for (let x = 2; x < CARD_W - 2; x += 1) {
+    for (const y of [2, CARD_H - 3]) {
+      if (guard(x, y)) continue;
+      if (Math.abs(x - (CARD_W >> 1)) < 10) continue;
+      px(x, y, GOLD_HI);
+    }
+  }
+  for (let y = 2; y < CARD_H - 2; y += 1) {
+    for (const x of [2, CARD_W - 3]) {
+      if (guard(x, y)) continue;
+      px(x, y, GOLD_HI);
+    }
+  }
+  /* the chamfer diagonals, plus a 1px accent at each end of the top gap */
+  for (let k = 0; k < cut; k += 1) {
+    px(2 + k, 2 + (cut - k), GOLD_HI);
+    px(CARD_W - 3 - k, 2 + (cut - k), GOLD_HI);
+    px(2 + k, CARD_H - 3 - (cut - k), GOLD_HI);
+    px(CARD_W - 3 - k, CARD_H - 3 - (cut - k), GOLD_HI);
+  }
+  rect(CARD_W / 2 - 11, 1, 3, 1, GOLD_HI);
+  rect(CARD_W / 2 + 8, 1, 3, 1, GOLD_HI);
+  rect(CARD_W / 2 - 11, CARD_H - 2, 3, 1, GOLD_HI);
+  rect(CARD_W / 2 + 8, CARD_H - 2, 3, 1, GOLD_HI);
+
+  /* inner hairline: quiet slate, chamfers only */
+  for (let x = 6; x < CARD_W - 6; x += 1) {
+    for (const y of [6, CARD_H - 7]) {
+      const edge = Math.min(x - 6, CARD_W - 7 - x);
+      const ny = Math.abs(y - (y === 6 ? 6 : CARD_H - 7));
+      if (edge + ny < 7) continue;
+      px(x, y, HAIR);
+    }
+  }
+  for (let y = 6; y < CARD_H - 6; y += 1) px(6, y, HAIR);
+  for (let y = 6; y < CARD_H - 6; y += 1) px(CARD_W - 7, y, HAIR);
+
+  /* corner brackets */
+  const arm = 14;
+  for (const [ox, oy, dx, dy] of [[2, 2, 1, 1], [CARD_W - 3, CARD_H - 3, -1, -1]]) {
+    for (let k = cut + 3; k < cut + 3 + arm; k += 1) {
+      px(ox + dx * k, oy + dy * 3, GOLD_HI);
+      px(ox + dx * 3, oy + dy * k, GOLD_HI);
+    }
+  }
+
+  /* emblem: a ball inside a progress ring, drawn on whole pixels */
   const cx = CARD_W / 2;
-  const cy = 100;
-  const r = 38;
+  const cy = 98;
+  const r = 30;
   for (let y = -r; y <= r; y += 1) {
     for (let x = -r; x <= r; x += 1) {
-      if (x * x + y * y > r * r) continue;
-      ctx.fillStyle = y < 0 ? "#c8281e" : "#f6efd4";
-      ctx.fillRect(cx + x, cy + y, 1, 1);
+      const d = Math.sqrt(x * x + y * y);
+      if (d > r) continue;
+      if (d > r - 1.4) {
+        px(cx + x, cy + y, HAIR);
+        continue;
+      }
+      if (Math.abs(y) < 2) px(cx + x, cy + y, INK_DEEP);
+      else px(cx + x, cy + y, y < 0 ? "#cf3b2c" : "#efe7cf");
     }
   }
-  ctx.fillStyle = INK;
-  ctx.fillRect(cx - r, cy - 2, r * 2, 4);
-  for (let y = -10; y <= 10; y += 1) {
-    for (let x = -10; x <= 10; x += 1) {
+  /* ring ticks at the quarters, 3px long */
+  for (const [ax, ay] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+    for (let k = 0; k < 3; k += 1) {
+      px(cx + ax * (r + 2 + k), cy + ay * (r + 2 + k), GOLD_HI);
+    }
+  }
+  /* hub */
+  for (let y = -8; y <= 8; y += 1) {
+    for (let x = -8; x <= 8; x += 1) {
       const d = Math.sqrt(x * x + y * y);
-      if (d > 10) continue;
-      ctx.fillStyle = d > 7 ? INK : "#f6efd4";
-      ctx.fillRect(cx + x, cy + y, 1, 1);
+      if (d > 8) continue;
+      px(cx + x, cy + y, d > 5.2 ? INK_DEEP : "#efe7cf");
+    }
+  }
+  for (let y = -3; y <= 3; y += 1) {
+    for (let x = -3; x <= 3; x += 1) {
+      if (x * x + y * y > 9) continue;
+      px(cx + x, cy + y, "#cf3b2c");
     }
   }
 
-  drawText(ctx, cx, 156, "KANTO 151", F5, "#f6efd4", 1, "c", 2);
-  drawText(ctx, cx, 176, "TRADE - PLAY - COLLECT", F3, "#8fa6d8", 1, "c");
-  drawText(ctx, cx, CARD_H - 22, "FAN PROJECT", F3, "#5d6f9c", 1, "c");
+  /* wordmark block */
+  drawText(ctx, cx, 146, "KANTO 151", F5, "#f4f1e6", 1, "c", 2);
+  rect(20, 166, 40, 1, HAIR);
+  rect(100, 166, 40, 1, HAIR);
+  rect(cx - 3, 165, 6, 1, GOLD_HI);
+  drawText(ctx, cx, 173, "TRADE - PLAY - COLLECT", F3, MUTED_BACK, 1, "c");
+
+  /* footer: serial-style rule instead of the old project note */
+  drawText(ctx, 24, CARD_H - 20, "SERIES 01", F3, MUTED_BACK, 1, "l");
+  drawText(ctx, CARD_W - 24, CARD_H - 20, "001 - 151", F3, MUTED_BACK, 1, "r");
+  rect(24, CARD_H - 13, CARD_W - 48, 1, HAIR);
   return canvas;
 }
 
