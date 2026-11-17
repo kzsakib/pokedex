@@ -420,6 +420,14 @@ export function cardSpriteLayout(card, sprite) {
     return { sprite: clean, k, w, h, x: Math.round(CARD_W / 2 - w / 2), y: feet - h, feet };
   }
   const inner = LAYOUT.interior;
+  if (card.special === "ex") {
+    /* EX printings break the window: the sprite runs past the ring and the frame */
+    const k = fitScale(clean, 150, 122);
+    const w = Math.round(clean.width * k);
+    const h = Math.round(clean.height * k);
+    const bottom = inner.y + inner.h + 4;
+    return { sprite: clean, k, w, h, x: Math.round(CARD_W / 2 - w / 2), y: bottom - h, feet: bottom };
+  }
   const k = fitScale(clean, 138, 102);
   const w = Math.round(clean.width * k);
   const h = Math.round(clean.height * k);
@@ -655,6 +663,7 @@ function drawFaBands(ctx, t) {
 
 function drawFrameKit(ctx, card, t, spec) {
   const hi = rgb(t.lineHi);
+  const hiAt = (x, y) => (t.premium ? rgb(t.frameInk(x, y)) : hi);
   const lo = rgb(t.lineLo);
   const accent = (x, y) => rgb(t.rainbow ? t.rainbowAt(x, y) : t.accent);
   const topG = spec.topGaps;
@@ -667,18 +676,18 @@ function drawFrameKit(ctx, card, t, spec) {
     let dx = x;
     if (x === 3 && y >= spec.jogL && y < spec.jogL + 5) dx = 4;
     if (x === CARD_W - 4 && y >= spec.jogR && y < spec.jogR + 5) dx = CARD_W - 5;
-    px(ctx, dx, y, hi);
+    px(ctx, dx, y, hiAt(dx, y));
   });
   for (const g of topG) {
     for (let k = 3; k <= 5; k += 1) {
-      px(ctx, g - 1, k, hi);
-      px(ctx, g + 3, k, hi);
+      px(ctx, g - 1, k, hiAt(g - 1, k));
+      px(ctx, g + 3, k, hiAt(g + 3, k));
     }
   }
   for (const g of botG) {
     for (let k = CARD_H - 6; k <= CARD_H - 4; k += 1) {
-      px(ctx, g - 1, k, hi);
-      px(ctx, g + 3, k, hi);
+      px(ctx, g - 1, k, hiAt(g - 1, k));
+      px(ctx, g + 3, k, hiAt(g + 3, k));
     }
   }
 
@@ -692,8 +701,8 @@ function drawFrameKit(ctx, card, t, spec) {
     const th = spec.th;
     for (let k = 0; k < spec.arm; k += 1) {
       for (let t2 = 0; t2 < th; t2 += 1) {
-        px(ctx, ox + dx * k, oy + dy * t2, hi);
-        px(ctx, ox + dx * t2, oy + dy * k, hi);
+        px(ctx, ox + dx * k, oy + dy * t2, hiAt(ox + dx * k, oy + dy * t2));
+        px(ctx, ox + dx * t2, oy + dy * k, hiAt(ox + dx * t2, oy + dy * k));
       }
     }
     for (const [ax, ay] of [[3, 3], [4, 3], [3, 4], [4, 4]]) px(ctx, ox + dx * ax, oy + dy * ay, accent(ox + dx * ax, oy + dy * ay));
@@ -716,7 +725,11 @@ function drawFrameKit(ctx, card, t, spec) {
   /* chamfered corners: an outer diagonal with two accent pixels */
   for (const name of spec.corners) {
     const [ox, oy, dx, dy] = CORNERS[name];
-    for (let k = 0; k <= spec.cut + 1; k += 1) px(ctx, ox + dx * (k + 1), oy + dy * (spec.cut + 3 - k), hi);
+    for (let k = 0; k <= spec.cut + 1; k += 1) {
+      const x = ox + dx * (k + 1);
+      const y = oy + dy * (spec.cut + 3 - k);
+      px(ctx, x, y, hiAt(x, y));
+    }
     px(ctx, ox + dx * 2, oy + dy * (spec.cut + 1), accent(ox, oy));
     px(ctx, ox + dx * 3, oy + dy * spec.cut, accent(ox, oy));
   }
@@ -725,12 +738,12 @@ function drawFrameKit(ctx, card, t, spec) {
   const key = spec.key;
   if (key === "fire") {
     for (let x = 48; x <= 111; x += 6) {
-      px(ctx, x, 2, hi);
-      px(ctx, x + 1, 1, hi);
-      px(ctx, x + 2, 2, hi);
+      px(ctx, x, 2, hiAt(x, 2));
+      px(ctx, x + 1, 1, hiAt(x + 1, 1));
+      px(ctx, x + 2, 2, hiAt(x + 2, 2));
     }
   } else if (key === "water") {
-    for (let x = 44; x <= 115; x += 1) px(ctx, x, Math.floor(x / 3) % 2 === 0 ? 2 : 1, hi);
+    for (let x = 44; x <= 115; x += 1) px(ctx, x, Math.floor(x / 3) % 2 === 0 ? 2 : 1, hiAt(x, 2));
   } else if (key === "grass") {
     for (const [list, y0, s] of [[topG, 3, -1], [botG, CARD_H - 4, 1]]) {
       for (const g of list) {
@@ -740,11 +753,11 @@ function drawFrameKit(ctx, card, t, spec) {
       }
     }
   } else if (key === "lightning") {
-    for (let y = 100; y <= 107; y += 1) px(ctx, 2, y, hi);
-    px(ctx, 1, 108, hi);
-    px(ctx, 1, 109, hi);
-    px(ctx, CARD_W - 3, 120, hi);
-    px(ctx, CARD_W - 3, 121, hi);
+    for (let y = 100; y <= 107; y += 1) px(ctx, 2, y, hiAt(2, y));
+    px(ctx, 1, 108, hiAt(1, 108));
+    px(ctx, 1, 109, hiAt(1, 109));
+    px(ctx, CARD_W - 3, 120, hiAt(CARD_W - 3, 120));
+    px(ctx, CARD_W - 3, 121, hiAt(CARD_W - 3, 121));
   } else if (key === "psychic") {
     for (let x = 30; x <= 129; x += 4) {
       px(ctx, x, 4, accent(x, 4));

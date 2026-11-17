@@ -92,6 +92,17 @@ export function themeFor(card) {
     hpCol: mixRgb(TYPE_COL[key] || TYPE_COL.colorless, [255, 255, 255], 0.22),
     shadowCol: mixRgb(panel, [0, 0, 0], 0.5),
     gold: GOLD,
+    /* premium frames read as a rolled gold foil: four hard tones stepping along
+       the line, so the border itself looks shiny */
+    frameInk(x, y) {
+      const ramp = [
+        mixRgb(GOLD, [255, 255, 255], 0.55),
+        mixRgb(GOLD, [255, 232, 150], 0.25),
+        GOLD,
+        mixRgb(GOLD, [120, 78, 16], 0.25),
+      ];
+      return ramp[Math.floor((x + y * 1.4) / 7) % 4];
+    },
     rainbowAt(x, y) {
       return RAINBOW[Math.floor((x + y) / 3) % 6];
     },
