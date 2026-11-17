@@ -301,7 +301,7 @@ export function generatePack(data, seed, options = {}) {
   const upgrade = rng.chance(0.08);
   slots.push({ mon: pickUnique(upgrade ? pools.rare : pools.uncommon), rarity: upgrade ? "rare" : "uncommon" });
   const roll = rng.random();
-  let rareRarity = roll < 0.45 ? "rare" : roll < 0.86 ? "holo" : "legend";
+  let rareRarity = roll < 0.3 ? "rare" : roll < 0.8 ? "holo" : "legend";
   if (force && ["rare", "holo", "legend"].includes(force)) rareRarity = force;
   slots.push({ mon: pickUnique(pools[rareRarity === "legend" ? "legend" : "rare"]), rarity: rareRarity });
 
@@ -319,9 +319,9 @@ export function generatePack(data, seed, options = {}) {
       /* premium printings: full art bleeds to the edges, EX breaks out of the window */
       const special = rng.random();
       if (card.rarity === "legend") card.special = special < 0.6 ? "full" : "ex";
-      else if (card.rarity === "holo") card.special = special < 0.38 ? "full" : special < 0.56 ? "ex" : null;
-      else if (card.rarity === "rare") card.special = special < 0.26 ? "full" : special < 0.38 ? "ex" : null;
-      else if (card.rarity === "uncommon") card.special = special < 0.1 ? "full" : null;
+      else if (card.rarity === "holo") card.special = special < 0.5 ? "full" : special < 0.78 ? "ex" : null;
+      else if (card.rarity === "rare") card.special = special < 0.42 ? "full" : special < 0.68 ? "ex" : null;
+      else if (card.rarity === "uncommon") card.special = special < 0.2 ? "full" : null;
     }
     card.slot = index;
     return card;

@@ -89,7 +89,7 @@ export function themeFor(card) {
     accent,
     text: mixRgb(lineHi, [255, 255, 255], 0.75),
     muted: tier === "fa" ? mixRgb(lineHi, [236, 234, 246], 0.42) : mixRgb(lineHi, panel, 0.45),
-    hpCol: [255, 100, 96],
+    hpCol: mixRgb(TYPE_COL[key] || TYPE_COL.colorless, [255, 255, 255], 0.22),
     shadowCol: mixRgb(panel, [0, 0, 0], 0.5),
     gold: GOLD,
     rainbowAt(x, y) {
