@@ -87,9 +87,9 @@ function ink(colour) {
 
 function glyphs(ctx, text, font, x, y, color, sp, scale = 1, outline = false) {
   if (globalThis.__textLog) globalThis.__textLog.push({ text, x: Math.round(x), y: Math.round(y), color, scale });
-  if (TEXT_MODE && TEXT_MODE.outline && !outline && ink(color) === TEXT_MODE.text) {
+  if (TEXT_MODE && TEXT_MODE.keyline && !outline) {
     for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-      glyphs(ctx, text, font, x + ox, y + oy, TEXT_MODE.outline, sp, scale, true);
+      glyphs(ctx, text, font, x + ox, y + oy, TEXT_MODE.keyline, sp, scale, true);
     }
   }
   ctx.fillStyle = ink(color);
@@ -643,10 +643,13 @@ function drawWindow(ctx, card, t) {
 function drawFaBands(ctx, t) {
   const band = rgb(t.panel);
   ctx.save();
-  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = rgb([0, 0, 0]);
+  ctx.globalAlpha = 0.34;
+  ctx.fillRect(6, 6, 148, 146);
   ctx.fillStyle = band;
+  ctx.globalAlpha = 0.42;
   ctx.fillRect(6, 6, 148, 32);
-  ctx.globalAlpha = 0.93;
+  ctx.globalAlpha = 0.5;
   ctx.fillRect(6, 147, 148, 71);
   ctx.restore();
 }
@@ -933,6 +936,8 @@ export function renderCard(card, sprite, options = {}) {
     if (tier === "fa") {
       drawFullArt(ctx, card, card.special === "full" ? place : null, !options.omitSprite);
       drawFaBands(ctx, t);
+      /* full art prints its text straight over the picture, so every glyph gets a dark keyline */
+      TEXT_MODE = { keyline: "#0a0816" };
     } else {
       drawWindow(ctx, card, t);
       if (place) {
