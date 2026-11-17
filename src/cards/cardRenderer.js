@@ -661,8 +661,103 @@ function drawFaBands(ctx, t) {
   ctx.restore();
 }
 
+/* the border changes shape by tier: standard carries the seeded tech frame,
+   EX a double rail with heavy brackets, full art a thin rail with all four
+   corners cut */
+function drawBorder(ctx, card, t, spec) {
+  if (t.tier === "ex") return drawFrameEx(ctx, card, t, spec);
+  if (t.tier === "fa") return drawFrameFa(ctx, card, t, spec);
+  return drawFrameKit(ctx, card, t, spec);
+}
+
+function drawFrameEx(ctx, card, t, spec) {
+  const hiAt = (x, y) => rgb(t.frameInk(x, y));
+  const lo = rgb(t.lineLo);
+  const accent = (x, y) => rgb(t.rainbow ? t.rainbowAt(x, y) : t.accent);
+
+  /* double gold rail, no gaps: the EX sheet reads as one sealed plate */
+  ringPixels(2, spec, (x, y) => px(ctx, x, y, hiAt(x, y)));
+  ringPixels(4, spec, (x, y) => px(ctx, x, y, lo));
+  ringPixels(6, spec, (x, y) => {
+    if ((x + y) % 2 !== 0) return;
+    px(ctx, x, y, hiAt(x, y));
+  });
+
+  /* heavy brackets on every corner */
+  const arm = spec.arm + 8;
+  for (const name of ["tl", "tr", "bl", "br"]) {
+    const [ox, oy, dx, dy] = CORNERS[name];
+    for (let k = 0; k < arm; k += 1) {
+      for (let th = 0; th < 3; th += 1) {
+        px(ctx, ox + dx * k, oy + dy * th, hiAt(ox + dx * k, oy + dy * th));
+        px(ctx, ox + dx * th, oy + dy * k, hiAt(ox + dx * th, oy + dy * k));
+      }
+    }
+    /* gem: 3x3 accent block, ringed in the dark line */
+    for (let gx = 5; gx <= 7; gx += 1) {
+      for (let gy = 5; gy <= 7; gy += 1) {
+        px(ctx, ox + dx * gx, oy + dy * gy, accent(ox + dx * gx, oy + dy * gy));
+      }
+    }
+  }
+
+  /* centre plaque bars, top and bottom */
+  for (const y of [2, CARD_H - 3]) {
+    for (let x = 52; x < 108; x += 1) px(ctx, x, y, hiAt(x, y));
+    for (let x = 58; x < 102; x += 1) px(ctx, x, y === 2 ? 5 : CARD_H - 6, accent(x, y));
+  }
+  /* side ticks at the vertical mid-point */
+  for (const y of [108, 112]) {
+    for (let k = 0; k < 4; k += 1) {
+      px(ctx, 2 + k, y, accent(2 + k, y));
+      px(ctx, CARD_W - 3 - k, y, accent(CARD_W - 3 - k, y));
+    }
+  }
+}
+
+function drawFrameFa(ctx, card, t, spec) {
+  const hiAt = (x, y) => rgb(t.frameInk(x, y));
+  const accent = (x, y) => rgb(t.rainbow ? t.rainbowAt(x, y) : t.accent);
+
+  /* one thin rail, every corner cut away */
+  ringPixels(2, spec, (x, y) => px(ctx, x, y, hiAt(x, y)));
+
+  const cut = 12;
+  for (const [cx, cy, sx, sy] of [[2, 2, 1, 1], [CARD_W - 3, 2, -1, 1], [2, CARD_H - 3, 1, -1], [CARD_W - 3, CARD_H - 3, -1, -1]]) {
+    for (let k = 0; k < cut; k += 1) ctx.clearRect(cx + sx * k, cy + sy * (cut - k), 1, 1);
+  }
+  for (const [cx, cy, sx, sy] of [[2, 2, 1, 1], [CARD_W - 3, 2, -1, 1], [2, CARD_H - 3, 1, -1], [CARD_W - 3, CARD_H - 3, -1, -1]]) {
+    for (let k = 0; k < cut; k += 1) {
+      const x = cx + sx * (k + 1);
+      const y = cy + sy * (cut + 1 - k);
+      if (x >= 0 && x < CARD_W && y >= 0 && y < CARD_H) px(ctx, x, y, hiAt(x, y));
+    }
+    for (let k = 0; k < 3; k += 1) px(ctx, cx + sx * (3 + k), cy + sy * (cut - k), accent(cx, cy));
+  }
+
+  /* inner corner brackets only, no continuous inner line */
+  const arm = spec.arm + 2;
+  for (const name of ["tl", "tr", "bl", "br"]) {
+    const [ox, oy, dx, dy] = CORNERS[name];
+    for (let k = 5; k < 5 + arm; k += 1) {
+      px(ctx, ox + dx * k, oy + dy * 5, hiAt(ox + dx * k, oy + dy * 5));
+      px(ctx, ox + dx * 5, oy + dy * k, hiAt(ox + dx * 5, oy + dy * k));
+    }
+  }
+
+  /* dashes along the top and bottom rails */
+  for (let x = 26; x < CARD_W - 26; x += 10) {
+    for (let d = 0; d < 5; d += 1) {
+      px(ctx, x + d, 1, accent(x + d, 1));
+      px(ctx, x + d, CARD_H - 2, accent(x + d, CARD_H - 2));
+    }
+  }
+}
+
 function drawFrameKit(ctx, card, t, spec) {
-  const hi = rgb(t.lineHi);
+  /* the standard sheet keeps the plain tech frame, but its lines are pulled
+     toward the type colour so each species' card edge reads as its own */
+  const hi = rgb(mixRgb(t.r[4], [255, 255, 255], 0.45));
   const hiAt = (x, y) => (t.premium ? rgb(t.frameInk(x, y)) : hi);
   const lo = rgb(t.lineLo);
   const accent = (x, y) => rgb(t.rainbow ? t.rainbowAt(x, y) : t.accent);
@@ -960,7 +1055,7 @@ export function renderCard(card, sprite, options = {}) {
     }
   }
 
-  drawFrameKit(ctx, card, t, spec);
+  drawBorder(ctx, card, t, spec);
   if (lint) {
     lintDraw("headerA", 10, 7, 138, 14, () => {});
     lintDraw("headerB", 10, 22, 138, 14, () => {});
