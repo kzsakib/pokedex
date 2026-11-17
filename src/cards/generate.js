@@ -45,16 +45,11 @@ const STATUS = ["HEADS: PARALYZED", "HEADS: ASLEEP", "HEADS: CONFUSED", "POISONE
 /* Chroma forms get a palette invented at pack time: the twelve hue sectors are
    shuffled and re-pointed, while saturation and lightness stay exactly as they
    were, so only the colours move. */
+/* Chroma rerolls hue only: each source colour sector gets a fresh, fully random
+   hue, and the sprite keeps that colour's own saturation and lightness. */
 function randomHueMap(rng) {
-  const targets = [...Array(12).keys()];
-  for (let i = targets.length - 1; i > 0; i -= 1) {
-    const j = rng.int(0, i);
-    [targets[i], targets[j]] = [targets[j], targets[i]];
-  }
   const map = {};
-  targets.forEach((target, source) => {
-    map[source] = (target * 30 + rng.int(0, 15)) % 360;
-  });
+  for (let source = 0; source < 12; source += 1) map[source] = rng.int(0, 359);
   return map;
 }
 
@@ -85,7 +80,7 @@ function randomVariant(rng) {
   const hueMap = randomHueMap(rng);
   const tcg = rng.pick(ALL_TYPES);
   const labelSource = rng.int(0, 11);
-  return { key: `hue-${rng.int(1000, 9999)}`, hueMap, tcg, labelSource, label: hueLabel(hueMap, labelSource), note: "" };
+  return { key: `hue-${rng.int(1000, 9999)}`, hueMap, hueMix: 1, tcg, labelSource, label: hueLabel(hueMap, labelSource), note: "" };
 }
 
 function rarityBonus(rarity) {
