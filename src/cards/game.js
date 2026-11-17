@@ -176,6 +176,11 @@ export class KantoPacksGame {
     this.entryEl.setAttribute("aria-live", "polite");
     this.container.appendChild(this.entryEl);
 
+    this.pickEl = document.createElement("div");
+    this.pickEl.className = "kp-pick";
+    this.pickEl.hidden = true;
+    this.container.insertAdjacentElement("afterend", this.pickEl);
+
     this.captionEl = document.createElement("div");
     this.captionEl.className = "kp-caption kp-caption--flow";
     this.captionEl.setAttribute("aria-live", "polite");
@@ -393,6 +398,7 @@ export class KantoPacksGame {
     this.layoutPacks();
     this.setPhase("choose");
     this.packKick = 0;
+    this.showPickMenu();
   }
 
   async generate() {
@@ -703,6 +709,30 @@ export class KantoPacksGame {
     });
   }
 
+  showPickMenu() {
+    if (!this.pickEl || !this.packs?.length) return;
+    const rows = this.packs
+      .map((entry, i) => {
+        const v = entry.variant;
+        return `<button class="kp-pick-btn" data-pack="${i}" style="--pack:${v.base};--pack-foil:${v.foil}">
+          <span class="kp-pick-num">0${i + 1}</span>
+          <span class="kp-pick-name">${v.name}</span>
+          <span class="kp-pick-tag">${v.label} · 5 CARDS</span>
+        </button>`;
+      })
+      .join("");
+    this.pickEl.innerHTML = `<span class="kp-pick-title">CHOOSE A SET</span><span class="kp-pick-row">${rows}</span>`;
+    this.pickEl.hidden = false;
+    for (const btn of this.pickEl.querySelectorAll(".kp-pick-btn")) {
+      btn.addEventListener("click", () => {
+        this.audio.unlock();
+        this.audio.startMusic();
+        this.audio.click();
+        this.choosePack(Number(btn.dataset.pack));
+      });
+    }
+  }
+
   packAt(p) {
     if (!this.packs?.length) return -1;
     const wx = p.x - (this.scene?.W || 288) / 2;
@@ -738,6 +768,10 @@ export class KantoPacksGame {
     this.pack = chosen.pack;
     this.packs = [];
     this.hoverPack = -1;
+    if (this.pickEl) {
+      this.pickEl.hidden = true;
+      this.pickEl.innerHTML = "";
+    }
     this.packKick = 1;
     this.packTilt = { yaw: 0, pitch: 0, vy: 0, vp: 0 };
     this.setPhase("idle");
@@ -1366,6 +1400,7 @@ export class KantoPacksGame {
     this.clearScene();
     this.scene.dispose();
     this.hud.remove();
+    this.pickEl?.remove();
     this.captionEl?.remove();
   }
 }
