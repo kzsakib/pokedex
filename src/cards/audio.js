@@ -257,7 +257,7 @@ export class KantoAudio {
     this.musicPlaying = true;
     this.musicStep = 0;
     this.nextNoteTime = this.ctx.currentTime + 0.15;
-    if (this.music) this.music.gain.setTargetAtTime(1.5, this.ctx.currentTime, 1.2);
+    if (this.music) this.music.gain.setTargetAtTime(2.4, this.ctx.currentTime, 1.2);
     this.musicTimer = setInterval(() => this.scheduleMusic(), 25);
   }
 
