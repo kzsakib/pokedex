@@ -127,19 +127,19 @@ function fitText(ctx, text, maxW, font, color, x, y, align = "l") {
 /* ---------- bounds lint ---------- */
 
 const ZONES = {
-  A: [5, 18],
-  B: [21, 34],
-  art: [37, 156],
-  info: [158, 163],
-  move1: [165, 182],
-  move2: [186, 202],
-  footer: [209, 217],
+  headerA: [6, 20],
+  headerB: [21, 36],
+  window: [38, 147],
+  info: [147, 154],
+  move1: [154, 175],
+  move2: [175, 196],
+  footer: [196, 218],
 };
 
 let lint = null;
 function record(zone, x, y, w, h) {
   if (!lint) return;
-  const [z0, z1] = ZONES[zone] || ZONES.A;
+  const [z0, z1] = ZONES[zone] || ZONES.headerA;
   const box = { zone, x, y, w, h };
   if (x < 0 || y < 0 || x + w > CARD_W || y + h > CARD_H) box.error = "outside card";
   else if (y < z0 || y + h - 1 > z1) box.error = "outside zone";
@@ -260,12 +260,29 @@ function drawRarity(ctx, rarity, x, y) {
 }
 
 import { backgroundFor } from "./backgrounds.js";
+import {
+  themeFor, frameSpec, insideFrame, ringPixels, drawTypeIcon, drawRingSlot,
+  mixRgb, rgb, typeRamp,
+} from "./theme.js";
 
 /* ---------- art window ---------- */
 
-const ART = { x: 8, y: 37, w: 144, h: 106, inner: { x: 10, y: 39, w: 140, h: 102 } };
-/* EX art sits in a shallower box so the pokemon overflows its frame */
-const ART_EX = { x: 8, y: 36, w: 144, h: 98, inner: { x: 10, y: 38, w: 140, h: 94 } };
+const ART = { x: 8, y: 39, w: 144, h: 107, inner: { x: 10, y: 41, w: 140, h: 102 } };
+const ART_EX = ART;
+
+export const LAYOUT = {
+  headerA: 7,
+  headerB: 22,
+  window: { x: 8, y: 39, w: 144, h: 107 },
+  interior: { x: 10, y: 41, w: 140, h: 102 },
+  info: 148,
+  move1: 155,
+  move2: 176,
+  divider: 194,
+  footerIcons: 198,
+  footerText: 201,
+  fa: { x: 6, y: 6, w: 148, h: 212 },
+};
 const BUFFER = { w: 70, h: 51 };
 
 function artBuffer(card, sprite) {
@@ -396,25 +413,24 @@ export function cardSpriteLayout(card, sprite) {
   const clean = trimSprite(sprite);
   if (!clean) return null;
   if (card.special === "full") {
-    const k = fitScale(clean, CARD_W - 26, 108);
+    const k = fitScale(clean, 140, 104);
     const w = clean.width * k;
     const h = clean.height * k;
-    const feet = 142;
+    const feet = 148;
     return { sprite: clean, k, w, h, x: Math.round(CARD_W / 2 - w / 2), y: feet - h, feet };
   }
-  const isEx = card.special === "ex";
-  const geo = isEx ? ART_EX : ART;
-  const k = fitScale(clean, geo.inner.w - 22, isEx ? geo.inner.h + 10 : geo.inner.h - 16);
+  const inner = LAYOUT.interior;
+  const k = fitScale(clean, 136, 100);
   const w = clean.width * k;
   const h = clean.height * k;
-  const bottom = isEx ? geo.inner.y + geo.inner.h + 8 : geo.inner.y + geo.inner.h - 6;
-  return { sprite: clean, k, w, h, x: Math.round(CARD_W / 2 - w / 2), y: bottom - h };
+  const bottom = inner.y + inner.h - 2;
+  return { sprite: clean, k, w, h, x: Math.round(CARD_W / 2 - w / 2), y: bottom - h, feet: bottom };
 }
 
 /* fill the box on the sprite's larger axis so every pokemon reads the same size */
+/* integer only: 2x when the trimmed art fits the box, else 1x */
 function fitScale(sprite, maxW, maxH) {
-  const k = Math.min(maxW / sprite.width, maxH / sprite.height);
-  return Math.max(0.8, Math.min(4, k));
+  return sprite.width * 2 <= maxW && sprite.height * 2 <= maxH ? 2 : 1;
 }
 
 /* largest whole-number scale that stays inside the box: no resampling mush */
@@ -557,7 +573,14 @@ function artWindow(ctx, card, geo = ART) {
   ctx.drawImage(buffer, 0, 0, BUFFER.w, BUFFER.h, inner.x, inner.y, inner.w, inner.h);
 }
 
-/* ---------- frame ---------- */
+/* ---------- the new face: dark panel, tech frame, grid layout ---------- */
+
+const CORNERS = {
+  tl: [0, 0, 1, 1],
+  tr: [CARD_W - 1, 0, -1, 1],
+  bl: [0, CARD_H - 1, 1, -1],
+  br: [CARD_W - 1, CARD_H - 1, -1, -1],
+};
 
 const BAYER = [
   [0, 8, 2, 10],
@@ -565,63 +588,6 @@ const BAYER = [
   [3, 11, 1, 9],
   [15, 7, 13, 5],
 ];
-
-function frame(ctx, card, options = {}) {
-  const bare = !!options.bare;
-  const ramp = rampFor(card.tcg);
-  const gold = card.rarity === "rare" || card.rarity === "holo" || card.rarity === "legend";
-
-  if (!bare) {
-    ctx.fillStyle = INK;
-    ctx.fillRect(0, 0, CARD_W, CARD_H);
-  } else {
-    /* full art: keep only the printed border, the picture runs underneath */
-    ctx.fillStyle = INK;
-    ctx.fillRect(0, 0, CARD_W, 2);
-    ctx.fillRect(0, CARD_H - 2, CARD_W, 2);
-    ctx.fillRect(0, 0, 2, CARD_H);
-    ctx.fillRect(CARD_W - 2, 0, 2, CARD_H);
-  }
-  // stair-stepped 4px corners
-  ctx.clearRect(0, 0, 2, 1);
-  ctx.clearRect(0, 0, 1, 2);
-  ctx.clearRect(CARD_W - 2, 0, 2, 1);
-  ctx.clearRect(CARD_W - 1, 0, 1, 2);
-  ctx.clearRect(0, CARD_H - 1, 2, 1);
-  ctx.clearRect(0, CARD_H - 2, 1, 2);
-  ctx.clearRect(CARD_W - 2, CARD_H - 1, 2, 1);
-  ctx.clearRect(CARD_W - 1, CARD_H - 2, 1, 2);
-
-  const lighter = mix(ramp.base, "#ffffff", 0.15);
-  for (let yy = 1; yy < CARD_H - 1 && !bare; yy += 1) {
-    for (let xx = 1; xx < CARD_W - 1; xx += 1) {
-      const t = (BAYER[yy % 4][xx % 4] + 0.5) / 16;
-      ctx.fillStyle = t < 0.55 ? ramp.base : lighter;
-      ctx.fillRect(xx, yy, 1, 1);
-    }
-  }
-  ctx.fillStyle = gold ? GOLD : "#c9c9d6";
-  ctx.fillRect(3, 3, CARD_W - 6, 1);
-  ctx.fillRect(3, CARD_H - 4, CARD_W - 6, 1);
-
-  /* bevel the ink band: light from the top-left */
-  ctx.fillStyle = mix(ramp.base, "#ffffff", 0.34);
-  ctx.fillRect(1, 1, CARD_W - 2, 1);
-  ctx.fillRect(1, 1, 1, CARD_H - 2);
-  ctx.fillStyle = mix(ramp.outline, "#0d0b1e", 0.3);
-  ctx.fillRect(1, CARD_H - 2, CARD_W - 2, 1);
-  ctx.fillRect(CARD_W - 2, 1, 1, CARD_H - 2);
-
-  if (!bare) {
-    ctx.fillStyle = mix(CREAM, ramp.base, 0.1);
-    ctx.fillRect(4, 4, CARD_W - 8, CARD_H - 8);
-    /* faint lighter line along the panel's top inner edge */
-    ctx.fillStyle = mix(CREAM, "#ffffff", 0.5);
-    ctx.fillRect(5, 4, CARD_W - 10, 1);
-  }
-}
-
-/* ---------- moves and footer ---------- */
 
 function damageText(move) {
   if (!move) return "-";
@@ -631,89 +597,321 @@ function damageText(move) {
   return String(d);
 }
 
-function moveSlot(ctx, card, move, y, zone) {
-  if (!move) return;
-  const cost = (move.cost || []).slice(0, 3);
-  cost.forEach((type, i) => lintDraw(zone, 8 + i * 10, y, 9, 9, () => drawIcon(ctx, type, 8 + i * 10, y)));
-  const nameX = 8 + cost.length * 10 + 3;
-  const dmg = damageText(move);
-  const dmgW = textWidth(dmg, F5, 1);
-  const maxName = 149 - dmgW - 6 - nameX;
-  lintDraw(zone, nameX, y + 1, Math.max(10, maxName), 7, () => {
-    fitText(ctx, move.name, Math.max(10, maxName), F5, TEXT, nameX, y + 1);
-  });
-  lintDraw(zone, 149 - dmgW, y + 1, dmgW, 7, () => {
-    drawText(ctx, 150, y + 2, dmg, F5, SHADOW, 1, "r", 1);
-    drawText(ctx, 149, y + 1, dmg, F5, TEXT, 1, "r", 1);
-  });
-  if (move.effect) {
-    lintDraw(zone, 9, y + 11, 140, 5, () => {
-      fitText(ctx, move.effect, 149 - 9, F3, "#544854", 9, y + 11);
-    });
+function px(ctx, x, y, colour) {
+  ctx.fillStyle = colour;
+  ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+}
+
+function bayerAt(x, y) {
+  return (BAYER[y % 4][x % 4] + 0.5) / 16;
+}
+
+function drawPanel(ctx, t, spec) {
+  ctx.fillStyle = rgb(t.panel);
+  ctx.fillRect(0, 0, CARD_W, CARD_H);
+  const a = rgb(t.panel), b = rgb(t.panel2);
+  const block = { x0: 7, y0: LAYOUT.info - 1, x1: 152, y1: 212 };
+  for (let y = 0; y < CARD_H; y += 1) {
+    for (let x = 0; x < CARD_W; x += 1) {
+      if (!insideFrame(x, y, 6, spec)) continue;
+      const inBlock = x >= block.x0 && x <= block.x1 && y >= block.y0 && y <= block.y1;
+      const on = inBlock ? bayerAt(x + 1, y) < 0.78 : bayerAt(x, y) < 0.82;
+      ctx.fillStyle = inBlock ? (on ? b : a) : on ? a : b;
+      ctx.fillRect(x, y, 1, 1);
+    }
   }
 }
 
-function footer(ctx, card) {
-  const y = 209;
-  const textY = 211;
-  const groups = [];
+function drawWindow(ctx, card, t) {
+  const { x, y, w, h } = LAYOUT.window;
+  const inner = LAYOUT.interior;
+  ctx.fillStyle = rgb(t.lineHi);
+  ctx.fillRect(x, y, w, 1);
+  ctx.fillRect(x, y + h - 1, w, 1);
+  ctx.fillRect(x, y, 1, h);
+  ctx.fillRect(x + w - 1, y, 1, h);
+  ctx.fillStyle = rgb(t.lineLo);
+  ctx.fillRect(x + 1, y + 1, w - 2, 1);
+  ctx.fillRect(x + 1, y + h - 2, w - 2, 1);
+  ctx.fillRect(x + 1, y + 1, 1, h - 2);
+  ctx.fillRect(x + w - 2, y + 1, 1, h - 2);
+  const buffer = backgroundFor(card);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(buffer, 0, 0, BUFFER.w, BUFFER.h, inner.x, inner.y, inner.w, inner.h);
+}
 
-  const wk = () => {
-    let w = 0;
-    w += textWidth("WK", F3, 1) + 2;
-    w += 9 + 2;
-    w += textWidth("×2", F3, 1);
-    return w;
-  };
-  const res = () => textWidth("RES", F3, 1) + 2 + 9 + 2 + textWidth(card.resistance ? "-30" : "-", F3, 1);
+function drawFaBands(ctx, t) {
+  const band = rgb(t.panel);
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = band;
+  ctx.fillRect(6, 6, 148, 32);
+  ctx.globalAlpha = 0.93;
+  ctx.fillRect(6, 147, 148, 71);
+  ctx.restore();
+}
+
+function drawFrameKit(ctx, card, t, spec) {
+  const hi = rgb(t.lineHi);
+  const lo = rgb(t.lineLo);
+  const accent = (x, y) => rgb(t.rainbow ? t.rainbowAt(x, y) : t.accent);
+  const topG = spec.topGaps;
+  const botG = spec.botGaps;
+  const inList = (x, list) => list.some((g) => x >= g && x <= g + 2);
+
+  ringPixels(3, spec, (x, y) => {
+    if (y === 3 && inList(x, topG)) return;
+    if (y === CARD_H - 4 && inList(x, botG)) return;
+    let dx = x;
+    if (x === 3 && y >= spec.jogL && y < spec.jogL + 5) dx = 4;
+    if (x === CARD_W - 4 && y >= spec.jogR && y < spec.jogR + 5) dx = CARD_W - 5;
+    px(ctx, dx, y, hi);
+  });
+  for (const g of topG) {
+    for (let k = 3; k <= 5; k += 1) {
+      px(ctx, g - 1, k, hi);
+      px(ctx, g + 3, k, hi);
+    }
+  }
+  for (const g of botG) {
+    for (let k = CARD_H - 6; k <= CARD_H - 4; k += 1) {
+      px(ctx, g - 1, k, hi);
+      px(ctx, g + 3, k, hi);
+    }
+  }
+
+  ringPixels(5, spec, (x, y) => px(ctx, x, y, lo));
+  if (t.tier === "ex" || t.tier === "fa" || card.rarity === "legend") ringPixels(1, spec, (x, y) => px(ctx, x, y, lo));
+
+  /* brackets on the two square corners */
+  const square = ["tl", "tr", "bl", "br"].filter((c) => !spec.corners.includes(c));
+  for (const name of square) {
+    const [ox, oy, dx, dy] = CORNERS[name];
+    const th = spec.th;
+    for (let k = 0; k < spec.arm; k += 1) {
+      for (let t2 = 0; t2 < th; t2 += 1) {
+        px(ctx, ox + dx * k, oy + dy * t2, hi);
+        px(ctx, ox + dx * t2, oy + dy * k, hi);
+      }
+    }
+    for (const [ax, ay] of [[3, 3], [4, 3], [3, 4], [4, 4]]) px(ctx, ox + dx * ax, oy + dy * ay, accent(ox + dx * ax, oy + dy * ay));
+    if (t.premium) {
+      for (let gx = 6; gx <= 8; gx += 1) {
+        for (let gy = 6; gy <= 8; gy += 1) px(ctx, ox + dx * gx, oy + dy * gy, accent(ox + dx * gx, oy + dy * gy));
+      }
+    }
+    if (spec.key === "fighting") {
+      const k = Math.floor(spec.arm / 2);
+      for (let a = 0; a < 2; a += 1) {
+        for (let b = 0; b < 2; b += 1) {
+          px(ctx, ox + dx * (k + b), oy + dy * (spec.th + a), accent(ox, oy));
+          px(ctx, ox + dx * (spec.th + a), oy + dy * (k + b), accent(ox, oy));
+        }
+      }
+    }
+  }
+
+  /* chamfered corners: an outer diagonal with two accent pixels */
+  for (const name of spec.corners) {
+    const [ox, oy, dx, dy] = CORNERS[name];
+    for (let k = 0; k <= spec.cut + 1; k += 1) px(ctx, ox + dx * (k + 1), oy + dy * (spec.cut + 3 - k), hi);
+    px(ctx, ox + dx * 2, oy + dy * (spec.cut + 1), accent(ox, oy));
+    px(ctx, ox + dx * 3, oy + dy * spec.cut, accent(ox, oy));
+  }
+
+  /* one motif per type, drawn on the frame lines only */
+  const key = spec.key;
+  if (key === "fire") {
+    for (let x = 48; x <= 111; x += 6) {
+      px(ctx, x, 2, hi);
+      px(ctx, x + 1, 1, hi);
+      px(ctx, x + 2, 2, hi);
+    }
+  } else if (key === "water") {
+    for (let x = 44; x <= 115; x += 1) px(ctx, x, Math.floor(x / 3) % 2 === 0 ? 2 : 1, hi);
+  } else if (key === "grass") {
+    for (const [list, y0, s] of [[topG, 3, -1], [botG, CARD_H - 4, 1]]) {
+      for (const g of list) {
+        px(ctx, g, y0 + s, accent(g, y0));
+        px(ctx, g + 1, y0 + 2 * s, accent(g, y0));
+        px(ctx, g + 2, y0 + 3 * s, accent(g, y0));
+      }
+    }
+  } else if (key === "lightning") {
+    for (let y = 100; y <= 107; y += 1) px(ctx, 2, y, hi);
+    px(ctx, 1, 108, hi);
+    px(ctx, 1, 109, hi);
+    px(ctx, CARD_W - 3, 120, hi);
+    px(ctx, CARD_W - 3, 121, hi);
+  } else if (key === "psychic") {
+    for (let x = 30; x <= 129; x += 4) {
+      px(ctx, x, 4, accent(x, 4));
+      px(ctx, x, CARD_H - 5, accent(x, CARD_H - 5));
+    }
+  }
+}
+
+function textCss(c) {
+  return rgb(c);
+}
+
+function drawHeader(ctx, card, t, spec) {
+  const rarityWord = { common: "COMMON", uncommon: "UNCOMMON", rare: "RARE", holo: "HOLO", legend: "LEGEND", chroma: "CHROMA" };
+  const tier = tierWord(card, t);
+  const stageWord = card.rarity === "legend" ? "LEGEND" : card.stage === 2 ? "STAGE 2" : card.stage === 1 ? "STAGE 1" : "BASIC";
+  const stageText = `${stageWord} LV.${card.level}`;
+  const hp = String(card.hp);
+  const hpW = textWidth(hp, F5, 1) * 2;
+  const hpLabelX = 148 - hpW - 9;
+
+  if (tier !== "plate") {
+    for (let i = 0; i < 4; i += 1) px(ctx, 10 + i, 13, textCss(t.lineHi));
+  }
+
+  let x = 16;
+  if (tier === "plate") {
+    ctx.fillStyle = rgb(t.gold);
+    ctx.fillRect(10, 10, 12, 7);
+    drawText(ctx, 12, 11, "EX", F3, rgb([40, 26, 6]));
+    x = 24;
+  } else if (tier) {
+    const tw = textWidth(upper(tier), F3, 1);
+    const sw = textWidth(upper(stageText), F3, 1);
+    if (16 + tw + 7 + sw <= hpLabelX - 3) {
+      drawText(ctx, 16, 11, tier, F3, textCss(t.lineHi));
+      px(ctx, 16 + tw + 3, 13, rgb(t.lineLo));
+      x = 16 + tw + 7;
+    }
+  }
+  drawText(ctx, x, 11, stageText, F3, textCss(t.muted));
+
+  drawText(ctx, 149, 8, hp, F5, rgb(t.shadowCol), 1, "r", 2);
+  drawText(ctx, 148, 7, hp, F5, rgb(t.hpCol), 1, "r", 2);
+  drawText(ctx, hpLabelX, 15, "HP", F3, textCss(t.text));
+  void rarityWord;
+
+  /* row B */
+  const nameRaw = upper(card.name);
+  let name = nameRaw;
+  let sp = 1;
+  if (textWidth(name, F5, sp) * 2 > 118) {
+    sp = 0;
+    while (textWidth(name, F5, 0) * 2 > 118 && name.length > 1) name = name.slice(0, -1);
+  }
+  drawText(ctx, 12, 24, name, F5, rgb(t.shadowCol), sp, "l", 2);
+  drawText(ctx, 10, 22, name, F5, rgb(t.tier === "ex" ? t.gold : t.text), sp, "l", 2);
+  drawTypeIcon(ctx, t.key, 140, 24);
+}
+
+function tierWord(card, t) {
+  if (t.tier === "ex") return "plate";
+  if (t.tier === "fa") return "FULL ART";
+  return { common: "COMMON", uncommon: "UNCOMMON", rare: "RARE", holo: "HOLO", legend: "LEGEND", chroma: "CHROMA" }[card.rarity] || "";
+}
+
+function drawInfoLine(ctx, card, t) {
+  const genus = upper(String(card.genus || "")).replace(/\s*POKEMON$/i, "").trim();
+  const dex = `${String(card.id).padStart(3, "0")}/151`;
+  const y = LAYOUT.info;
+  if (t.tier === "ex") drawText(ctx, 10, y, "EX RULE: 2 PRIZES WHEN KO", F3, rgb(t.gold));
+  else fitText(ctx, genus, 96, F3, textCss(t.muted), 10, y);
+  drawText(ctx, 149, y, dex, F3, textCss(t.muted), 1, "r");
+}
+
+function drawMoves(ctx, card, t) {
+  const slots = [112, 124, 136];
+  const rows = [LAYOUT.move1, LAYOUT.move2];
+  card.moves.slice(0, 2).forEach((move, i) => {
+    const y0 = rows[i];
+    const cost = (move.cost || []).slice(0, 3);
+    for (let s2 = 0; s2 < 3; s2 += 1) {
+      const sx = slots[s2];
+      if (s2 < cost.length) drawTypeIcon(ctx, cost[s2], sx, y0);
+      else drawRingSlot(ctx, sx, y0, t.lineLo);
+    }
+    const dmg = damageText(move);
+    const dmgW = textWidth(dmg, F5, 1);
+    drawText(ctx, 108, y0 + 2, dmg, F5, textCss(t.text), 1, "r");
+    const nameW = 108 - dmgW - 4 - 10;
+    let name = upper(move.name);
+    let sp = 1;
+    if (textWidth(name, F5, 1) > nameW) {
+      sp = 0;
+      while (textWidth(name, F5, 0) > nameW && name.length > 1) name = name.slice(0, -1);
+    }
+    drawText(ctx, 10, y0 + 2, name, F5, textCss(t.text), sp);
+    if (move.effect) fitText(ctx, String(move.effect).slice(0, 34), 138, F3, textCss(t.muted), 10, y0 + 13);
+  });
+
+  if (!card.moves[1]) {
+    const total = Math.round((card.height || 0) * 39.3701);
+    const ft = Math.floor(total / 12);
+    const inch = total % 12;
+    const lb = Math.round((card.weight || 0) * 2.2046);
+    drawText(ctx, 10, LAYOUT.move2 + 4, `HT ${ft}'${String(inch).padStart(2, "0")}"  WT ${lb} LB`, F3, textCss(t.text));
+    const flavour = String(card.flavour || card.flavor || "").slice(0, 34);
+    if (flavour) drawText(ctx, 10, LAYOUT.move2 + 15, flavour, F3, textCss(t.muted));
+  }
+}
+
+function drawDivider(ctx, t) {
+  const y = LAYOUT.divider;
+  ctx.fillStyle = rgb(t.lineLo);
+  ctx.fillRect(10, y, 140, 1);
+  ctx.fillRect(10, y - 2, 1, 3);
+  ctx.fillRect(149, y - 2, 1, 3);
+}
+
+function drawFooter(ctx, card, t) {
+  const yText = LAYOUT.footerText;
+  const yIcon = LAYOUT.footerIcons;
   const retreat = Math.min(3, card.retreat || 0);
-  const ret = () => textWidth("RET", F3, 1) + 2 + (retreat === 0 ? textWidth("0", F3, 1) : retreat * 10 - 1);
+  const groups = [];
+  const wkText = textWidth("WK", F3, 1);
+  const resText = textWidth("RES", F3, 1);
+  const retText = textWidth("RET", F3, 1);
+  const wk = { w: wkText + 3 + (card.weakness ? 11 + 3 + textWidth("X2", F3, 1) : textWidth("-", F3, 1)) };
+  const res = { w: resText + 3 + (card.resistance ? 11 + 3 + textWidth("-30", F3, 1) : textWidth("-", F3, 1)) };
+  const ret = { w: retText + 3 + (retreat ? retreat * 11 + (retreat - 1) * 1 : textWidth("-", F3, 1)) };
+  groups.push(wk, res, ret);
+  const total = groups.reduce((a, g) => a + g.w, 0);
+  const gap = Math.max(6, Math.floor((140 - total) / 2));
 
-  const widths = [wk(), res(), ret()];
-  const total = widths.reduce((a, b) => a + b, 0);
-  const gap = Math.max(6, Math.floor((143 - total) / 2));
+  let x = 10;
+  drawText(ctx, x, yText, "WK", F3, textCss(t.text));
+  x += wkText + 3;
+  if (card.weakness) {
+    drawTypeIcon(ctx, keyOfType(card.weakness), x, yIcon);
+    x += 11 + 3;
+    drawText(ctx, x, yText, "X2", F3, textCss(t.muted));
+  } else {
+    drawText(ctx, x, yText, "-", F3, textCss(t.muted));
+  }
+  x = 10 + wk.w + gap;
 
-  let x = 8;
-  const drawGroup = (width, fn) => {
-    const start = x;
-    fn();
-    lintDraw("footer", start, 209, width, 9, () => {});
-    x += width + gap;
-  };
-
-  drawGroup(widths[0], () => {
-    drawText(ctx, x, textY, "WK", F3, TEXT_MUTED, 1);
-    x += textWidth("WK", F3, 1) + 2;
-    drawIcon(ctx, card.weakness || "Colorless", x, y);
-    x += 9 + 2;
-    drawText(ctx, x, textY, "×2", F3, TEXT, 1);
-    x = x; // group width reserved below
-  });
-  x = 8 + widths[0] + gap;
-
-  drawText(ctx, x, textY, "RES", F3, TEXT_MUTED, 1);
-  x += textWidth("RES", F3, 1) + 2;
+  drawText(ctx, x, yText, "RES", F3, textCss(t.text));
+  x += resText + 3;
   if (card.resistance) {
-    drawIcon(ctx, card.resistance, x, y);
-    x += 11;
-    drawText(ctx, x, textY, "-30", F3, TEXT, 1);
+    drawTypeIcon(ctx, keyOfType(card.resistance), x, yIcon);
+    x += 11 + 3;
+    drawText(ctx, x, yText, "-30", F3, textCss(t.muted));
   } else {
-    drawText(ctx, x + 9, textY, "-", F3, TEXT, 1);
+    drawText(ctx, x, yText, "-", F3, textCss(t.muted));
   }
-  x = 8 + widths[0] + gap + widths[1] + gap;
+  x = 10 + wk.w + gap + res.w + gap;
 
-  drawText(ctx, x, textY, "RET", F3, TEXT_MUTED, 1);
-  x += textWidth("RET", F3, 1) + 2;
-  if (retreat === 0) {
-    drawText(ctx, x, textY, "0", F3, TEXT, 1);
+  drawText(ctx, x, yText, "RET", F3, textCss(t.text));
+  x += retText + 3;
+  if (retreat) {
+    for (let i = 0; i < retreat; i += 1) drawTypeIcon(ctx, "colorless", x + i * 12, yIcon);
   } else {
-    for (let i = 0; i < retreat; i += 1) drawIcon(ctx, "Colorless", x + i * 10, y);
+    drawText(ctx, x, yText, "-", F3, textCss(t.muted));
   }
-
-  groups.push(total);
 }
 
-/* ---------- card ---------- */
+function keyOfType(tcg) {
+  return String(tcg || "colorless").toLowerCase().replace(/[^a-z]/g, "") || "colorless";
+}
 
 export function renderCard(card, sprite, options = {}) {
   const canvas = document.createElement("canvas");
@@ -721,108 +919,58 @@ export function renderCard(card, sprite, options = {}) {
   canvas.height = CARD_H;
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
-
   lint = options.lint ? { boxes: [] } : null;
   TEXT_MODE = null;
 
-  frame(ctx, card);
+  const t = themeFor(card);
+  const spec = frameSpec(card);
+  const place = sprite && !options.omitArt ? cardSpriteLayout(card, sprite) : null;
+  const tier = t.tier;
 
-  if (card.special === "full" && !options.omitArt) {
-    /* full art: the picture owns the whole face and the text prints over a wash */
-    drawFullArt(ctx, card, card.special === "full" && sprite && !options.omitArt ? cardSpriteLayout(card, sprite) : null, !options.omitSprite);
-    frame(ctx, card, { bare: true });
-    /* printed hairlines, no panel: the art stays visible behind the attacks */
-    ctx.fillStyle = "rgba(246, 239, 212, 0.4)";
-    ctx.fillRect(4, 4, CARD_W - 8, 1);
-    ctx.fillRect(4, 138, CARD_W - 8, 1);
-    ctx.fillRect(4, 207, CARD_W - 8, 1);
-  } else {
-    frame(ctx, card);
-    const geo = card.special === "ex" ? ART_EX : ART;
-    artWindow(ctx, card, geo);
-    if (sprite && !options.omitSprite && !options.omitArt) {
-      const place = cardSpriteLayout(card, sprite);
-      if (place) drawSpriteAt(ctx, place);
+  drawPanel(ctx, t, spec);
+
+  if (!options.omitArt) {
+    if (tier === "fa") {
+      drawFullArt(ctx, card, card.special === "full" ? place : null, !options.omitSprite);
+      drawFaBands(ctx, t);
+    } else {
+      drawWindow(ctx, card, t);
+      if (place) {
+        if (place.feet) {
+          ctx.fillStyle = "rgba(12,10,26,0.35)";
+          ctx.fillRect(Math.round(place.x + place.w * 0.2), place.feet - 1, Math.round(place.w * 0.6), 2);
+        }
+        if (!options.omitSprite) drawSpriteAt(ctx, place);
+      }
     }
   }
 
-  if (card.special === "full" && !options.omitArt) {
-    /* every printed line goes light with a dark keyline so it reads over the art */
-    TEXT_MODE = { text: "#f6efd4", muted: "#e8dfc6", shadow: "#0a0816", effect: "#ded5b8", outline: "#0d0b1e" };
+  drawFrameKit(ctx, card, t, spec);
+  if (lint) {
+    lintDraw("headerA", 10, 7, 138, 14, () => {});
+    lintDraw("headerB", 10, 22, 138, 14, () => {});
+    lintDraw("window", 8, 39, 144, 107, () => {});
+    lintDraw("info", 10, 148, 139, 6, () => {});
+    lintDraw("move1", 10, 155, 138, 19, () => {});
+    lintDraw("move2", 10, 176, 138, 19, () => {});
+    lintDraw("footer", 10, 198, 139, 10, () => {});
   }
-
-  // Row A
-  const stageName = card.rarity === "legend" ? "LEGEND" : card.stage === 2 ? "STAGE 2" : card.stage === 1 ? "STAGE 1" : "BASIC";
-  lintDraw("A", 8, 10, 60, 5, () => drawText(ctx, 8, 10, `${stageName}  LV.${card.level}`, F3, TEXT, 1));
-  const hp = String(card.hp);
-  const hpW = textWidth(hp, F5, 1) * 2;
-  lintDraw("A", 151 - hpW, 5, hpW, 14, () => {
-    drawText(ctx, 152, 6, hp, F5, SHADOW, 1, "r", 2);
-    drawText(ctx, 151, 5, hp, F5, HP_RED, 1, "r", 2);
-  });
-  lintDraw("A", 151 - hpW - 18, 13, 16, 5, () => drawText(ctx, 151 - hpW - 2, 13, "HP", F3, TEXT, 1, "r"));
-
-  // Row B
-  const nameMax = card.special === "ex" ? 110 : 118;
-  lintDraw("B", 8, 21, nameMax, 14, () => {
-    const raw = upper(card.name);
-    let n = raw;
-    while (textWidth(n, F5, 1) * 2 > nameMax && n.length > 0) n = n.slice(0, -1);
-    drawText(ctx, 9, 22, n, F5, SHADOW, 1, "l", 2);
-    drawText(ctx, 8, 21, n, F5, TEXT, 1, "l", 2);
-  });
-  lintDraw("B", 142, 23, 9, 9, () => drawIcon(ctx, card.tcg, 142, 23));
-  if (card.special === "ex") {
-    drawText(ctx, 137, 24, "EX", F5, SHADOW, 1, "r", 1);
-    drawText(ctx, 136, 23, "EX", F5, "#c8281e", 1, "r", 1);
-  }
-
-  // info strip
-  const baseGenus = upper(String(card.genus || "")).replace(/\s*POKEMON$/i, "").trim();
-  const genus = card.variant && card.variant.label ? `${card.variant.label} ${baseGenus}`.trim() : baseGenus;
-  const dex = `${String(card.id).padStart(3, "0")}/151`;
-  const dexW = textWidth(dex, F3, 1);
-  const genusW = 140 - dexW - 4 - 8;
-  lintDraw("info", 8, 145, genusW, 5, () => fitText(ctx, genus, genusW, F3, TEXT_MUTED, 8, 145));
-  lintDraw("info", 140 - dexW, 145, dexW, 5, () => drawText(ctx, 140, 145, dex, F3, TEXT_MUTED, 1, "r"));
-  lintDraw("info", 146, 145, 5, 5, () => drawRarity(ctx, card.rarity, 146, 145));
-
-  // move slots
-  const fullArt = card.special === "full" && !options.omitArt;
-  const ruleColour = fullArt ? "rgba(246, 239, 212, 0.45)" : mix(rampFor(card.tcg).base, INK, 0.25);
-  moveSlot(ctx, card, card.moves[0], 152, "move1");
-  ctx.fillStyle = ruleColour;
-  for (let x = 8; x < 152; x += 2) ctx.fillRect(x, 169, 1, 1);
-
-  if (card.moves[1]) {
-    moveSlot(ctx, card, card.moves[1], 172, "move2");
-  } else {
-    const total = Math.round((card.height || 0) * 39.3701);
-    const ft = Math.floor(total / 12);
-    const inch = total % 12;
-    const lb = Math.round((card.weight || 0) * 2.2046);
-    lintDraw("move2", 9, 174, 140, 5, () =>
-      fitText(ctx, `HT ${ft}'${String(inch).padStart(2, "0")}"  WT ${lb} LB`, 140, F3, TEXT, 9, 174)
-    );
-
-  }
-
-  ctx.fillStyle = fullArt ? "rgba(246, 239, 212, 0.4)" : mix(rampFor(card.tcg).base, INK, 0.3);
-  ctx.fillRect(6, 207, 148, 1);
-  footer(ctx, card);
-  TEXT_MODE = null;
+  drawHeader(ctx, card, t, spec);
+  drawInfoLine(ctx, card, t);
+  drawMoves(ctx, card, t);
+  drawDivider(ctx, t);
+  drawFooter(ctx, card, t);
 
   if (lint) {
     const seen = new Map();
-    for (const b of lint.boxes) {
-      if (b.error) continue;
-      const key = b.zone;
-      const other = seen.get(key);
-      const tiled = b.zone === "info" || b.zone === "move1" || b.zone === "move2";
-      if (!tiled && other && b.x < other.x + other.w && other.x < b.x + b.w && b.y < other.y + other.h && other.y < b.y + b.h) {
-        b.error = "overlap";
+    for (const box of lint.boxes) {
+      if (box.error) continue;
+      const other = seen.get(box.zone);
+      if (other && box.x < other.x + other.w && other.x < box.x + box.w && box.y < other.y + other.h && other.y < box.y + box.h) {
+        const tiled = box.zone === "move1" || box.zone === "move2";
+        if (!tiled) box.error = "overlap";
       }
-      seen.set(key, b);
+      seen.set(box.zone, box);
     }
     canvas.__lint = lint.boxes;
     lint = null;

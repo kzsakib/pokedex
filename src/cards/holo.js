@@ -15,7 +15,7 @@ export function makeHoloMask(rarity) {
   } else if (rarity === "holo") {
     /* full-card iridescent sheet, art window a touch stronger */
     for (let y = 6; y < CARD_H - 6; y += 1) ctx.fillRect(6, y, CARD_W - 12, 1);
-    for (let y = 39; y < 143; y += 1) ctx.fillRect(10, y, 140, 1);
+    for (let y = 41; y < 143; y += 1) ctx.fillRect(10, y, 140, 1);
   }
   return canvas;
 }
