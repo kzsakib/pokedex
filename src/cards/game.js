@@ -723,6 +723,7 @@ export class KantoPacksGame {
       .join("");
     this.pickEl.innerHTML = `<span class="kp-pick-title">CHOOSE A SET</span><span class="kp-pick-row">${rows}</span>`;
     this.pickEl.hidden = false;
+    this.container.classList.add("kp-picking");
     for (const btn of this.pickEl.querySelectorAll(".kp-pick-btn")) {
       btn.addEventListener("click", () => {
         this.audio.unlock();
@@ -771,6 +772,7 @@ export class KantoPacksGame {
     if (this.pickEl) {
       this.pickEl.hidden = true;
       this.pickEl.innerHTML = "";
+      this.container.classList.remove("kp-picking");
     }
     this.packKick = 1;
     this.packTilt = { yaw: 0, pitch: 0, vy: 0, vp: 0 };

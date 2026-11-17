@@ -185,17 +185,17 @@ function shine(ctx, v, y0, y1) {
   const bandB = mix(v.foil, v.base, 0.35);
   for (let y = y0; y < y1; y += 1) {
     for (let x = 0; x < PACK_W; x += 1) {
-      const s = (x * 0.6 + y * 1.4) % 176;
+      const s = (x * 0.55 + y * 1.35) % 300;
       let cover = 0;
       let colour = bandA;
-      if (s > 30 && s < 58) {
-        cover = 0.34;
+      if (s > 66 && s < 96) {
+        cover = 0.22;
         colour = bandB;
-      } else if (s >= 58 && s < 74) {
-        cover = 0.62;
+      } else if (s >= 96 && s < 112) {
+        cover = 0.5;
         colour = bandA;
-      } else if (s >= 74 && s < 86) {
-        cover = 0.26;
+      } else if (s >= 112 && s < 124) {
+        cover = 0.18;
         colour = bandB;
       }
       if (cover <= 0) continue;
@@ -285,13 +285,15 @@ function header(ctx, v) {
   const words = v.name.split(" ");
   const line1 = words[0];
   const line2 = words.slice(1).join(" ");
-  const s1 = 30;
+  let s1 = 30;
+  while (s1 > 16 && textWidth(line1, s1, 1, 2) > 142) s1 -= 1;
   const w1 = textWidth(line1, s1, 1, 2);
   const x1 = Math.round((PACK_W - w1) / 2);
   drawText(ctx, line1, x1 + 2, 52, { size: s1, color: mix(v.deep, "#000000", 0.45), tracking: 2 });
   drawText(ctx, line1, x1, 50, { size: s1, color: "#fdfbf4", tracking: 2 });
 
-  const s2 = 15;
+  let s2 = 15;
+  while (s2 > 9 && textWidth(line2, s2, 1, 3) > 142) s2 -= 1;
   const w2 = textWidth(line2, s2, 1, 3);
   const x2 = Math.round((PACK_W - w2) / 2);
   drawText(ctx, line2, x2, 88, { size: s2, color: mix(v.accent, v.deep, 0.15), tracking: 3 });
@@ -366,8 +368,10 @@ export function renderPackFront(v, mascot) {
   ctx.fillStyle = mix(v.foil, v.deep, 0.35);
   ctx.fillRect(0, ry, PACK_W, 1);
   const line = "5 CARDS · 1 RARE OR BETTER";
-  const lw = textWidth(line, 8, 1, 1);
-  drawText(ctx, line, Math.round((PACK_W - lw) / 2), ry + 7, { size: 8, color: mix(v.foil, "#ffffff", 0.2), tracking: 1 });
+  let fs = 8;
+  while (fs > 6 && textWidth(line, fs, 1, 1) > PACK_W - 20) fs -= 1;
+  const lw = textWidth(line, fs, 1, 1);
+  drawText(ctx, line, Math.round((PACK_W - lw) / 2), ry + 8, { size: fs, color: mix(v.foil, "#ffffff", 0.2), tracking: 1 });
 
   /* outer edge + crimps over the top */
   frame(ctx, 3, 26, PACK_W - 6, PACK_H - 52, 9, mix(v.foil, v.deep, 0.2));

@@ -841,13 +841,19 @@
 
 /* pack chooser: three set cards under the stage */
 .kp-pick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 16px;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  margin: 14px auto 0;
+  gap: 8px;
+  margin: 0 auto;
   max-width: min(100%, 760px);
-  padding: 0 4px;
+  padding: 0 10px;
+  pointer-events: none;
 }
 .kp-pick[hidden] {
   display: none;
@@ -860,6 +866,7 @@
   color: #8d89a6;
 }
 .kp-pick-row {
+  pointer-events: auto;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -932,4 +939,9 @@
   .kp-pick-name {
     font-size: 10px;
   }
+}
+
+/* while the set picker is showing it owns the bottom of the stage */
+.kp-stage.kp-picking .kp-hint {
+  display: none;
 }
