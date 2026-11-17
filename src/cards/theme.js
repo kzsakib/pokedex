@@ -88,7 +88,7 @@ export function themeFor(card) {
     panel2,
     accent,
     text: mixRgb(lineHi, [255, 255, 255], 0.75),
-    muted: mixRgb(lineHi, panel, tier === "fa" ? 0.18 : 0.45),
+    muted: tier === "fa" ? mixRgb(lineHi, [236, 234, 246], 0.42) : mixRgb(lineHi, panel, 0.45),
     hpCol: [255, 100, 96],
     shadowCol: mixRgb(panel, [0, 0, 0], 0.5),
     gold: GOLD,
