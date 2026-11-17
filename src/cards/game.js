@@ -209,6 +209,7 @@ export class KantoPacksGame {
     hud.querySelector(".kp-sound").addEventListener("click", () => {
       this.audio.unlock();
       this.audio.setMuted(!this.audio.muted);
+      if (!this.audio.muted) this.audio.startMusic();
       this.el.sound.textContent = this.audio.muted ? "sound off" : "sound on";
       this.el.sound.setAttribute("aria-pressed", String(this.audio.muted));
     });
@@ -506,6 +507,7 @@ export class KantoPacksGame {
     canvas.style.touchAction = "none";
     canvas.addEventListener("pointerdown", (e) => {
       this.audio.unlock();
+      this.audio.startMusic();
       canvas.setPointerCapture?.(e.pointerId);
       const p = this.toLocal(e);
       this.lastPointer = { x: e.clientX, y: e.clientY, t: performance.now() };
@@ -654,6 +656,7 @@ export class KantoPacksGame {
       if (e.code === "Space") {
         e.preventDefault();
         this.audio.unlock();
+        this.audio.startMusic();
         if (this.phase === "idle" || this.phase === "tearing") {
           this.spaceHeld = true;
         } else if (this.phase === "stack" || (this.phase === "reveal" && !this.flipped[this.revealIndex])) {
