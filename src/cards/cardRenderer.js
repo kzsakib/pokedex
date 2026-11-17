@@ -422,10 +422,10 @@ export function cardSpriteLayout(card, sprite) {
   const inner = LAYOUT.interior;
   if (card.special === "ex") {
     /* EX printings break the window: the sprite runs past the ring and the frame */
-    const k = fitScale(clean, 150, 122);
+    const k = fitScale(clean, 152, 112);
     const w = Math.round(clean.width * k);
     const h = Math.round(clean.height * k);
-    const bottom = inner.y + inner.h + 4;
+    const bottom = inner.y + inner.h + 6;
     return { sprite: clean, k, w, h, x: Math.round(CARD_W / 2 - w / 2), y: bottom - h, feet: bottom };
   }
   const k = fitScale(clean, 138, 102);
