@@ -848,8 +848,6 @@ function drawMoves(ctx, card, t) {
     const inch = total % 12;
     const lb = Math.round((card.weight || 0) * 2.2046);
     drawText(ctx, 10, LAYOUT.move2 + 4, `HT ${ft}'${String(inch).padStart(2, "0")}"  WT ${lb} LB`, F3, textCss(t.text));
-    const flavour = String(card.flavour || card.flavor || "").slice(0, 34);
-    if (flavour) drawText(ctx, 10, LAYOUT.move2 + 15, flavour, F3, textCss(t.muted));
   }
 }
 
