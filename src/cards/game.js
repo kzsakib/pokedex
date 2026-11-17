@@ -691,15 +691,17 @@ export class KantoPacksGame {
     if (!this.packs?.length) return;
     const W = this.scene?.W || 288;
     const packW = 176;
-    const fit = (W - 14) / (3 * packW * 0.82);
+    /* near edge-to-edge so the printed name on each sleeve stays readable
+       even on the packs sitting behind */
+    const fit = (W - 12) / (3 * packW * 0.99);
     const scale = Math.max(0.4, Math.min(1, fit));
-    const gap = packW * scale * 0.82;
+    const gap = packW * scale * 0.99;
     this.packs.forEach((entry, i) => {
       entry.home = {
         x: (i - 1) * gap,
-        y: i === 1 ? 8 : -6,
-        z: i === 1 ? 10 : -30,
-        rot: (i - 1) * 0.26,
+        y: i === 1 ? 5 : -4,
+        z: i === 1 ? 10 : -24,
+        rot: (i - 1) * 0.16,
         scale,
       };
       const g = entry.pack.group;
