@@ -129,8 +129,8 @@ void main() {
          hard iridescent edge where two bands cross */
       float sheen = fract(uv.x * 0.5 + uv.y * 0.42 + tilt.x * 0.85 + t * 0.01);
       float wave = sin(sheen * 6.2831 + tilt.y * 2.0) * 0.5 + 0.5;
-      col = dodge(col, rainbow(floor(sheen * 6.0)), inArt * (0.10 + 0.14 * wave));
-      col = dodge(col, rainbow(floor(fract(sheen * 3.0 + 0.33) * 6.0)), inArt * smoothstep(0.55, 0.5, abs(sheen - 0.5)) * 0.10);
+      col = dodge(col, rainbow(floor(sheen * 6.0)), inArt * (0.22 + 0.24 * wave));
+      col = dodge(col, rainbow(floor(fract(sheen * 3.0 + 0.33) * 6.0)), inArt * smoothstep(0.55, 0.5, abs(sheen - 0.5)) * 0.18);
       float rim = smoothstep(0.88, 1.0, fract(sheen * 2.0 + uv.y * 0.18));
       col = dodge(col, mix(irid, irid, 0.30), inArt * rim * 0.12);
       /* sparkle: two parallax layers of hard pixel stars that twinkle in step */
@@ -139,7 +139,7 @@ void main() {
       float s1 = smoothstep(0.13, 0.05, max(abs(p1.x), abs(p1.y)));
       float s2 = smoothstep(0.10, 0.04, max(abs(p2.x), abs(p2.y)));
       float twinkle = step(0.5, fract(sin(dot(floor(uv * 46.0), vec2(12.9898, 78.233))) * 437.58 + t * 0.35));
-      col = dodge(col, rainbow(floor(fract(sheen + 0.5) * 6.0)), (s1 * 0.6 + s2 * 0.4) * twinkle * 0.55);
+      col = dodge(col, rainbow(floor(fract(sheen + 0.5) * 6.0)), (s1 * 0.6 + s2 * 0.4) * twinkle * 0.7);
       col = dodge(col, irid, (s1 + s2 * 0.7) * (1.0 - twinkle * 0.6) * 0.42);
     } else if (uEffect < 3.5) {
       /* rainbow rare: the printed rainbow runs over the whole face, radial from the centre */
