@@ -643,14 +643,10 @@ function drawWindow(ctx, card, t) {
 function drawFaBands(ctx, t) {
   const band = rgb(t.panel);
   ctx.save();
+  /* one even wash instead of bands, so the picture runs edge to edge with no seams */
   ctx.fillStyle = rgb([0, 0, 0]);
-  ctx.globalAlpha = 0.34;
-  ctx.fillRect(6, 6, 148, 146);
-  ctx.fillStyle = band;
   ctx.globalAlpha = 0.42;
-  ctx.fillRect(6, 6, 148, 32);
-  ctx.globalAlpha = 0.5;
-  ctx.fillRect(6, 147, 148, 71);
+  ctx.fillRect(6, 6, 148, 212);
   ctx.restore();
 }
 
