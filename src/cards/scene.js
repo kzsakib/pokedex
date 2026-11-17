@@ -86,12 +86,9 @@ void main() {
     col = mix(col, vec3(0.72, 0.62, 0.95), 0.03 * band);
   }
 
-  /* real cards foil one zone or the other: holo lives in the art window,
-     reverse holo lives on the frame and text box and the art stays matte */
-  vec4 AR = vec4(0.0625, 0.3616, 0.9313, 0.8170);
-  float inArt = smoothstep(AR.x - 0.004, AR.x + 0.004, vUv.x) * smoothstep(AR.z + 0.004, AR.z - 0.004, vUv.x)
-              * smoothstep(AR.y - 0.004, AR.y + 0.004, vUv.y) * smoothstep(AR.w + 0.004, AR.w - 0.004, vUv.y);
-  float onFrame = 1.0 - inArt;
+  /* the foil sheet covers the whole face: art, frame and text box alike */
+  float inArt = 1.0;
+  float onFrame = 1.0;
 
   if (!backside && uEffect > 0.5) {
     float t = uTime;

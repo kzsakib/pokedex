@@ -65,13 +65,13 @@ export function themeFor(card) {
   const key = keyOf(card.tcg);
   const r = typeRamp(key);
   const tier = card.special === "ex" ? "ex" : card.special === "full" ? "fa" : "std";
-  const premium = tier !== "std" || ["rare", "holo", "legend"].includes(card.rarity);
+  const premium = tier !== "std";
   const goldHi = mixRgb(GOLD, [255, 255, 255], 0.25);
   const goldLo = mixRgb(GOLD, [70, 46, 10], 0.3);
-  const lineHi = premium ? goldHi : mixRgb(r[4], [255, 255, 255], 0.35);
-  const lineLo = premium ? goldLo : r[2];
-  const panel = mixRgb(r[0], [8, 10, 16], 0.55);
-  const panel2 = mixRgb(r[0], [8, 10, 16], 0.35);
+  const lineHi = premium ? goldHi : mixRgb(r[4], [255, 255, 255], 0.22);
+  const lineLo = premium ? goldLo : mixRgb(r[3], [255, 255, 255], 0.1);
+  const panel = mixRgb(r[0], [8, 10, 16], 0.42);
+  const panel2 = mixRgb(r[0], [8, 10, 16], 0.24);
   const [ah, as, av] = rgbToHsv(TYPE_COL[key] || TYPE_COL.colorless);
   const accent = hsvToRgb((ah + 150) % 360, Math.min(1, as * 1.1 + 0.15), Math.max(0.85, av));
   const rainbow = card.rarity === "holo" || tier === "fa";

@@ -413,16 +413,16 @@ export function cardSpriteLayout(card, sprite) {
   const clean = trimSprite(sprite);
   if (!clean) return null;
   if (card.special === "full") {
-    const k = fitScale(clean, 140, 104);
-    const w = clean.width * k;
-    const h = clean.height * k;
+    const k = fitScale(clean, 146, 110);
+    const w = Math.round(clean.width * k);
+    const h = Math.round(clean.height * k);
     const feet = 148;
     return { sprite: clean, k, w, h, x: Math.round(CARD_W / 2 - w / 2), y: feet - h, feet };
   }
   const inner = LAYOUT.interior;
-  const k = fitScale(clean, 136, 100);
-  const w = clean.width * k;
-  const h = clean.height * k;
+  const k = fitScale(clean, 138, 102);
+  const w = Math.round(clean.width * k);
+  const h = Math.round(clean.height * k);
   const bottom = inner.y + inner.h - 2;
   return { sprite: clean, k, w, h, x: Math.round(CARD_W / 2 - w / 2), y: bottom - h, feet: bottom };
 }
@@ -430,7 +430,10 @@ export function cardSpriteLayout(card, sprite) {
 /* fill the box on the sprite's larger axis so every pokemon reads the same size */
 /* integer only: 2x when the trimmed art fits the box, else 1x */
 function fitScale(sprite, maxW, maxH) {
-  return sprite.width * 2 <= maxW && sprite.height * 2 <= maxH ? 2 : 1;
+  /* fill the box on the larger axis: whole steps where they fit, quarter steps
+     after that so mid-size sprites are not stuck at 1x */
+  const raw = Math.min(maxW / sprite.width, maxH / sprite.height);
+  return Math.max(1, Math.min(3, Math.floor(raw * 4) / 4));
 }
 
 /* largest whole-number scale that stays inside the box: no resampling mush */
