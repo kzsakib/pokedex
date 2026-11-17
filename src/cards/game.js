@@ -717,7 +717,7 @@ export class KantoPacksGame {
         return `<button class="kp-pick-btn" data-pack="${i}" style="--pack:${v.base};--pack-foil:${v.foil}">
           <span class="kp-pick-num">0${i + 1}</span>
           <span class="kp-pick-name">${v.name}</span>
-          <span class="kp-pick-tag">${v.label} · 5 CARDS</span>
+          <span class="kp-pick-tag">${v.label}</span>
         </button>`;
       })
       .join("");
