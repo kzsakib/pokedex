@@ -747,9 +747,10 @@ function drawFrameFa(ctx, card, t, spec) {
 
   /* dashes along the top and bottom rails */
   for (let x = 26; x < CARD_W - 26; x += 10) {
-    for (let d = 0; d < 5; d += 1) {
-      px(ctx, x + d, 1, accent(x + d, 1));
-      px(ctx, x + d, CARD_H - 2, accent(x + d, CARD_H - 2));
+    for (let d = 0; d < 6; d += 1) {
+      const hot = d === 2;
+      px(ctx, x + d, 1, hot ? accent(x + d, 1) : hiAt(x + d, 1));
+      px(ctx, x + d, CARD_H - 2, hot ? accent(x + d, CARD_H - 2) : hiAt(x + d, CARD_H - 2));
     }
   }
 }
