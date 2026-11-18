@@ -804,6 +804,10 @@
   color: #dcc4ff;
 }
 
+.kp-entry--splice {
+  color: #ffe0b0;
+}
+
 @keyframes kp-caret {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0; }

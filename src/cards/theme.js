@@ -63,8 +63,12 @@ export function typeRamp(key) {
 
 export function themeFor(card) {
   const key = keyOf(card.tcg);
-  const r = typeRamp(key);
-  const tier = card.special === "ex" ? "ex" : card.special === "full" ? "fa" : "std";
+  const splice = card.rarity === "fusion";
+  const bodyKey = keyOf(card.fusion?.tcgB || card.tcg);
+  const rHead = typeRamp(key);
+  const rBody = splice ? typeRamp(bodyKey) : rHead;
+  const r = splice ? rHead.map((c, i) => mixRgb(c, rBody[i], 0.5)) : rHead;
+  const tier = splice ? "fu" : card.special === "ex" ? "ex" : card.special === "full" ? "fa" : "std";
   const premium = tier !== "std";
   const goldHi = mixRgb(GOLD, [255, 255, 255], 0.25);
   const goldLo = mixRgb(GOLD, [70, 46, 10], 0.3);
@@ -74,11 +78,36 @@ export function themeFor(card) {
   const panel2 = mixRgb(r[0], [8, 10, 16], 0.24);
   const [ah, as, av] = rgbToHsv(TYPE_COL[key] || TYPE_COL.colorless);
   const accent = hsvToRgb((ah + 150) % 360, Math.min(1, as * 1.1 + 0.15), Math.max(0.85, av));
+  const [bh, bs, bv] = rgbToHsv(TYPE_COL[bodyKey] || TYPE_COL.colorless);
+  const accentB = hsvToRgb((bh + 150) % 360, Math.min(1, bs * 1.1 + 0.15), Math.max(0.85, bv));
   const rainbow = card.rarity === "holo" || tier === "fa";
+  /* a fusion plate is cut from both halves: each side keeps its own ink, panel
+     and accent, and the two meet on a dithered seam */
+  const split = splice
+    ? {
+        keyA: key,
+        keyB: bodyKey,
+        aInk: mixRgb(rHead[4], [255, 255, 255], 0.35),
+        bInk: mixRgb(rBody[4], [255, 255, 255], 0.35),
+        /* the rails carry each half's own type colour, not a foil gold, so the
+           splice is legible at a glance */
+        aEdge: mixRgb(TYPE_COL[key] || TYPE_COL.colorless, [255, 255, 255], 0.12),
+        bEdge: mixRgb(TYPE_COL[bodyKey] || TYPE_COL.colorless, [255, 255, 255], 0.12),
+        aDark: mixRgb(rHead[0], [8, 10, 16], 0.3),
+        bDark: mixRgb(rBody[0], [8, 10, 16], 0.3),
+        aAccent: accent,
+        bAccent: accentB,
+        panelA: mixRgb(rHead[0], [8, 10, 16], 0.42),
+        panelA2: mixRgb(rHead[0], [8, 10, 16], 0.24),
+        panelB: mixRgb(rBody[0], [8, 10, 16], 0.42),
+        panelB2: mixRgb(rBody[0], [8, 10, 16], 0.24),
+      }
+    : null;
   return {
     key,
     type: TYPE_COL[key] || TYPE_COL.colorless,
     r,
+    split,
     tier,
     premium,
     rainbow,
@@ -215,7 +244,10 @@ export function frameSpec(card) {
   const botGaps = gaps();
   const jogL = 40 + Math.floor(rnd() * 120);
   const jogR = 40 + Math.floor(rnd() * 120);
-  const premium = card.special === "ex" || card.special === "full" || ["rare", "holo", "legend"].includes(card.rarity);
+  const premium =
+    card.special === "ex" ||
+    card.special === "full" ||
+    ["rare", "holo", "legend", "fusion"].includes(card.rarity);
   const th = premium ? 3 : 2;
   return { corners, cut, arm, topGaps, botGaps, jogL, jogR, th, key };
 }

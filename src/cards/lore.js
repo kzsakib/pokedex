@@ -4,9 +4,12 @@
 
 /* The deployed site never holds a key: it asks the worker in lore-proxy/,
    which keeps the Groq key as a secret and returns only the finished line. */
-const PROXY =
+const PROXY_SRC =
   (import.meta.env && import.meta.env.VITE_LORE_PROXY) ||
   "https://site-9ab0858b3eb2458ba4fa0615c5c508b8.freebuff.page/lore";
+/* the worker answers /lore for chroma and /fusion for spliced entries */
+const PROXY_BASE = PROXY_SRC.replace(/\/lore\/?$/, "");
+const PROXY = `${PROXY_BASE}/lore`;
 const KEY = (import.meta.env && import.meta.env.VITE_GROQ_KEY) || "";
 
 const HUE_FAMILIES = [
@@ -177,4 +180,71 @@ export async function chromaLore(card, timeoutMs = 7000) {
     /* fall through */
   }
   return fallbackLore(card, seed);
+}
+
+/* ---------- fusion entries ----------
+   Two species' dex lines go in, one creature's entry comes out. */
+
+const bare = (s) => String(s || "").replace(/\s+/g, " ").trim().replace(/[.!?]+$/, "");
+
+const goodEntry = (line) => {
+  if (!line || line.length < 60 || line.length > 520) return false;
+  if (!/[.!?]$/.test(line)) return false;
+  const n = words(line);
+  return n >= 8 && n <= 90;
+};
+
+/* the join keeps each source entry intact, so the combined line stays honest */
+const FUSION_TEMPLATES = [
+  (n, a, b) => `${n} has two lineages in one body. ${a}. ${b}.`,
+  (n, a, b) => `${n} keeps both halves' habits and gives up neither. ${a}. ${b}.`,
+  (n, a, b) => `${n} lives as if both halves must be satisfied at once. ${a}. ${b}.`,
+];
+
+export function fusionFallback(card) {
+  const f = card.fusion || {};
+  const a = bare(f.entryA);
+  const b = bare(f.entryB);
+  const name = card.name || "It";
+  if (!a && !b) return `${name} keeps to cover no other creature uses, and answers to a call only its own two halves make.`;
+  if (!a) return `${name} carries one line's habits onto ground the other half never walked. ${b}.`;
+  if (!b) return `${name} does first what its head half learned first. ${a}.`;
+  return FUSION_TEMPLATES[Math.abs(card.id || 0) % FUSION_TEMPLATES.length](name, a, b);
+}
+
+async function fusionFromProxy(card, timeoutMs) {
+  const f = card.fusion || {};
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${PROXY_BASE}/fusion`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: card.name,
+        head: f.headName,
+        body: f.bodyName,
+        entryA: f.entryA,
+        entryB: f.entryB,
+        types: [card.tcg, f.tcgB],
+      }),
+    });
+    if (!res.ok) throw new Error(`proxy ${res.status}`);
+    const json = await res.json();
+    const line = String(json?.line || "").trim();
+    return goodEntry(line) ? line : null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function fusionLore(card, timeoutMs = 7000) {
+  try {
+    const viaProxy = await fusionFromProxy(card, timeoutMs);
+    if (viaProxy) return viaProxy;
+  } catch {
+    /* fall through to the local writer */
+  }
+  return fusionFallback(card);
 }

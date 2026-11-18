@@ -6,7 +6,8 @@ import { createCardMesh } from "./cards3d.js";
 import { makeHoloMask } from "./holo.js";
 import { loadGen1, loadSprite, spriteFor } from "./assets.js";
 import { generatePack, RARITY_LABEL } from "./generate.js";
-import { chromaLore } from "./lore.js";
+import { chromaLore, fusionLore, fusionFallback } from "./lore.js";
+import { loadFusionIndex } from "./fusions.js";
 import { cardSpriteLayout, renderCard } from "./cardRenderer.js";
 import { loadTypeIcons } from "./icons.js";
 import { TYPE_COL, keyOf } from "./theme.js";
@@ -15,11 +16,11 @@ import { renderPackFront, renderPackBack, renderStrip, VARIANTS } from "./packAr
 const FINISH_TAG = { reverse: " · REVERSE", holo: "", prism: " · PRISM", gold: " · GOLD", foil: " · FOIL", star: " · STARLIGHT", ember: " · EMBER", crystal: " · CRYSTAL", lightning: " · STORM", bubble: " · AQUA", grid: " · CIRCUIT", confetti: " · FESTIVAL", shiny: "" };
 import { freshSeed } from "./rng.js";
 import { KantoAudio } from "./audio.js";
-import { loadBinder, recordPack, resetBinder, backfillNote } from "./storage.js";
+import { loadBinder, recordPack, resetBinder, backfillNote, backfillEntry } from "./storage.js";
 import { fallbackLore } from "./lore.js";
 
 const ORDER = ["common", "uncommon", "rare", "holo", "legend"];
-const SPARKLES = { uncommon: "silver", rare: "gold", holo: "rainbow", legend: "legend" };
+const SPARKLES = { uncommon: "silver", rare: "gold", holo: "rainbow", fusion: "rainbow", legend: "legend" };
 const BEST = { common: 0, uncommon: 1, rare: 2, holo: 3, legend: 4 };
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -107,6 +108,8 @@ export class KantoPacksGame {
     /* Sprites are fetched per card as the pack is built: preloading all 151
        up front cost 151 requests before the first sleeve could be touched. */
     this.data = await loadGen1();
+    /* the fusion index only lists pairs whose sprite we ship */
+    this.fusions = await loadFusionIndex();
     this.loaderText("PRINTING THE SET");
     this.loaderProgress(100);
     await minBoot;
@@ -313,7 +316,7 @@ export class KantoPacksGame {
       emerge: "",
       stack: "click to flip",
       reveal: "click to flip · drag to tilt",
-      summary: this.scene?.portrait ? "drag up and down to browse · open another or check the binder" : "five cards · open another or check the binder",
+      summary: this.scene?.portrait ? "drag up and down to browse · open another or check the binder" : "seven cards · open another or check the binder",
     };
     this.hint(hints[phase] || "");
     this.container.classList.toggle("kp-browsing", phase === "summary" && !!this.scene?.portrait);
@@ -418,7 +421,7 @@ export class KantoPacksGame {
     this.resetLoader();
     const minShow = new Promise((resolve) => setTimeout(resolve, 1100));
     await loadTypeIcons();
-    const pack = generatePack(this.data, this.seed, { force: this.force });
+    const pack = generatePack(this.data, this.seed, { force: this.force, fusions: this.fusions });
     this.packData = pack;
     this.cards = pack.cards;
     this.binder = recordPack(this.binder, this.cards);
@@ -445,9 +448,9 @@ export class KantoPacksGame {
       this.scene.root.add(mesh.group);
     }
 
-    /* one line per chroma card, written while the loader is up */
-    await Promise.all(
-      this.cards
+    /* one entry per chroma and fusion card, written while the loader is up */
+    await Promise.all([
+      ...this.cards
         .filter((card) => card.variant)
         .map(async (card) => {
           const line = await chromaLore(card);
@@ -455,8 +458,17 @@ export class KantoPacksGame {
             card.variant.note = line;
             backfillNote(this.binder, card);
           }
-        })
-    );
+        }),
+      ...this.cards
+        .filter((card) => card.fusion)
+        .map(async (card) => {
+          const line = await fusionLore(card);
+          if (line) {
+            card.entry = line;
+            backfillEntry(this.binder, card);
+          }
+        }),
+    ]);
 
     /* the pack has served its purpose once the cards exist */
     if (this.pack) this.pack.group.visible = false;
@@ -492,12 +504,21 @@ export class KantoPacksGame {
     }, 1600);
   }
 
+  clearEntry() {
+    if (this.typeTimer) {
+      clearInterval(this.typeTimer);
+      this.typeTimer = null;
+    }
+    if (this.entryEl) this.entryEl.textContent = "";
+  }
+
   typeEntry(text, card) {
     if (!this.entryEl) return;
     if (this.typeTimer) clearInterval(this.typeTimer);
     const full = String(text || "").replace(/\s+/g, " ").trim();
     this.entryEl.textContent = "";
     this.entryEl.classList.toggle("kp-entry--chroma", !!(card && card.variant));
+    this.entryEl.classList.toggle("kp-entry--splice", !!(card && card.fusion));
     if (!full) return;
     let i = 0;
     this.typeTimer = setInterval(() => {
@@ -512,13 +533,21 @@ export class KantoPacksGame {
 
   showCaption(card) {
     const stats = `HT ${fmtHeight(card.height)}  WT ${card.weight ? `${Math.round(card.weight * 2.2046)} LB` : "??"}`;
+    const splice = card.fusion
+      ? `${card.fusion.headName} × ${card.fusion.bodyName}${card.fusion.artist ? ` · sprite by ${card.fusion.artist}` : " · community sprite"}`
+      : "";
     this.el.caption.innerHTML = `
       <strong>${card.name}</strong>
       <span>${RARITY_LABEL[card.rarity]}${card.shiny ? " · SHINY ✦" : FINISH_TAG[card.finish] || ""}</span>
+      ${splice ? `<span>${splice}</span>` : ""}
       <span>${stats}</span>
       <span>seed ${this.seed}</span>
     `;
-    const entry = card.variant && card.variant.note ? card.variant.note : card.flavour || "";
+    const entry = card.fusion
+      ? card.entry || fusionFallback(card)
+      : card.variant && card.variant.note
+        ? card.variant.note
+        : card.flavour || "";
     this.typeEntry(entry, card);
     this.el.caption.classList.add("kp-show");
   }
@@ -579,7 +608,7 @@ export class KantoPacksGame {
     canvas.addEventListener("pointermove", (e) => {
       if (this.summaryDragging) {
         const dy = e.clientY - this.summaryStartY;
-        this.summaryScroll = clamp(this.summaryStartScroll + dy, -80, 1900);
+        this.summaryScroll = clamp(this.summaryStartScroll + dy, -80, this.summaryMax || 1900);
         return;
       }
       const p = this.toLocal(e);
@@ -918,6 +947,7 @@ export class KantoPacksGame {
   }
 
   showSummary() {
+    this.clearEntry();
     this.summaryScroll = 0;
     this.focusIndex = -1;
     this.suppressPick = false;
@@ -936,12 +966,14 @@ export class KantoPacksGame {
 
   layoutSummary() {
     const portrait = this.scene.portrait;
-    /* five cards plus a margin on both sides has to fit the render width */
-    const n = this.meshes.length || 5;
+    /* seven cards plus a margin on both sides has to fit the render width */
+    const n = this.meshes.length || 7;
     const gap = 12;
     const fit = Math.min(1, (this.scene.W - 40 - gap * (n - 1)) / (152 * n));
     const step = 152 * fit + gap;
     const scale = portrait ? 2 : fit;
+    /* the portrait stack scrolls one card per 460px step */
+    this.summaryMax = Math.max(0, (n - 1) * 460 - 180);
     this.meshes.forEach((mesh, i) => {
       mesh.group.visible = true;
       mesh.setFlipWithTilt(0, 0, 0);
@@ -997,6 +1029,8 @@ export class KantoPacksGame {
   }
 
   openBinder() {
+    /* the typed entry belongs to the card under it, not to the binder dialog */
+    this.clearEntry();
     this.renderBinder();
     this.el.binder.hidden = false;
     this.audio.click();
@@ -1042,9 +1076,11 @@ export class KantoPacksGame {
       });
       cell.appendChild(canvas);
       const cap = document.createElement("figcaption");
-      cap.textContent = card.variant
-        ? `${card.name || ""} · ${card.variant.label}`
-        : `${card.name || ""}${FINISH_TAG[card.finish] || ""}`;
+      cap.textContent = card.fusion
+        ? `${card.name || ""} · ${card.fusion.headName}×${card.fusion.bodyName}`
+        : card.variant
+          ? `${card.name || ""} · ${card.variant.label}`
+          : `${card.name || ""}${FINISH_TAG[card.finish] || ""}`;
       cell.appendChild(cap);
       cells.push(cell);
     }
@@ -1065,9 +1101,10 @@ export class KantoPacksGame {
           <strong>${card.name || ""}</strong>
           <span>${RARITY_LABEL[card.rarity] || ""}${card.variant ? ` · ${card.variant.label} FORM` : ""}${card.shiny ? " · SHINY ✦" : ""}</span>
           ${card.variant ? `<span class="kp-pull-view-note">${card.variant.label} FORM</span>` : ""}
+          ${card.fusion ? `<span class="kp-pull-view-note">${card.fusion.headName} × ${card.fusion.bodyName}${card.fusion.artist ? ` · sprite by ${card.fusion.artist}` : " · community sprite"}</span>` : ""}
           <span>${card.special === "full" ? "FULL ART" : card.special === "ex" ? "EX · BREAKS THE FRAME" : `${(FINISH_TAG[card.finish] || "").replace(/^ · /, "").toLowerCase() || "standard"} finish`}</span>
           ${(() => {
-            const line = (card.variant && card.variant.note) || card.flavour || "";
+            const line = card.fusion ? card.entry || "" : (card.variant && card.variant.note) || card.flavour || "";
             return line ? `<span class="kp-pull-view-entry">${line}</span>` : "";
           })()}
         </div>
@@ -1290,7 +1327,7 @@ export class KantoPacksGame {
         this.beamMesh.material.uniforms.uTime.value = this.time;
         this.beamMesh.position.y = 200;
       }
-      if (this.phaseTime > 0.45 && meshes.length === 5) {
+      if (this.phaseTime > 0.45 && meshes.length > 0) {
         this.setPhase("emerge");
         this.emergeStart = this.time;
         meshes.forEach((m, i) => {
@@ -1322,7 +1359,7 @@ export class KantoPacksGame {
       }
     }
 
-    if ((this.phase === "stack" || this.phase === "reveal") && meshes.length === 5) {
+    if ((this.phase === "stack" || this.phase === "reveal") && meshes.length > 0) {
       /* stack: face-down cards sit behind the active one */
       const active = meshes[this.revealIndex];
       meshes.forEach((mesh, i) => {

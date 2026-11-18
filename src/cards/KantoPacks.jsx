@@ -31,7 +31,9 @@ export default function KantoPacks() {
       <div className="kp-stage" ref={stageRef} />
       <p className="kp-credit">
         Fan project. Not affiliated with Nintendo, Game Freak or The Pokémon
-        Company. Sprites from the PokeAPI sprites repository.
+        Company. Sprites from the PokeAPI sprites repository. Fusion sprites are
+        fan art from the Pokémon Infinite Fusion custom-sprite project, credited
+        per card to their artists.
       </p>
     </section>
   );

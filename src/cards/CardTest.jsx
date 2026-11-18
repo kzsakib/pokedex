@@ -61,6 +61,27 @@ const CARDS = [
     ],
   },
   { ...base, id: 1, name: "BULBASAUR", tcg: "Grass", hp: 70, rarity: "uncommon" },
+  {
+    ...base,
+    id: 142006,
+    name: "AERODRIZARD",
+    tcg: "Colorless",
+    rarity: "fusion",
+    genus: "SPLICE",
+    hp: 120,
+    height: 1.2,
+    weight: 40,
+    fusion: {
+      head: 142,
+      body: 6,
+      headName: "AERODACTYL",
+      bodyName: "CHARIZARD",
+      tcgB: "Fire",
+      artist: "universez_",
+      entryA: "A ferocious, prehistoric POKéMON that took to the air, attacking with its saw-like fangs.",
+      entryB: "Spits fire that is hot enough to melt boulders. Known to cause forest fires unintentionally.",
+    },
+  },
 ];
 
 export default function CardTest() {

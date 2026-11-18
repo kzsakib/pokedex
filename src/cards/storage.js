@@ -1,7 +1,7 @@
 /* Binder persistence. */
 const KEY = "kanto-packs-v1";
 
-export const RARITY_RANK = { common: 0, uncommon: 1, rare: 2, holo: 3, chroma: 4, legend: 5 };
+export const RARITY_RANK = { common: 0, uncommon: 1, rare: 2, holo: 3, chroma: 4, fusion: 5, legend: 6 };
 
 function empty() {
   return { packs: 0, owned: {}, rarest: null, shinies: 0, pulls: [] };
@@ -15,6 +15,8 @@ function snapshot(card) {
     moves: card.moves, weakness: card.weakness, resistance: card.resistance,
     retreat: card.retreat, height: card.height, weight: card.weight, finish: card.finish,
     flavour: card.flavour || "",
+    entry: card.entry || "",
+    fusion: card.fusion ? { ...card.fusion } : null,
     variant: card.variant ? { key: card.variant.key, label: card.variant.label, tcg: card.variant.tcg, note: card.variant.note, hueMap: card.variant.hueMap } : null,
   };
 }
@@ -50,20 +52,23 @@ export function recordPack(binder, cards) {
   binder.pulls = binder.pulls || [];
   for (const card of cards) {
     const id = String(card.id);
-    const current = binder.owned[id];
-    const better =
-      !current ||
-      (card.shiny && !current.shiny) ||
-      (card.shiny === current.shiny && RARITY_RANK[card.rarity] > RARITY_RANK[current.rarity]);
-    if (better) {
-      binder.owned[id] = {
-        rarity: card.rarity,
-        shiny: card.shiny,
-        name: card.name,
-        count: (current?.count || 0) + 1,
-      };
-    } else {
-      current.count = (current.count || 0) + 1;
+    /* a fusion is its own creature: it never fills one of the 151 slots */
+    if (!card.fusion) {
+      const current = binder.owned[id];
+      const better =
+        !current ||
+        (card.shiny && !current.shiny) ||
+        (card.shiny === current.shiny && RARITY_RANK[card.rarity] > RARITY_RANK[current.rarity]);
+      if (better) {
+        binder.owned[id] = {
+          rarity: card.rarity,
+          shiny: card.shiny,
+          name: card.name,
+          count: (current?.count || 0) + 1,
+        };
+      } else {
+        current.count = (current.count || 0) + 1;
+      }
     }
     binder.pulls.unshift({ card: snapshot(card), at: Date.now() });
     if (card.shiny) binder.shinies += 1;
@@ -85,6 +90,20 @@ export function backfillNote(binder, card) {
     if (c.id !== card.id) continue;
     if (c.variant.key !== card.variant.key) continue;
     c.variant.note = card.variant.note;
+    changed = true;
+  }
+  if (changed) saveBinder(binder);
+  return changed;
+}
+
+/* fusion entries arrive after the pack is stored, so the binder gets them late */
+export function backfillEntry(binder, card) {
+  let changed = false;
+  for (const pull of binder.pulls || []) {
+    const c = pull.card;
+    if (!c || !c.fusion || !card.fusion) continue;
+    if (c.fusion.head !== card.fusion.head || c.fusion.body !== card.fusion.body) continue;
+    c.entry = card.entry;
     changed = true;
   }
   if (changed) saveBinder(binder);

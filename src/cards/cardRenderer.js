@@ -621,13 +621,23 @@ function drawPanel(ctx, t, spec) {
   ctx.fillStyle = rgb(t.panel);
   ctx.fillRect(0, 0, CARD_W, CARD_H);
   const a = rgb(t.panel), b = rgb(t.panel2);
+  /* a fusion's sheet is cut from both halves; the two panels meet on a dithered
+     seam, so the join stays pixel work instead of a gradient */
+  const s = t.split;
+  const headBase = s ? rgb(s.panelA) : a;
+  const headAlt = s ? rgb(s.panelA2) : b;
+  const bodyBase = s ? rgb(s.panelB) : a;
+  const bodyAlt = s ? rgb(s.panelB2) : b;
   const block = { x0: 7, y0: LAYOUT.info - 1, x1: 152, y1: 212 };
   for (let y = 0; y < CARD_H; y += 1) {
     for (let x = 0; x < CARD_W; x += 1) {
       if (!insideFrame(x, y, 6, spec)) continue;
       const inBlock = x >= block.x0 && x <= block.x1 && y >= block.y0 && y <= block.y1;
       const on = inBlock ? bayerAt(x + 1, y) < 0.78 : bayerAt(x, y) < 0.82;
-      ctx.fillStyle = inBlock ? (on ? b : a) : on ? a : b;
+      const head = !s || x + bayerAt(x, y) * 10 < 82;
+      const base = head ? headBase : bodyBase;
+      const alt = head ? headAlt : bodyAlt;
+      ctx.fillStyle = inBlock ? (on ? alt : base) : on ? base : alt;
       ctx.fillRect(x, y, 1, 1);
     }
   }
@@ -636,11 +646,25 @@ function drawPanel(ctx, t, spec) {
 function drawWindow(ctx, card, t) {
   const { x, y, w, h } = LAYOUT.window;
   const inner = LAYOUT.interior;
-  ctx.fillStyle = rgb(t.lineHi);
-  ctx.fillRect(x, y, w, 1);
-  ctx.fillRect(x, y + h - 1, w, 1);
-  ctx.fillRect(x, y, 1, h);
-  ctx.fillRect(x + w - 1, y, 1, h);
+  if (t.split) {
+    /* a fusion's window is framed in both halves' colours, split dead centre */
+    for (let i = 0; i < w; i += 1) {
+      ctx.fillStyle = rgb(x + i < CARD_W / 2 ? t.split.aEdge : t.split.bEdge);
+      ctx.fillRect(x + i, y, 1, 1);
+      ctx.fillRect(x + i, y + h - 1, 1, 1);
+    }
+    for (let i = 0; i < h; i += 1) {
+      ctx.fillStyle = rgb(y + i < CARD_H / 2 ? t.split.aEdge : t.split.bEdge);
+      ctx.fillRect(x, y + i, 1, 1);
+      ctx.fillRect(x + w - 1, y + i, 1, 1);
+    }
+  } else {
+    ctx.fillStyle = rgb(t.lineHi);
+    ctx.fillRect(x, y, w, 1);
+    ctx.fillRect(x, y + h - 1, w, 1);
+    ctx.fillRect(x, y, 1, h);
+    ctx.fillRect(x + w - 1, y, 1, h);
+  }
   ctx.fillStyle = rgb(t.lineLo);
   ctx.fillRect(x + 1, y + 1, w - 2, 1);
   ctx.fillRect(x + 1, y + h - 2, w - 2, 1);
@@ -665,9 +689,77 @@ function drawFaBands(ctx, t) {
    EX a double rail with heavy brackets, full art a thin rail with all four
    corners cut */
 function drawBorder(ctx, card, t, spec) {
+  if (card.rarity === "fusion") return drawFrameFusion(ctx, card, t, spec);
   if (t.tier === "ex") return drawFrameEx(ctx, card, t, spec);
   if (t.tier === "fa") return drawFrameFa(ctx, card, t, spec);
   return drawFrameKit(ctx, card, t, spec);
+}
+
+/* ---------- fusion frame: two plates stitched into one card ---------- */
+
+function drawFrameFusion(ctx, card, t, spec) {
+  const s = t.split;
+  const headSide = (x) => x < CARD_W / 2;
+  const edgeAt = (x) => rgb(headSide(x) ? s.aEdge : s.bEdge);
+  const darkAt = (x) => rgb(headSide(x) ? s.aDark : s.bDark);
+  const lo = rgb(t.lineLo);
+  const white = "#f6efd4";
+
+  /* the outer rail is each half's own type colour and changes hands dead centre */
+  ringPixels(2, spec, (x, y) => px(ctx, x, y, edgeAt(x)));
+  ringPixels(3, spec, (x, y) => px(ctx, x, y, darkAt(x)));
+  /* zipper teeth: the two plates are stitched, not welded */
+  ringPixels(6, spec, (x, y) => {
+    if ((x + y) % 2 === 0) px(ctx, x, y, edgeAt(x));
+  });
+  ringPixels(4, spec, (x, y) => px(ctx, x, y, lo));
+
+  /* corner brackets, 5px arms, each corner its own side */
+  for (const name of ["tl", "tr", "bl", "br"]) {
+    const [ox, oy, dx, dy] = CORNERS[name];
+    for (let k = 3; k <= 7; k += 1) {
+      for (let th = 0; th < 2; th += 1) {
+        px(ctx, ox + dx * k, oy + dy * (3 + th), edgeAt(ox + dx * k));
+        px(ctx, ox + dx * (3 + th), oy + dy * k, edgeAt(ox + dx * k));
+      }
+    }
+    px(ctx, ox + dx * 4, oy + dy * 4, white);
+  }
+
+  /* the fusion core: a split diamond at the top and bottom centre. The left half
+     is cut from the head, the right from the body, and a dark ring ties them. */
+  const mid = CARD_W >> 1;
+  const diamond = ["..X..", ".XXX.", "XXXXX", ".XXX.", "..X.."];
+  for (const top of [4, CARD_H - 9]) {
+    diamond.forEach((row, ry) => {
+      [...row].forEach((ch, rx) => {
+        if (ch !== "X") return;
+        const gx = mid - 2 + rx;
+        const gy = top + ry;
+        if (gx < 2 || gx > CARD_W - 3 || gy < 2 || gy > CARD_H - 3) return;
+        px(ctx, gx, gy, edgeAt(gx));
+      });
+    });
+    for (const [rx, ry] of [[2, 0], [0, 2], [4, 2], [2, 4]]) px(ctx, mid - 2 + rx, top + ry, white);
+    px(ctx, mid - 1, top + 1, white);
+  }
+
+  /* side locks: the two halves reach into each other at the waist */
+  for (let y = 102; y <= 114; y += 3) {
+    const reach = y % 2 === 0 ? 5 : 3;
+    for (let k = 0; k < reach; k += 1) {
+      px(ctx, 2 + k, y, k % 2 === 0 ? rgb(s.bEdge) : rgb(s.aEdge));
+      px(ctx, CARD_W - 3 - k, y, k % 2 === 0 ? rgb(s.aEdge) : rgb(s.bEdge));
+    }
+  }
+
+  /* a short stitch run down each rail, halfway between the corners and the waist */
+  for (const y of [48, 56, 64]) {
+    for (let k = 0; k < 2; k += 1) {
+      px(ctx, 2 + k, y, darkAt(2 + k));
+      px(ctx, CARD_W - 3 - k, y, darkAt(CARD_W - 3 - k));
+    }
+  }
 }
 
 function drawFrameEx(ctx, card, t, spec) {
@@ -870,7 +962,8 @@ function drawHeader(ctx, card, t, spec) {
   const rarityWord = { common: "COMMON", uncommon: "UNCOMMON", rare: "RARE", holo: "HOLO", legend: "LEGEND", chroma: "CHROMA" };
   const tier = tierWord(card, t);
   const stageWord = card.rarity === "legend" ? "LEGEND" : card.stage === 2 ? "STAGE 2" : card.stage === 1 ? "STAGE 1" : "BASIC";
-  const stageText = `${stageWord} LV.${card.level}`;
+  /* a fusion has no stage line: the tag already says what it is */
+  const stageText = card.rarity === "fusion" ? `LV.${card.level}` : `${stageWord} LV.${card.level}`;
   const hp = String(card.hp);
   const hpW = textWidth(hp, F5, 1) * 2;
   const hpLabelX = 148 - hpW - 9;
@@ -903,27 +996,42 @@ function drawHeader(ctx, card, t, spec) {
 
   /* row B */
   const nameRaw = upper(card.name);
+  /* a fusion prints both type discs, so its name gets one disc less room */
+  const nameLimit = card.fusion ? 110 : 118;
   let name = nameRaw;
   let sp = 1;
-  if (textWidth(name, F5, sp) * 2 > 118) {
+  if (textWidth(name, F5, sp) * 2 > nameLimit) {
     sp = 0;
-    while (textWidth(name, F5, 0) * 2 > 118 && name.length > 1) name = name.slice(0, -1);
+    while (textWidth(name, F5, 0) * 2 > nameLimit && name.length > 1) name = name.slice(0, -1);
   }
   drawText(ctx, 12, 24, name, F5, rgb(t.shadowCol), sp, "l", 2);
   drawText(ctx, 10, 22, name, F5, rgb(t.tier === "ex" ? t.gold : t.text), sp, "l", 2);
-  drawTypeIcon(ctx, t.key, 140, 24);
+  if (card.fusion) {
+    drawTypeIcon(ctx, keyOfType(card.fusion.tcgB), 127, 24);
+    drawTypeIcon(ctx, t.key, 140, 24);
+  } else {
+    drawTypeIcon(ctx, t.key, 140, 24);
+  }
 }
 
 function tierWord(card, t) {
   if (t.tier === "ex") return "plate";
   if (t.tier === "fa") return "FULL ART";
-  return { common: "COMMON", uncommon: "UNCOMMON", rare: "RARE", holo: "HOLO", legend: "LEGEND", chroma: "CHROMA" }[card.rarity] || "";
+  return { common: "COMMON", uncommon: "UNCOMMON", rare: "RARE", holo: "HOLO", legend: "LEGEND", chroma: "CHROMA", fusion: "FUSION" }[card.rarity] || "";
 }
 
 function drawInfoLine(ctx, card, t) {
+  const y = LAYOUT.info;
+  if (card.fusion) {
+    /* both parents' names on the left, both ids on the right */
+    const pair = `${upper(card.fusion.headName)}\u00d7${upper(card.fusion.bodyName)}`;
+    fitText(ctx, pair, 96, F3, textCss(t.muted), 10, y);
+    const ids = `${String(card.fusion.head).padStart(3, "0")}/${String(card.fusion.body).padStart(3, "0")}`;
+    drawText(ctx, 149, y, ids, F3, textCss(t.muted), 1, "r");
+    return;
+  }
   const genus = upper(String(card.genus || "")).replace(/\s*POKEMON$/i, "").trim();
   const dex = `${String(card.id).padStart(3, "0")}/151`;
-  const y = LAYOUT.info;
   if (t.tier === "ex") drawText(ctx, 10, y, "EX RULE: 2 PRIZES WHEN KO", F3, rgb(t.gold));
   else fitText(ctx, genus, 96, F3, textCss(t.muted), 10, y);
   drawText(ctx, 149, y, dex, F3, textCss(t.muted), 1, "r");

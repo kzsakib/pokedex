@@ -73,6 +73,34 @@ const usable = (line) =>
   !COLOUR.test(line);
 
 
+/* ---- fusion entries: two species' dex lines go in, one entry comes out ---- */
+const FUSION_SYSTEM =
+  "You write Pokédex entries for a fan monster-catching game. Two creatures have been spliced into one and you are given the flavour text of both halves plus the new creature's name. Reply with the entry only: one or two grammatical sentences, 30 to 60 words, in-world and matter-of-fact.\n\n" +
+  "Give the creature one body and one life: its head and front follow the first half, its build, habits and temper follow the second. Blend what each entry says into behaviour you can watch — a hunt, a shelter, a season, a habit, a way of moving. Do not list both halves' facts side by side and do not explain how the creature was made. Start on the creature itself, never on an observer (no 'Observed', 'Field notes', 'Researchers'). Do not mention fusion, splicing, experiments, breeding, genes, cards, printing, software or games. Use 'it' rather than the species name: the card already prints the name.";
+
+const fusionUsable = (line) =>
+  !!line &&
+  line.length >= 60 &&
+  line.length <= 520 &&
+  /[.!?]$/.test(line) &&
+  words(line) >= 8 &&
+  words(line) <= 90;
+
+function askGroq(env, messages, temperature) {
+  return fetch(GROQ, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${env.GROQ_KEY}` },
+    body: JSON.stringify({
+      model: "openai/gpt-oss-20b",
+      temperature,
+      /* the reasoning pass is billed against this, so leave it room */
+      max_tokens: 800,
+      reasoning_effort: "low",
+      messages,
+    }),
+  });
+}
+
 function originAllowed(origin) {
   if (ALLOWED_ORIGINS.has(origin)) return true;
   return /^https:\/\/pv-[a-z0-9-]+\.style\.dev$/.test(origin);
@@ -103,7 +131,9 @@ export default {
       return new Response(null, { status: allowed ? 204 : 403, headers: headers(allowed ? origin : "null") });
     }
     if (!allowed) return reply({ error: "origin not allowed" }, 403, "null");
-    if (url.pathname !== "/" && url.pathname !== "/lore") return reply({ error: "not found" }, 404, origin);
+    if (url.pathname !== "/" && url.pathname !== "/lore" && url.pathname !== "/fusion") {
+      return reply({ error: "not found" }, 404, origin);
+    }
     if (request.method !== "POST") return reply({ error: "use POST" }, 405, origin);
     if (!env.GROQ_KEY) return reply({ error: "proxy is missing its key" }, 503, origin);
 
@@ -121,6 +151,41 @@ export default {
       return reply({ error: "bad json" }, 400, origin);
     }
 
+    if (url.pathname === "/fusion") {
+      const raw = (value) => String(value || "").toUpperCase().replace(/[^A-Z .'-]/g, "").slice(0, 24);
+      const head = raw(body?.head);
+      const bodyHalf = raw(body?.body);
+      const fused = String(body?.name || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 16);
+      const entryA = String(body?.entryA || "").replace(/\s+/g, " ").trim().slice(0, 300);
+      const entryB = String(body?.entryB || "").replace(/\s+/g, " ").trim().slice(0, 300);
+      if (!head || !bodyHalf || fused.length < 3) return reply({ error: "bad fusion" }, 400, origin);
+      const types = (Array.isArray(body?.types) ? body.types : []).filter((t) => TYPES.has(t)).join(" / ");
+
+      const prompt =
+        `Fused creature: ${fused}. Its head half is ${head}, its body half is ${bodyHalf}. Types: ${types || "unknown"}.\n` +
+        `Entry written about ${head}: ${entryA || "none"}\n` +
+        `Entry written about ${bodyHalf}: ${entryB || "none"}\n` +
+        `Write the one Pokédex entry for ${fused}: combine both halves into a single animal, its body following the head half and its habits and build following the body half.`;
+
+      let upstream;
+      try {
+        upstream = await askGroq(
+          env,
+          [
+            { role: "system", content: FUSION_SYSTEM },
+            { role: "user", content: prompt },
+          ],
+          1.1,
+        );
+      } catch {
+        return reply({ error: "upstream unreachable" }, 502, origin);
+      }
+      if (!upstream.ok) return reply({ error: `upstream ${upstream.status}` }, 502, origin);
+      const line = clean((await upstream.json().catch(() => null))?.choices?.[0]?.message?.content);
+      if (fusionUsable(line)) return reply({ line }, 200, origin);
+      return reply({ error: "unusable entry" }, 422, origin);
+    }
+
     const name = String(body?.name || "").toUpperCase().replace(/[^A-Z0-9 '.-]/g, "").slice(0, 24);
     const tcg = TYPES.has(body?.tcg) ? body.tcg : "Colorless";
     if (name.length < 2) return reply({ error: "bad species" }, 400, origin);
@@ -130,19 +195,7 @@ export default {
       `Species: ${name}. Type: ${tcg}. The cause for this individual: ${angle}. ` +
       "Write its one-line Pokédex entry around that cause, ending on what it can do because of it. One sentence, no colour words.";
 
-    const ask = (messages) =>
-      fetch(GROQ, {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${env.GROQ_KEY}` },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-20b",
-          temperature: 1.25,
-          /* the reasoning pass is billed against this, so leave it room */
-          max_tokens: 800,
-          reasoning_effort: "low",
-          messages,
-        }),
-      });
+    const ask = (messages) => askGroq(env, messages, 1.25);
 
     let upstream;
     try {

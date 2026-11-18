@@ -232,6 +232,9 @@ export class KantoAudio {
       this.noiseBurst({ dur: 0.9, gain: 0.03, freq: 4800, freqEnd: 2600, q: 0.4, send: 0.6, delay: 0.08 });
     } else if (rarity === "chroma") {
       [1046, 1175, 1397, 1760].forEach((f, i) => bell(f, i, 0.04));
+    } else if (rarity === "fusion") {
+      [587, 784, 880, 1175, 1568].forEach((f, i) => bell(f, i, 0.045));
+      this.tone({ freq: 147, dur: 0.5, type: "triangle", gain: 0.04, send: 0.3 });
     }
   }
 

@@ -535,7 +535,67 @@ const SCENES = {
 
 const cache = new Map();
 
+/* A fusion card shows both halves' habitats, torn down a stepped seam and
+   stitched back together so the two scenes read as one picture. */
+function fusionBackground(card) {
+  const f = card.fusion;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  const halves = [
+    [card.tcg, f.head],
+    [f.tcgB || card.tcg, f.body],
+  ].map(([key, id]) => {
+    const set = SCENES[key] || SCENES.Colorless;
+    const variant = Math.abs(id) % set.length;
+    const c = document.createElement("canvas");
+    c.width = W;
+    c.height = H;
+    const cx = c.getContext("2d");
+    cx.imageSmoothingEnabled = false;
+    set[variant](cx, null, seedOf({ id }, variant + 7));
+    return c;
+  });
+  ctx.drawImage(halves[0], 0, 0);
+
+  const rnd = seedOf(card, 5);
+  const seam = [];
+  let x = W / 2 + (rnd() - 0.5) * 8;
+  for (let y = 0; y < H; y += 1) {
+    if (y % 3 === 0) x = Math.max(24, Math.min(W - 24, x + (rnd() - 0.5) * 3));
+    seam.push(Math.round(x));
+  }
+  for (let y = 0; y < H; y += 1) {
+    const sx = seam[y];
+    ctx.drawImage(halves[1], sx, y, W - sx, 1, sx, y, W - sx, 1);
+  }
+  /* stitches straddling the tear, so it reads as one mended picture */
+  for (let y = 1; y < H; y += 4) {
+    const sx = seam[y];
+    ctx.fillStyle = "rgba(24,18,38,0.7)";
+    ctx.fillRect(sx - 1, y, 3, 1);
+    ctx.fillStyle = "rgba(246,239,212,0.5)";
+    ctx.fillRect(sx, y - 1, 1, 1);
+  }
+  return canvas;
+}
+
 export function backgroundFor(card) {
+  if (card.fusion) {
+    const key = `fusion:${card.fusion.head}.${card.fusion.body}`;
+    if (cache.has(key)) return cache.get(key);
+    const canvas = fusionBackground(card);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "rgba(27, 22, 48, 0.35)";
+    ctx.fillRect(0, 0, W, 1);
+    ctx.fillRect(0, H - 1, W, 1);
+    ctx.fillRect(0, 0, 1, H);
+    ctx.fillRect(W - 1, 0, 1, H);
+    cache.set(key, canvas);
+    return canvas;
+  }
   const set = SCENES[card.tcg] || SCENES.Colorless;
   const variant = Math.abs(card.id) % set.length;
   const key = `${card.tcg || "Colorless"}:${variant}`;

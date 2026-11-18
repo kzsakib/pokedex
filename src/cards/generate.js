@@ -1,6 +1,7 @@
 /* Seeded pack generation: composition, stats, moves, effects, rarity. */
 import { makeRng, hashSeed } from "./rng.js";
 import { spriteVersionFor } from "./spriteVersions.js";
+import { fusionName } from "./fusions.js";
 
 const LEGEND_IDS = [144, 145, 146, 150, 151];
 
@@ -24,9 +25,9 @@ const TYPE_MAP = {
 
 import { hueLabel } from "./lore.js";
 
-export const RARITY_ORDER = { common: 0, uncommon: 1, rare: 2, holo: 3, chroma: 4, legend: 5 };
-export const RARITY_LABEL = { common: "COMMON", uncommon: "UNCOMMON", rare: "RARE", holo: "HOLO RARE", legend: "LEGEND", chroma: "CHROMA" };
-export const RARITY_MARK = { common: "●", uncommon: "◆", rare: "★", holo: "★", legend: "★" };
+export const RARITY_ORDER = { common: 0, uncommon: 1, rare: 2, holo: 3, chroma: 4, fusion: 5, legend: 6 };
+export const RARITY_LABEL = { common: "COMMON", uncommon: "UNCOMMON", rare: "RARE", holo: "HOLO RARE", legend: "LEGEND", chroma: "CHROMA", fusion: "FUSION" };
+export const RARITY_MARK = { common: "●", uncommon: "◆", rare: "★", holo: "★", legend: "★", fusion: "◆" };
 
 const MOVES = {
   Fire: ["EMBER", "FLAMETHROWER", "FIRE SPIN", "FIRE BLAST", "FIRE PUNCH", "SMOKESCREEN"],
@@ -114,7 +115,7 @@ function rollDamage(rng, cost, stage, rarity) {
   const base = { 1: [10, 20], 2: [20, 40], 3: [40, 60], 4: [60, 90] }[clamp(count, 1, 4)];
   let value = rng.int(base[0] / 10, base[1] / 10) * 10;
   if (stage === 2) value += 10;
-  if (rarity === "rare" || rarity === "holo" || rarity === "legend") value += 10;
+  if (rarity === "rare" || rarity === "holo" || rarity === "legend" || rarity === "fusion") value += 10;
   value = snap10(value);
   const roll = rng.random();
   if (roll < 0.12) return { damage: value, form: "none", display: "-" };
@@ -123,13 +124,14 @@ function rollDamage(rng, cost, stage, rarity) {
   return { damage: value, form: "fixed", display: String(value) };
 }
 
-function pickMoves(rng, pokemon, tcg, count, stage, rarity) {
-  const pools = [MOVES[tcg] || MOVES.Colorless, MOVES.Colorless];
+function pickMoves(rng, pokemon, tcg, count, stage, rarity, altTcg = null) {
+  /* a fusion draws from both halves' move pools, everything else from one */
+  const pools = [MOVES[tcg] || MOVES.Colorless, MOVES[altTcg] || MOVES.Colorless];
   const chosen = [];
   let guard = 0;
   while (chosen.length < count && guard < 40) {
     guard += 1;
-    const pool = rng.chance(0.7) ? pools[0] : pools[1];
+    const pool = altTcg ? rng.pick(pools) : rng.chance(0.7) ? pools[0] : pools[1];
     const name = rng.pick(pool);
     if (chosen.some((m) => m.name === name)) continue;
     const cost = rollCost(rng, tcg, stage, rarity);
@@ -221,8 +223,10 @@ function spreadFoils(rng, cards) {
     best === "legend" ? weightedInt(rng, [[3, 0.3], [4, 0.4], [5, 0.3]])
     : best === "holo" ? weightedInt(rng, [[2, 0.45], [3, 0.35], [4, 0.2]])
     : weightedInt(rng, [[1, 0.35], [2, 0.45], [3, 0.2]]);
-  let have = cards.filter((c) => c.finish !== "plain").length;
-  const order = [...cards].sort((a, b) => RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity]);
+  /* fusions already carry a foil plate of their own */
+  const printable = cards.filter((c) => c.rarity !== "fusion");
+  let have = printable.filter((c) => c.finish !== "plain").length;
+  const order = printable.sort((a, b) => RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity]);
   for (const card of order) {
     if (have >= target) break;
     if (card.finish !== "plain") continue;
@@ -272,6 +276,78 @@ function makeCard(rng, pokemon, rarity, shiny, opts = {}) {
   };
 }
 
+/* Head type leads, the body supplies the second: the fan game's own rule uses
+   the body's second type, falls back to its first, and steps aside when both
+   halves would collapse onto one type. */
+export function fusionTypes(head, body) {
+  const headRaw = head.types[0];
+  let bodyRaw = body.types[1] || body.types[0];
+  if (bodyRaw === headRaw) bodyRaw = body.types[0];
+  const tcg = TYPE_MAP[headRaw] || "Colorless";
+  let tcgB = TYPE_MAP[bodyRaw] || "Colorless";
+  if (tcgB === tcg) {
+    const alt = body.types.find((t) => TYPE_MAP[t] && TYPE_MAP[t] !== tcg);
+    tcgB = TYPE_MAP[alt] || (tcg === "Colorless" ? "Fighting" : "Colorless");
+  }
+  return { tcg, tcgB };
+}
+
+/* A fusion card: one head, one body, one spliced name, stats averaged and the
+   two halves' move pools merged. No chroma reroll and no full-art printing \u2014
+   the splice frame is the whole point of the card. */
+function makeFusionCard(rng, entry, data) {
+  const head = data.find((m) => m.id === entry.head);
+  const body = data.find((m) => m.id === entry.body);
+  if (!head || !body) return null;
+  const { tcg, tcgB } = fusionTypes(head, body);
+  const stage = 2;
+  const level = rng.int(40, 62);
+  const hp = clamp(snap10(30 + (head.stats.hp + body.stats.hp) * 0.3 + rng.int(-10, 20)), 60, 150);
+  const moves = pickMoves(rng, body, tcg, 2, stage, "fusion", tcgB);
+  const weakness = rollWeakness(rng, tcg);
+  const resistance = rollResistance(rng, tcg, weakness);
+  const retreat = clamp(
+    Math.round((retreatFor(head, "fusion", rng) + retreatFor(body, "fusion", rng)) / 2),
+    0,
+    4,
+  );
+  const finish = rollFinish(rng, [
+    ["prism", 0.2], ["gold", 0.16], ["star", 0.14], ["crystal", 0.12],
+    ["lightning", 0.12], ["aurora", 0.14], ["grid", 0.12],
+  ]);
+  return {
+    id: head.id * 1000 + body.id,
+    name: fusionName(head.name, body.name),
+    tcg,
+    stage,
+    level,
+    hp,
+    rarity: "fusion",
+    shiny: false,
+    finish,
+    moves,
+    weakness,
+    resistance,
+    retreat,
+    height: Math.round(((head.height + body.height) / 2) * 10) / 10,
+    weight: Math.round((head.weight + body.weight) * 10) / 10,
+    genus: head.genus || "SPLICE",
+    fusion: {
+      head: head.id,
+      body: body.id,
+      headName: head.name,
+      bodyName: body.name,
+      tcgB,
+      artist: entry.artist || "",
+      entryA: head.flavour || "",
+      entryB: body.flavour || "",
+    },
+    entry: "",
+    sprite: null,
+    seed: rng.seedCode || "",
+  };
+}
+
 /** Generate an ordered pack (reveal order: weakest first). */
 export function generatePack(data, seed, options = {}) {
   const rng = makeRng(seed);
@@ -306,8 +382,8 @@ export function generatePack(data, seed, options = {}) {
 
   if (force === "shiny") slots[slots.length - 1].forceShiny = true;
 
-  /* two of the five slots are chroma forms: same pokemon, re-rolled palette */
-  const cards = slots.map((slot, index) => {
+  /* two of the five regular slots are chroma forms: same pokemon, re-rolled palette */
+  const regular = slots.map((slot, index) => {
     const shiny = slot.forceShiny || rng.chance(1 / 40);
     const chroma = index < 2 ? randomVariant(rng) : null;
     const card = makeCard(rng, slot.mon, chroma ? "chroma" : slot.rarity, shiny, { tcg: chroma ? chroma.tcg : undefined, slot: index });
@@ -326,14 +402,39 @@ export function generatePack(data, seed, options = {}) {
     return card;
   });
 
-  spreadFoils(rng, cards);
-  cards.sort((a, b) => {
+  /* two fusion slots: a kanto head spliced onto an unrelated kanto body, two
+     different pairs per pack */
+  const fusions = Array.isArray(options.fusions) ? options.fusions : [];
+  const pairs = new Set();
+  for (let i = 0; i < 2 && fusions.length > 0; i += 1) {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const entry = rng.pick(fusions);
+      if (!entry || pairs.has(`${entry.head}.${entry.body}`)) continue;
+      const card = makeFusionCard(rng, entry, data);
+      if (!card) continue;
+      pairs.add(`${entry.head}.${entry.body}`);
+      card.slot = regular.length;
+      regular.push(card);
+      break;
+    }
+  }
+
+  /* the forced printing lands on the best regular card, never on a fusion */
+  if (force === "full" || force === "ex") {
+    const top = regular.reduce(
+      (acc, card) => (RARITY_ORDER[card.rarity] > RARITY_ORDER[acc.rarity] ? card : acc),
+      regular[0],
+    );
+    if (top && top.rarity !== "fusion") top.special = force;
+  }
+
+  spreadFoils(rng, regular);
+  const cards = regular.sort((a, b) => {
     const r = RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity];
     if (r !== 0) return r;
     if (a.shiny !== b.shiny) return a.shiny ? -1 : 1;
     return a.slot - b.slot;
   });
-  if (force === "full" || force === "ex") cards[cards.length - 1].special = force;
   const best = cards.reduce((acc, card) => (RARITY_ORDER[card.rarity] > RARITY_ORDER[acc] ? card.rarity : acc), "common");
   return { seed, cards, best, hash: hashSeed(seed) };
 }

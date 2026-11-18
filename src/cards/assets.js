@@ -33,7 +33,7 @@ function loadImage(url) {
   });
 }
 
-function trim(img) {
+function trim(img, max = 54) {
   const canvas = document.createElement("canvas");
   canvas.width = img.width;
   canvas.height = img.height;
@@ -58,7 +58,7 @@ function trim(img) {
   const bw = maxX - minX + 1;
   const bh = maxY - minY + 1;
   /* shrink oversized sprites proportionally instead of cropping their edges */
-  const s = Math.min(1, 54 / bw, 54 / bh);
+  const s = Math.min(1, max / bw, max / bh);
   const w = Math.max(1, Math.round(bw * s));
   const h = Math.max(1, Math.round(bh * s));
   const out = document.createElement("canvas");
@@ -246,7 +246,22 @@ export async function chromaSprite(id, variant, version = null) {
   return out;
 }
 
+/* Fusion sprites are the community's 288x288 battlers, vendored under
+   cards/fusions/. They trim and scale like every other sprite. */
+const fusionCache = new Map();
+
+export async function loadFusionSprite(head, body) {
+  const key = `${head}.${body}`;
+  if (fusionCache.has(key)) return fusionCache.get(key);
+  /* the community art is 288px: keep more of it than the Game Boy printings,
+     which are only 40-54px before the card scales them up */
+  const sprite = trim(await loadImage(`${BASE}cards/fusions/${key}.png`), 96);
+  fusionCache.set(key, sprite);
+  return sprite;
+}
+
 export async function spriteFor(card) {
+  if (card.fusion) return loadFusionSprite(card.fusion.head, card.fusion.body);
   const version = card.sprite || null;
   if (card.variant) return chromaSprite(card.id, card.variant, version);
   return card.shiny ? loadShiny(card.id, version) : loadSprite(card.id, version);
