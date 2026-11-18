@@ -73,18 +73,30 @@ const usable = (line) =>
   !COLOUR.test(line);
 
 
-/* ---- fusion entries: two species' dex lines go in, one entry comes out ---- */
+/* ---- fusion entries: two species' dex lines go in, one short line comes out ---- */
 const FUSION_SYSTEM =
-  "You write Pokédex entries for a fan monster-catching game. Two creatures have been spliced into one and you are given the flavour text of both halves plus the new creature's name. Reply with the entry only: one or two grammatical sentences, 30 to 60 words, in-world and matter-of-fact.\n\n" +
-  "Give the creature one body and one life: its head and front follow the first half, its build, habits and temper follow the second. Blend what each entry says into behaviour you can watch — a hunt, a shelter, a season, a habit, a way of moving. Do not list both halves' facts side by side and do not explain how the creature was made. Start on the creature itself, never on an observer (no 'Observed', 'Field notes', 'Researchers'). Do not mention fusion, splicing, experiments, breeding, genes, cards, printing, software or games. Use 'it' rather than the species name: the card already prints the name.";
+  "You write Pokédex entries for a fan monster-catching game. Two creatures have been spliced into one and you are given the flavour text of both halves. Reply with the entry only: ONE grammatical sentence of 14 to 22 words, in-world and matter-of-fact.\n\n" +
+  "Give the creature one body and one life: its head and front follow the first half, its build, habits and temper follow the second. Take one habit from each half and fuse them into something you can watch — a hunt, a shelter, a season, a way of moving. Do not list the halves' facts side by side and do not explain how the creature was made. Start on the creature itself, never on an observer (no 'Observed', 'Field notes', 'Researchers'). The card already prints the creature's name and its types, so never write either: no names and no type words (fire, water, psychic, fighting and so on), only 'it'. Never mention fusion, splicing, experiments, breeding, genes, cards, printing, software or games.";
 
-const fusionUsable = (line) =>
-  !!line &&
-  line.length >= 60 &&
-  line.length <= 520 &&
-  /[.!?]$/.test(line) &&
-  words(line) >= 8 &&
-  words(line) <= 90;
+const TYPE_WORD =
+  /\b(fire|water|grass|lightning|electric|psychic|fighting|colorless|normal|flying|poison|ground|rock|bug|ghost|dragon|ice|steel|dark|fairy|type|types)\b/i;
+
+const flatName = (value) => String(value || "").toUpperCase().replace(/[^A-Z]/g, "");
+
+/* One sentence, short enough for the strip under the card, with neither the
+   creature's name nor a type word in it. */
+const fusionUsable = (line, banned = []) => {
+  if (!line) return false;
+  const text = String(line).trim();
+  if (text.length < 50 || text.length > 220) return false;
+  if (!/[.!?]$/.test(text)) return false;
+  if (/[.!?]\s+[A-Z(]/.test(text.slice(0, -1))) return false;
+  const n = words(text);
+  if (n < 10 || n > 28) return false;
+  if (TYPE_WORD.test(text)) return false;
+  const flat = flatName(text);
+  return !banned.some((name) => name && flat.includes(name));
+};
 
 function askGroq(env, messages, temperature) {
   return fetch(GROQ, {
@@ -160,12 +172,15 @@ export default {
       const entryB = String(body?.entryB || "").replace(/\s+/g, " ").trim().slice(0, 300);
       if (!head || !bodyHalf || fused.length < 3) return reply({ error: "bad fusion" }, 400, origin);
       const types = (Array.isArray(body?.types) ? body.types : []).filter((t) => TYPES.has(t)).join(" / ");
+      const banned = [fused, head, bodyHalf]
+        .map((value) => flatName(value).slice(0, 5))
+        .filter((value) => value.length >= 3);
 
       const prompt =
         `Fused creature: ${fused}. Its head half is ${head}, its body half is ${bodyHalf}. Types: ${types || "unknown"}.\n` +
         `Entry written about ${head}: ${entryA || "none"}\n` +
         `Entry written about ${bodyHalf}: ${entryB || "none"}\n` +
-        `Write the one Pokédex entry for ${fused}: combine both halves into a single animal, its body following the head half and its habits and build following the body half.`;
+        `Write the single Pokédex sentence for ${fused}: combine both halves into one animal, its body following the head half and its habits and build following the body half. Do not use any of those three names or any type word in the entry.`;
 
       let upstream;
       try {
@@ -182,7 +197,7 @@ export default {
       }
       if (!upstream.ok) return reply({ error: `upstream ${upstream.status}` }, 502, origin);
       const line = clean((await upstream.json().catch(() => null))?.choices?.[0]?.message?.content);
-      if (fusionUsable(line)) return reply({ line }, 200, origin);
+      if (fusionUsable(line, banned)) return reply({ line }, 200, origin);
       return reply({ error: "unusable entry" }, 422, origin);
     }
 

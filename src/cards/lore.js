@@ -183,33 +183,72 @@ export async function chromaLore(card, timeoutMs = 7000) {
 }
 
 /* ---------- fusion entries ----------
-   Two species' dex lines go in, one creature's entry comes out. */
+   Both halves' dex lines go in; one short line comes out. The card prints the
+   name and both type discs already, so the entry repeats neither, and it stays
+   a single sentence so it fits the strip under the card. */
 
 const bare = (s) => String(s || "").replace(/\s+/g, " ").trim().replace(/[.!?]+$/, "");
 
-const goodEntry = (line) => {
-  if (!line || line.length < 60 || line.length > 520) return false;
-  if (!/[.!?]$/.test(line)) return false;
-  const n = words(line);
-  return n >= 8 && n <= 90;
+const TYPE_WORD =
+  /\b(fire|water|grass|lightning|electric|psychic|fighting|colorless|normal|flying|poison|ground|rock|bug|ghost|dragon|ice|steel|dark|fairy|type|types)\b/i;
+
+const nameLetters = (value) => String(value || "").toUpperCase().replace(/[^A-Z]/g, "");
+
+/* catches the creature's name and either half's name, however it is spaced */
+function repeatsName(line, card) {
+  const flat = nameLetters(line);
+  const f = card.fusion || {};
+  return [card.name, f.headName, f.bodyName]
+    .map(nameLetters)
+    .filter((n) => n.length >= 3)
+    .some((n) => flat.includes(n.slice(0, 5)));
+}
+
+/* a finished sentence with no second one hiding in the middle */
+const oneSentence = (line) => {
+  const text = String(line || "").trim();
+  if (!/[.!?]$/.test(text)) return false;
+  return !/[.!?]\s+[A-Z(]/.test(text.slice(0, -1));
 };
 
-/* the join keeps each source entry intact, so the combined line stays honest */
-const FUSION_TEMPLATES = [
-  (n, a, b) => `${n} has two lineages in one body. ${a}. ${b}.`,
-  (n, a, b) => `${n} keeps both halves' habits and gives up neither. ${a}. ${b}.`,
-  (n, a, b) => `${n} lives as if both halves must be satisfied at once. ${a}. ${b}.`,
-];
+const goodEntry = (line, card) => {
+  if (!line) return false;
+  const text = String(line).replace(/\s+/g, " ").trim();
+  const n = words(text);
+  if (text.length < 50 || text.length > 220) return false;
+  if (n < 10 || n > 28) return false;
+  if (!oneSentence(text)) return false;
+  if (TYPE_WORD.test(text)) return false;
+  return !(card && repeatsName(text, card));
+};
+
+/* Offline writer: each half lends one short clause, joined as a single
+   sentence so the line reads as one creature, not two dex pages. */
+const shortClause = (source, max = 11) => {
+  const text = bare(source).replace(/\bPOK[eé]MON\b/gi, "creature");
+  if (!text) return "";
+  const sentence = text.split(/[.;:!?]/)[0].trim();
+  if (!sentence) return "";
+  /* the first comma clause is the short one, unless it drops the subject */
+  const bits = sentence.split(",");
+  let clause = bits[0].trim();
+  if (clause.split(/\s+/).filter(Boolean).length < 4 && bits.length > 1) clause = sentence;
+  const parts = clause.split(/\s+/).filter(Boolean);
+  clause = parts.length <= max ? clause : parts.slice(0, max).join(" ");
+  return clause.replace(/[,;:\-]+$/, "").trim();
+};
+
+const lowerFirst = (text) => (text ? text[0].toLowerCase() + text.slice(1) : text);
+const upperFirst = (text) => (text ? text[0].toUpperCase() + text.slice(1) : text);
 
 export function fusionFallback(card) {
   const f = card.fusion || {};
-  const a = bare(f.entryA);
-  const b = bare(f.entryB);
-  const name = card.name || "It";
-  if (!a && !b) return `${name} keeps to cover no other creature uses, and answers to a call only its own two halves make.`;
-  if (!a) return `${name} carries one line's habits onto ground the other half never walked. ${b}.`;
-  if (!b) return `${name} does first what its head half learned first. ${a}.`;
-  return FUSION_TEMPLATES[Math.abs(card.id || 0) % FUSION_TEMPLATES.length](name, a, b);
+  const a = shortClause(f.entryA);
+  const b = shortClause(f.entryB);
+  if (!a && !b) return "It keeps to cover no other creature uses and answers a call only its own two halves make.";
+  if (!a) return `${upperFirst(b)}.`;
+  if (!b) return `${upperFirst(a)}.`;
+  return `${upperFirst(a)}; ${lowerFirst(b)}.`;
 }
 
 async function fusionFromProxy(card, timeoutMs) {
@@ -233,7 +272,7 @@ async function fusionFromProxy(card, timeoutMs) {
     if (!res.ok) throw new Error(`proxy ${res.status}`);
     const json = await res.json();
     const line = String(json?.line || "").trim();
-    return goodEntry(line) ? line : null;
+    return goodEntry(line, card) ? line : null;
   } finally {
     clearTimeout(timer);
   }

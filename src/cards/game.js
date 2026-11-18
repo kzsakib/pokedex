@@ -510,16 +510,48 @@ export class KantoPacksGame {
       this.typeTimer = null;
     }
     if (this.entryEl) this.entryEl.textContent = "";
+    this.fit = null;
+  }
+
+  /* The entry line lives over the bottom of the stage, so the card is fitted
+     into the space above it instead of being printed through the text. */
+  measureFit(base = 2) {
+    const scene = this.scene;
+    if (!scene || !this.entryEl) return { scale: base, y: 12 };
+    const canvasRect = scene.canvas.getBoundingClientRect();
+    const entryRect = this.entryEl.getBoundingClientRect();
+    if (!canvasRect.height) return { scale: base, y: 12 };
+    const px = canvasRect.height / (scene.H || 560) || 1;
+    const topPad = 18;
+    const gap = 14;
+    /* where the entry starts, measured from the top of the canvas */
+    const limit = (entryRect.top - canvasRect.top) / px - gap;
+    const avail = Math.min(scene.H - topPad, limit) - topPad;
+    if (avail < 150) return { scale: base, y: 12 };
+    const scale = Math.min(base, avail / 224);
+    return { scale, y: scene.H / 2 - topPad - avail / 2 };
   }
 
   typeEntry(text, card) {
     if (!this.entryEl) return;
     if (this.typeTimer) clearInterval(this.typeTimer);
     const full = String(text || "").replace(/\s+/g, " ").trim();
-    this.entryEl.textContent = "";
     this.entryEl.classList.toggle("kp-entry--chroma", !!(card && card.variant));
     this.entryEl.classList.toggle("kp-entry--splice", !!(card && card.fusion));
-    if (!full) return;
+    this.entryEl.textContent = "";
+    if (!full) {
+      this.fit = null;
+      return;
+    }
+    /* measure the finished line first, so the card is sized once for the whole
+       entry instead of shrinking as the text types in */
+    this.entryEl.textContent = full;
+    this.fit = this.measureFit(this.phase === "summary" ? 1.7 : 2);
+    this.entryEl.textContent = "";
+    if (this.focusIndex >= 0 && this.meshes[this.focusIndex]?.summaryTarget) {
+      const focused = this.meshes[this.focusIndex];
+      focused.summaryTarget = { ...focused.summaryTarget, y: this.fit.y, scale: this.fit.scale };
+    }
     let i = 0;
     this.typeTimer = setInterval(() => {
       i += 1;
@@ -1008,11 +1040,13 @@ export class KantoPacksGame {
     if (i < 0 || !this.meshes[i]) return;
     this.focusIndex = i;
     this.audio.click();
+    const fit = this.measureFit(1.7);
+    this.fit = fit;
     this.meshes.forEach((mesh, j) => {
       mesh.group.visible = true;
       mesh.summaryTarget =
         j === i
-          ? { x: 0, y: 12, scale: this.scene.portrait ? 1.65 : 1.7 }
+          ? { x: 0, y: fit.y, scale: fit.scale }
           : { x: 0, y: 0, scale: 0.001 };
     });
     this.showCaption(this.cards[i]);
@@ -1023,6 +1057,7 @@ export class KantoPacksGame {
   unfocusCard() {
     if (this.focusIndex < 0) return;
     this.focusIndex = -1;
+    this.clearEntry();
     this.el.caption.classList.remove("kp-show");
     this.layoutSummary();
     this.hint(this.scene.portrait ? "tap a card to enlarge · drag to browse" : "tap a card to enlarge it");
@@ -1372,12 +1407,13 @@ export class KantoPacksGame {
         }
         mesh.group.visible = i === this.revealIndex;
         const offset = i - this.revealIndex;
-        const targetScale = i === this.revealIndex ? 2 : 1;
+        const fit =
+          i === this.revealIndex ? this.fit || { scale: 2, y: 12 } : { scale: 1, y: 0 };
         mesh.group.position.lerp(
-          new THREE.Vector3(offset * 2, -offset * 3, 70 + offset * -4),
+          new THREE.Vector3(offset * 2, fit.y - offset * 3, 70 + offset * -4),
           0.14
         );
-        mesh.group.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.16);
+        mesh.group.scale.lerp(new THREE.Vector3(fit.scale, fit.scale, fit.scale), 0.16);
         if (i === this.revealIndex) {
           mesh.setFlipWithTilt(1 - this.flip, this.tilt.x, this.tilt.y);
         } else {
