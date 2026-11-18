@@ -11,7 +11,7 @@ function empty() {
 function snapshot(card) {
   return {
     id: card.id, name: card.name, genus: card.genus, tcg: card.tcg, stage: card.stage,
-    level: card.level, hp: card.hp, rarity: card.rarity, shiny: card.shiny,
+    level: card.level, hp: card.hp, rarity: card.rarity, shiny: card.shiny, sprite: card.sprite,
     moves: card.moves, weakness: card.weakness, resistance: card.resistance,
     retreat: card.retreat, height: card.height, weight: card.weight, finish: card.finish,
     flavour: card.flavour || "",

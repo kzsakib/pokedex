@@ -17,7 +17,12 @@ export function loadGen1() {
   return dataPromise;
 }
 
-const spriteUrl = (id) => `${BASE}cards/sprites/${String(id).padStart(3, "0")}.png`;
+/* `version` is one of the vendored printings (cards/sprites/<version>/);
+   without one the default printing in cards/sprites/ is used. */
+const spriteUrl = (id, version) =>
+  version
+    ? `${BASE}cards/sprites/${version}/${String(id).padStart(3, "0")}.png`
+    : `${BASE}cards/sprites/${String(id).padStart(3, "0")}.png`;
 
 function loadImage(url) {
   return new Promise((resolve, reject) => {
@@ -113,19 +118,27 @@ function shinyFrom(sprite) {
   return canvas;
 }
 
-export async function loadSprite(id) {
-  if (spriteCache.has(id)) return spriteCache.get(id);
-  const img = await loadImage(spriteUrl(id));
-  const sprite = trim(img);
-  spriteCache.set(id, sprite);
+export async function loadSprite(id, version = null) {
+  const key = `${version || "base"}:${id}`;
+  if (spriteCache.has(key)) return spriteCache.get(key);
+  let sprite;
+  try {
+    sprite = trim(await loadImage(spriteUrl(id, version)));
+  } catch (error) {
+    /* a printing that never shipped for this species falls back to the default */
+    if (!version) throw error;
+    return loadSprite(id);
+  }
+  spriteCache.set(key, sprite);
   return sprite;
 }
 
-export async function loadShiny(id) {
-  if (shinyCache.has(id)) return shinyCache.get(id);
-  const base = await loadSprite(id);
+export async function loadShiny(id, version = null) {
+  const key = `${version || "base"}:${id}`;
+  if (shinyCache.has(key)) return shinyCache.get(key);
+  const base = await loadSprite(id, version);
   const shiny = shinyFrom(base);
-  shinyCache.set(id, shiny);
+  shinyCache.set(key, shiny);
   return shiny;
 }
 
@@ -243,16 +256,17 @@ function recolorSprite(base, variant) {
 
 const chromaCache = new Map();
 
-export async function chromaSprite(id, variant) {
-  const key = `${id}:${variant.key}`;
+export async function chromaSprite(id, variant, version = null) {
+  const key = `${version || "base"}:${id}:${variant.key}`;
   if (chromaCache.has(key)) return chromaCache.get(key);
-  const base = await loadSprite(id);
+  const base = await loadSprite(id, version);
   const out = recolorSprite(base, variant);
   chromaCache.set(key, out);
   return out;
 }
 
 export async function spriteFor(card) {
-  if (card.variant) return chromaSprite(card.id, card.variant);
-  return card.shiny ? loadShiny(card.id) : loadSprite(card.id);
+  const version = card.sprite || null;
+  if (card.variant) return chromaSprite(card.id, card.variant, version);
+  return card.shiny ? loadShiny(card.id, version) : loadSprite(card.id, version);
 }

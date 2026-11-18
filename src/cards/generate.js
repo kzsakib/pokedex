@@ -1,5 +1,6 @@
 /* Seeded pack generation: composition, stats, moves, effects, rarity. */
 import { makeRng, hashSeed } from "./rng.js";
+import { spriteVersionFor } from "./spriteVersions.js";
 
 const LEGEND_IDS = [144, 145, 146, 150, 151];
 
@@ -242,6 +243,8 @@ function makeCard(rng, pokemon, rarity, shiny, opts = {}) {
   const weakness = rollWeakness(rng, tcg);
   const resistance = rollResistance(rng, tcg, weakness);
   const retreat = retreatFor(pokemon, rarity, rng);
+  /* which era's front sprite this printing carries */
+  const sprite = spriteVersionFor(rng.seedCode || "", pokemon.id, opts.slot || 0);
   const finish = shiny
     ? "shiny"
     : rarity === "legend"
@@ -259,6 +262,7 @@ function makeCard(rng, pokemon, rarity, shiny, opts = {}) {
     hp,
     rarity,
     shiny,
+    sprite,
     moves,
     weakness,
     resistance,
@@ -306,7 +310,7 @@ export function generatePack(data, seed, options = {}) {
   const cards = slots.map((slot, index) => {
     const shiny = slot.forceShiny || rng.chance(1 / 40);
     const chroma = index < 2 ? randomVariant(rng) : null;
-    const card = makeCard(rng, slot.mon, chroma ? "chroma" : slot.rarity, shiny, chroma ? { tcg: chroma.tcg } : {});
+    const card = makeCard(rng, slot.mon, chroma ? "chroma" : slot.rarity, shiny, { tcg: chroma ? chroma.tcg : undefined, slot: index });
     if (chroma) {
       card.variant = { ...chroma }; /* the hue map rides along: the sprite needs it */
       card.finish = rollFinish(rng, PREMIUM);
