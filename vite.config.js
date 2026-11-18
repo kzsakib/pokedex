@@ -13,4 +13,11 @@ export default defineConfig({
     // The cloud preview arrives through a tunnel hostname, set per process.
     allowedHosts: process.env.PREVIEW_HOST ? [process.env.PREVIEW_HOST] : [],
   },
+  // `vite preview` serves the production build on the same port for timing runs.
+  preview: {
+    host: "0.0.0.0",
+    port: 3000,
+    strictPort: true,
+    allowedHosts: process.env.PREVIEW_HOST ? [process.env.PREVIEW_HOST] : [],
+  },
 });

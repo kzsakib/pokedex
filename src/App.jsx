@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import {
   ENTRY_LIMIT,
@@ -38,7 +38,9 @@ import ShinyText from "./components/ShinyText";
 import EvolutionTray from "./EvolutionTray";
 import SpecimenScreen from "./SpecimenScreen";
 import TeamBuilder from "./team/TeamBuilder";
-import KantoPacks from "./cards/KantoPacks";
+/* The packs bench drags three.js (~600 kB) in with it, so it loads as its own
+   chunk instead of sitting in the entry bundle. */
+const KantoPacks = lazy(() => import("./cards/KantoPacks"));
 
 const LEDE =
   "A field instrument for the original 151. Search the field archive, load a specimen record, switch between Pokédex entries by game, and trace the evolution line. Every reading below streams live from PokéAPI.";
@@ -853,7 +855,15 @@ export default function App() {
         </section>
 
 
-        <KantoPacks />
+        <Suspense
+          fallback={
+            <section className="bay kp-section" aria-hidden="true">
+              <div className="kp-stage" />
+            </section>
+          }
+        >
+          <KantoPacks />
+        </Suspense>
 
         <footer className="bay closing">
           <div>

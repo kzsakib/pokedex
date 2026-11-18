@@ -4,7 +4,7 @@ import { PixelScene } from "./scene.js";
 import { createPack } from "./pack3d.js";
 import { createCardMesh } from "./cards3d.js";
 import { makeHoloMask } from "./holo.js";
-import { loadGen1, preloadSprites, loadSprite, spriteFor } from "./assets.js";
+import { loadGen1, loadSprite, spriteFor } from "./assets.js";
 import { generatePack, RARITY_LABEL } from "./generate.js";
 import { chromaLore } from "./lore.js";
 import { cardSpriteLayout, renderCard } from "./cardRenderer.js";
@@ -66,6 +66,16 @@ export class KantoPacksGame {
     this.boot();
     this.onResize = () => this.scene.resize();
     window.addEventListener("resize", this.onResize);
+    /* Only draw while the bench is on screen. The loop used to push a WebGL
+       frame every 16 ms even with the section scrolled far out of view. */
+    this.onScreen = true;
+    this.viewport = new IntersectionObserver(
+      ([entry]) => {
+        this.onScreen = entry.isIntersecting;
+      },
+      { rootMargin: "160px" },
+    );
+    this.viewport.observe(container);
     this.raf = requestAnimationFrame(this.loop);
   }
 
@@ -92,14 +102,13 @@ export class KantoPacksGame {
     this.container.classList.add("kp-loading");
     this.drawLoaderBall();
     this.loaderText("BOOTING THE REGISTRY");
-    const minBoot = new Promise((resolve) => setTimeout(resolve, 900));
+    /* short enough to feel alive, long enough that the loader never flashes */
+    const minBoot = new Promise((resolve) => setTimeout(resolve, 550));
+    /* Sprites are fetched per card as the pack is built: preloading all 151
+       up front cost 151 requests before the first sleeve could be touched. */
     this.data = await loadGen1();
-    this.loaderText("LOADING SPRITES");
-    await preloadSprites((done) => {
-      const pct = Math.min(100, Math.round((done / 151) * 100));
-      this.loaderProgress(pct);
-      if (done % 25 === 0) this.hint(`loading sprites… ${pct}%`);
-    });
+    this.loaderText("PRINTING THE SET");
+    this.loaderProgress(100);
     await minBoot;
     this.container.classList.remove("kp-loading");
     this.resetLoader();
@@ -1206,6 +1215,7 @@ export class KantoPacksGame {
 
   loop = () => {
     this.raf = requestAnimationFrame(this.loop);
+    if (!this.onScreen || document.hidden) return;
     this.frame();
   };
 
@@ -1400,6 +1410,7 @@ export class KantoPacksGame {
 
   destroy() {
     cancelAnimationFrame(this.raf);
+    this.viewport?.disconnect();
     window.removeEventListener("resize", this.onResize);
     this.clearScene();
     this.scene.dispose();

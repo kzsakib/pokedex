@@ -10,6 +10,9 @@
       content="An industrial field-unit Pokédex for the original 151 Pokémon. Search the index, read base stats, and trace evolution lines. Every reading streams live from PokéAPI."
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- the registry reads live from PokéAPI, sprites from the PokeAPI repo -->
+    <link rel="preconnect" href="https://pokeapi.co" crossorigin />
+    <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin />
   </head>
   <body>
     <div id="root"></div>

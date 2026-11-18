@@ -142,25 +142,6 @@ export async function loadShiny(id, version = null) {
   return shiny;
 }
 
-export async function preloadSprites(onProgress) {
-  const ids = Array.from({ length: 151 }, (_, i) => i + 1);
-  let done = 0;
-  const queue = ids.slice();
-  async function worker() {
-    while (queue.length) {
-      const id = queue.shift();
-      try {
-        await loadSprite(id);
-      } catch {
-        /* a missing sprite should not block the pack */
-      }
-      done += 1;
-      if (onProgress) onProgress(done, ids.length);
-    }
-  }
-  await Promise.all(Array.from({ length: 8 }, worker));
-}
-
 function hslToRgb(h, s, l) {
   const c = (1 - Math.abs(2 * l - 1)) * s;
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
