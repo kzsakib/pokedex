@@ -67,6 +67,10 @@ export function bodyPart(name) {
     if (best === null || Math.abs(i - target) < Math.abs(best - target)) best = i;
   }
   if (best === null) best = Math.max(2, Math.min(hi, target));
+  /* step off a doubled letter so the splice does not read as a typo */
+  while (best < hi && n[best] === n[best + 1]) best += 1;
+  /* never leave a tail shorter than three letters */
+  best = Math.min(best, n.length - 3);
   /* keep the ending, never the middle: five head letters plus six tail letters
      is the most the name line can print at 2x */
   return n.slice(best).slice(-6);
