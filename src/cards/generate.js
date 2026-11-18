@@ -406,13 +406,19 @@ export function generatePack(data, seed, options = {}) {
      different pairs per pack */
   const fusions = Array.isArray(options.fusions) ? options.fusions : [];
   const pairs = new Set();
+  const heads = new Set();
+  const bodies = new Set();
   for (let i = 0; i < 2 && fusions.length > 0; i += 1) {
-    for (let attempt = 0; attempt < 40; attempt += 1) {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
       const entry = rng.pick(fusions);
       if (!entry || pairs.has(`${entry.head}.${entry.body}`)) continue;
+      /* two fusions in one pack never share a half: that read as a duplicate */
+      if (heads.has(entry.head) || bodies.has(entry.body)) continue;
       const card = makeFusionCard(rng, entry, data);
       if (!card) continue;
       pairs.add(`${entry.head}.${entry.body}`);
+      heads.add(entry.head);
+      bodies.add(entry.body);
       card.slot = regular.length;
       regular.push(card);
       break;
