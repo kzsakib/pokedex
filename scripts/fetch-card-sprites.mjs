@@ -18,7 +18,7 @@ import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 
 const RAW = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
-const OUT = path.resolve("public/cards/sprites");
+const OUT = path.resolve(process.env.SPRITE_OUT || "public/cards/sprites");
 
 export const VERSIONS = [
   ["rg", "generation-i/red-green-japan"],
@@ -38,28 +38,35 @@ export const VERSIONS = [
 
 const NEAR_WHITE = 246;
 
+/* The plate is white but the sprite itself can reach a corner (Golbat's Gold
+   sprite has its black outline in pixel 0), so the fill is seeded from every
+   border pixel rather than a single corner probe. */
 function keyOutWhite(canvas) {
   const ctx = canvas.getContext("2d");
   const { width, height } = canvas;
+  if (width === 0 || height === 0) return canvas;
   const image = ctx.getImageData(0, 0, width, height);
   const d = image.data;
-  const white = (i) => d[i] > NEAR_WHITE && d[i + 1] > NEAR_WHITE && d[i + 2] > NEAR_WHITE;
-  if (width === 0 || height === 0) return canvas;
-  if (!white(0)) return canvas; /* already transparent or a full-bleed plate */
+  const plate = (p) => {
+    const i = p * 4;
+    return d[i + 3] !== 0 && d[i] > NEAR_WHITE && d[i + 1] > NEAR_WHITE && d[i + 2] > NEAR_WHITE;
+  };
   const seen = new Uint8Array(width * height);
   const queue = [];
   const push = (x, y) => {
     const p = y * width + x;
     if (seen[p]) return;
     seen[p] = 1;
-    if (!white(p * 4)) return;
+    if (!plate(p)) return;
     queue.push(p);
   };
   for (let x = 0; x < width; x += 1) { push(x, 0); push(x, height - 1); }
   for (let y = 0; y < height; y += 1) { push(0, y); push(width - 1, y); }
+  let cleared = 0;
   while (queue.length) {
     const p = queue.pop();
     d[p * 4 + 3] = 0;
+    cleared += 1;
     const x = p % width;
     const y = (p - x) / width;
     if (x > 0) push(x - 1, y);
@@ -67,7 +74,7 @@ function keyOutWhite(canvas) {
     if (y > 0) push(x, y - 1);
     if (y < height - 1) push(x, y + 1);
   }
-  ctx.putImageData(image, 0, 0);
+  if (cleared) ctx.putImageData(image, 0, 0);
   return canvas;
 }
 
