@@ -96,6 +96,9 @@ export default function TeamBuilder({ roster = [] }) {
   rosterRef.current = roster;
 
   const [state, setState] = useState(EMPTY);
+  /* Nothing of the game is fetched until the player presses start: no engine,
+     no overworld sprites, no catch rates. The bay is a poster until then. */
+  const [started, setStarted] = useState(false);
   const [flights, setFlights] = useState([]);
   const [landed, setLanded] = useState(null);
   const [revealed, setRevealed] = useState(false);
@@ -168,19 +171,21 @@ export default function TeamBuilder({ roster = [] }) {
     ]);
   };
 
+  /* The engine, the sprites and the species lookups all hang off this
+     effect, and it does not run until the start plate has been pressed. */
   useEffect(() => {
+    if (!started) return undefined;
     const host = hostRef.current;
     if (!host) return undefined;
 
     let arena = null;
     let poll = 0;
-    let observer = null;
     let parker = null;
 
-    const start = () => {
+    const boot = () => {
       if (arena) return true;
       if (rosterRef.current.length < 3) {
-        poll = window.setTimeout(start, 500);
+        poll = window.setTimeout(boot, 500);
         return false;
       }
       arena = new CatchArena(host, {
@@ -193,22 +198,7 @@ export default function TeamBuilder({ roster = [] }) {
       return true;
     };
 
-    /* The engine is heavy, so it only boots when the bay comes into view. */
-    if ("IntersectionObserver" in window) {
-      observer = new IntersectionObserver(
-        (entries) => {
-          if (entries.some((entry) => entry.isIntersecting)) {
-            observer?.disconnect();
-            observer = null;
-            start();
-          }
-        },
-        { rootMargin: "320px" },
-      );
-      observer.observe(host);
-    } else {
-      start();
-    }
+    boot();
 
     /* Once it is awake the arena still parks its render loop whenever the
        panel scrolls away, so reading the dex does not keep the GPU busy. */
@@ -220,13 +210,12 @@ export default function TeamBuilder({ roster = [] }) {
     }
 
     return () => {
-      observer?.disconnect();
       parker?.disconnect();
       window.clearTimeout(poll);
       arena?.destroy();
       arenaRef.current = null;
     };
-  }, []);
+  }, [started]);
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -348,7 +337,7 @@ export default function TeamBuilder({ roster = [] }) {
           </header>
 
           <div className="team-stage" ref={stageRef}>
-            {!complete && (
+            {started && !complete && (
               <div className="team-hud">
                 <span
                   className="team-hud__balls"
@@ -392,6 +381,30 @@ export default function TeamBuilder({ roster = [] }) {
             >
               {announce ? state.message : ""}
             </p>
+
+            {!started && (
+              <div className="team-start">
+                <div className="team-start__plate">
+                  <p className="team-start__eyebrow">Field trial · 6 rounds</p>
+                  <p className="team-start__title">Catch 6</p>
+                  <p className="team-start__copy">
+                    Three balls a round. Swipe to where the creature will be.
+                    The field loads only when you press start.
+                  </p>
+                  <button
+                    type="button"
+                    className="team-start__button"
+                    onClick={() => {
+                      playSfx("click");
+                      setStarted(true);
+                    }}
+                  >
+                    <span className="team-start__arrow" aria-hidden="true">▶</span>
+                    Start
+                  </button>
+                </div>
+              </div>
+            )}
 
           </div>
 
