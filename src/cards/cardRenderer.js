@@ -262,7 +262,7 @@ function drawRarity(ctx, rarity, x, y) {
 import { backgroundFor } from "./backgrounds.js";
 import {
   themeFor, frameSpec, insideFrame, ringPixels, drawTypeIcon, drawRingSlot,
-  mixRgb, rgb, typeRamp,
+  mixRgb, rgb, typeRamp, mulberry32,
 } from "./theme.js";
 
 /* ---------- art window ---------- */
@@ -762,6 +762,106 @@ function drawFrameFusion(ctx, card, t, spec) {
   }
 }
 
+/* ---------- EX sparkles ----------
+   The EX sheet is printed on foil, so a handful of hard-pixel glints sit on the
+   plate: axis arms around a white core, no glow and no blur. They are placed
+   clear of the creature's own pixels, and each card rolls its own scatter. */
+
+const SPARKLE_CORE = "#fffdf2";
+const SPARKLE_SHADOW = "#0b0916";
+
+/* a glint is a hard plus around one white pixel; the dark diagonal corners are
+   what keep it legible over pale sky and bright sprite pixels */
+function drawSparkle(ctx, x, y, big, arm) {
+  if (!big) {
+    for (const [dx, dy] of [[-1, -1], [1, 1], [-1, 1], [1, -1]]) px(ctx, x + dx, y + dy, SPARKLE_SHADOW);
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) px(ctx, x + dx, y + dy, arm);
+    px(ctx, x, y, SPARKLE_CORE);
+    return;
+  }
+  /* four-point burst: two pixels up each arm plus the diagonal ribs */
+  for (const [dx, dy] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) {
+    px(ctx, x + dx + (dy === 0 ? Math.sign(dx) : 0), y + dy + (dx === 0 ? Math.sign(dy) : 0), SPARKLE_SHADOW);
+  }
+  for (const [dx, dy] of [[-1, -1], [1, 1], [-1, 1], [1, -1]]) px(ctx, x + dx * 2, y + dy * 2, SPARKLE_SHADOW);
+  for (const [dx, dy] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) px(ctx, x + dx, y + dy, arm);
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) px(ctx, x + dx, y + dy, arm);
+  for (const [dx, dy] of [[-1, -1], [1, 1], [-1, 1], [1, -1]]) px(ctx, x + dx, y + dy, arm);
+  px(ctx, x, y, SPARKLE_CORE);
+}
+
+/* does the sprite itself have ink here? a glint behind the creature is wasted */
+function spriteInkAt(place, x, y, r) {
+  const sp = place && place.sprite;
+  if (!sp) return false;
+  if (x + r < place.x || x - r >= place.x + place.w || y + r < place.y || y - r >= place.y + place.h) {
+    return false;
+  }
+  let alpha = sp.__alpha;
+  if (alpha === undefined) {
+    try {
+      alpha = sp.getContext("2d").getImageData(0, 0, sp.width, sp.height);
+    } catch {
+      alpha = null; /* a tainted canvas cannot be read: treat its box as solid */
+    }
+    sp.__alpha = alpha;
+  }
+  if (!alpha) return true;
+  const sx = sp.width / place.w;
+  const sy = sp.height / place.h;
+  const x0 = Math.max(0, Math.floor((x - r - place.x) * sx));
+  const x1 = Math.min(sp.width - 1, Math.ceil((x + r - place.x) * sx));
+  const y0 = Math.max(0, Math.floor((y - r - place.y) * sy));
+  const y1 = Math.min(sp.height - 1, Math.ceil((y + r - place.y) * sy));
+  for (let py = y0; py <= y1; py += 1) {
+    for (let pxx = x0; pxx <= x1; pxx += 1) {
+      if (alpha.data[(py * sp.width + pxx) * 4 + 3] > 24) return true;
+    }
+  }
+  return false;
+}
+
+function drawExSparkles(ctx, card, t, spec, place) {
+  const rnd = mulberry32((card.id * 3571 + 977) >>> 0);
+  const arms = [
+    rgb(t.accent),
+    rgb(mixRgb(t.accent, [255, 255, 255], 0.6)),
+    rgb(mixRgb(t.lineHi, [255, 255, 255], 0.4)),
+  ];
+  let n = 0;
+  const nextArm = () => arms[n++ % arms.length];
+
+  /* three glints ride the gold rail itself */
+  const rail = [];
+  ringPixels(4, spec, (x, y) => rail.push([x, y]));
+  const railPicked = [];
+  for (let tries = 0; tries < 40 && railPicked.length < 3 && rail.length; tries += 1) {
+    const [x, y] = rail[Math.floor(rnd() * rail.length)];
+    /* keep them off the corners, where the brackets and gems already sit */
+    if (x < 14 || x > CARD_W - 15 || y < 14 || y > CARD_H - 15) continue;
+    if (railPicked.some((p) => Math.abs(p[0] - x) < 40)) continue;
+    railPicked.push([x, y]);
+    drawSparkle(ctx, x, y, rnd() < 0.5, nextArm());
+  }
+
+  /* and a scatter inside the art, wherever the creature is not */
+  const art = { x0: LAYOUT.interior.x + 4, y0: LAYOUT.interior.y + 4, x1: LAYOUT.interior.x + LAYOUT.interior.w - 5, y1: LAYOUT.interior.y + LAYOUT.interior.h - 5 };
+  const used = [];
+  let drawn = 0;
+  for (let tries = 0; tries < 220 && drawn < 13; tries += 1) {
+    const big = rnd() < 0.34;
+    const r = big ? 2 : 1;
+    const x = Math.round(art.x0 + r * 2 + rnd() * (art.x1 - art.x0 - r * 3));
+    const y = Math.round(art.y0 + r * 2 + rnd() * (art.y1 - art.y0 - r * 3));
+    if (x - r < art.x0 || x + r > art.x1 || y - r < art.y0 || y + r > art.y1) continue;
+    if (used.some((u) => Math.abs(u[0] - x) < 10 && Math.abs(u[1] - y) < 10)) continue;
+    if (spriteInkAt(place, x, y, r + 1)) continue;
+    used.push([x, y]);
+    drawSparkle(ctx, x, y, big, nextArm());
+    drawn += 1;
+  }
+}
+
 function drawFrameEx(ctx, card, t, spec) {
   const hiAt = (x, y) => rgb(t.frameInk(x, y));
   const lo = rgb(t.lineLo);
@@ -1165,6 +1265,8 @@ export function renderCard(card, sprite, options = {}) {
   }
 
   drawBorder(ctx, card, t, spec);
+  /* the EX foil carries glints over the plate, never over the creature */
+  if (tier === "ex" && !options.omitArt) drawExSparkles(ctx, card, t, spec, place);
   if (lint) {
     lintDraw("headerA", 10, 7, 138, 14, () => {});
     lintDraw("headerB", 10, 22, 138, 14, () => {});
